@@ -1,6 +1,9 @@
-//! Wrapper around the regelrecht engine: builds a fresh `LawExecutionService`
-//! per evaluation (the service is not Sync; construction from cached YAML is
-//! cheap) and exposes the two evaluations the orchestration layer needs.
+//! Wrapper around the regelrecht engine.
+//!
+//! De wet rekent per aanspraak (artikel 8 landelijk, artikel 12 decentraal);
+//! de orchestratielaag voert de wet per component uit en telt de bedragen
+//! op tot één beschikking. Die som is bewust orchestratie en geen wet: de
+//! engine kent geen aggregatie over collecties (RFC-012).
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -8,16 +11,16 @@ use std::sync::Arc;
 use regelrecht_engine::{LawExecutionService, Value};
 use serde::Serialize;
 
+use crate::db::{Component, ComponentUitkomst};
 use crate::state::LawCorpus;
 
 pub const WPP_ID: &str = "wet_op_de_politieke_partijen";
 pub const AWB_ID: &str = "algemene_wet_bestuursrecht";
 pub const ATW_ID: &str = "algemene_termijnenwet";
 
-/// Outcome of the besluit evaluation, including reactive hook outputs and
-/// the intermediate checks used for the motivering.
+/// Uitkomst van een samengestelde jaaraanvraag.
 #[derive(Debug, Clone, Serialize)]
-pub struct BesluitUitkomst {
+pub struct JaaruitkomstUitkomst {
     pub subsidie_toegekend: bool,
     pub subsidiebedrag: i64,
     pub betaalopdracht_vereist: bool,
@@ -25,10 +28,7 @@ pub struct BesluitUitkomst {
     pub bezwaartermijn_weken: i64,
     pub motivering_vereist: bool,
     pub voldoet_aan_transparantie: bool,
-    pub heeft_recht_landelijk: bool,
-    pub heeft_recht_decentraal: bool,
-    /// All raw outputs (incl. provenance-bearing hook outputs), JSON-encoded.
-    pub outputs: serde_json::Value,
+    pub componenten: Vec<ComponentUitkomst>,
     pub motivering: String,
 }
 
@@ -72,7 +72,6 @@ fn euro(cents: i64) -> String {
     let cents = cents.abs();
     let whole = cents / 100;
     let rest = cents % 100;
-    // Dutch thousands separator
     let mut s = whole.to_string();
     let mut grouped = String::new();
     while s.len() > 3 {
@@ -83,152 +82,216 @@ fn euro(cents: i64) -> String {
     format!("{sign}€ {s}{grouped},{rest:02}")
 }
 
-fn build_motivering(
-    params: &BTreeMap<String, Value>,
-    toegekend: bool,
-    bedrag: i64,
-    voldoet_transparantie: bool,
-    niveau: &str,
-) -> String {
-    if toegekend {
-        let grondslag = if niveau == "LANDELIJK" {
-            "artikel 6 en 8 van de Wet op de politieke partijen (kamerzetels, ledental en de bij \
-             ministeriële regeling vastgestelde bedragen)"
-        } else {
-            "artikel 7 en 12 van de Wet op de politieke partijen (zetels in het decentrale \
-             orgaan en het bij ministeriële regeling vastgestelde bedrag per zetel)"
-        };
-        return format!(
-            "De aanvraag voldoet aan de transparantie-eisen van artikel 5 van de Wet op de \
-             politieke partijen. Op grond van {grondslag} wordt de subsidie vastgesteld op {}.",
-            euro(bedrag)
-        );
+/// Engine-parameters voor één component, gecombineerd met de eigen opgaven
+/// (ledental, transparantieverklaringen) die op rechtspersoonsniveau gelden.
+fn component_params(
+    component: &Component,
+    eigen: &serde_json::Map<String, serde_json::Value>,
+) -> BTreeMap<String, Value> {
+    let mut params: BTreeMap<String, Value> = BTreeMap::new();
+    for key in [
+        "ontvangt_anonieme_giften",
+        "ontvangt_giften_niet_ingezetenen",
+        "voldoet_aan_meldplicht_giften",
+        "financien_openbaar_op_website",
+    ] {
+        let waarde = eigen.get(key).and_then(|v| v.as_bool()).unwrap_or(false);
+        params.insert(key.to_string(), Value::Bool(waarde));
     }
+    let leden = eigen
+        .get("aantal_betalende_leden")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
 
-    let mut redenen: Vec<String> = Vec::new();
-    if !voldoet_transparantie {
-        if matches!(params.get("ontvangt_anonieme_giften"), Some(Value::Bool(true))) {
-            redenen.push(
-                "de partij ontvangt anonieme giften, hetgeen op grond van artikel 5 verboden is"
-                    .to_string(),
-            );
-        }
-        if matches!(
-            params.get("ontvangt_giften_niet_ingezetenen"),
-            Some(Value::Bool(true))
-        ) {
-            redenen.push(
-                "de partij ontvangt giften van niet-ingezetenen, hetgeen op grond van artikel 5 \
-                 verboden is"
-                    .to_string(),
-            );
-        }
-        if matches!(
-            params.get("voldoet_aan_meldplicht_giften"),
-            Some(Value::Bool(false))
-        ) {
-            redenen.push(
-                "de partij voldoet niet aan de meldplicht voor giften van € 10.000 of meer \
-                 (artikel 5)"
-                    .to_string(),
-            );
-        }
-        if matches!(
-            params.get("financien_openbaar_op_website"),
-            Some(Value::Bool(false))
-        ) {
-            redenen.push(
-                "de partij maakt haar financiën niet openbaar op haar website (artikel 5)"
-                    .to_string(),
-            );
-        }
-    }
-    if niveau == "LANDELIJK" {
-        if as_int(params, "aantal_kamerzetels") < 1 {
-            redenen.push(
-                "de partij heeft geen zetel in de Eerste of Tweede Kamer (artikel 6)".to_string(),
-            );
-        }
-        if as_int(params, "aantal_betalende_leden") < 1000 {
-            redenen.push(
-                "de partij heeft minder dan duizend betalende leden (artikel 6)".to_string(),
-            );
-        }
-    } else if as_int(params, "aantal_raadszetels") < 1 {
-        redenen.push(
-            "aan de partij is bij de laatstgehouden verkiezing van het decentrale orgaan geen \
-             zetel toegewezen (artikel 7)"
-                .to_string(),
+    if component.soort == "LANDELIJK" {
+        params.insert("niveau".into(), Value::String("LANDELIJK".into()));
+        params.insert("orgaan".into(), Value::String("GEMEENTERAAD".into()));
+        params.insert("aantal_kamerzetels".into(), Value::Int(component.zetels));
+        params.insert("aantal_betalende_leden".into(), Value::Int(leden));
+        params.insert("aantal_raadszetels".into(), Value::Int(0));
+        params.insert("inwoneraantal_gemeente".into(), Value::Int(0));
+    } else {
+        params.insert("niveau".into(), Value::String("DECENTRAAL".into()));
+        params.insert(
+            "orgaan".into(),
+            Value::String(component.orgaan.clone().unwrap_or_else(|| "GEMEENTERAAD".into())),
         );
+        params.insert("aantal_raadszetels".into(), Value::Int(component.zetels));
+        params.insert(
+            "inwoneraantal_gemeente".into(),
+            Value::Int(component.inwoneraantal),
+        );
+        params.insert("aantal_kamerzetels".into(), Value::Int(0));
+        params.insert("aantal_betalende_leden".into(), Value::Int(0));
     }
-    if redenen.is_empty() {
-        redenen.push("de aanvraag voldoet niet aan de wettelijke voorwaarden".to_string());
-    }
-    format!(
-        "De aanvraag wordt afgewezen omdat {}.",
-        redenen.join("; en omdat ")
-    )
+    params
 }
 
-/// Evaluate the subsidiebesluit for the given application parameters.
-///
-/// Runs two evaluations: the intermediate checks (art. 5/6/7) for the
-/// motivering, and the besluit itself (art. 15) which reactively fires the
-/// betaalopdracht hook (art. 16) and the AWB hooks (3:46, 6:7).
-pub async fn evaluate_besluit(
+fn orgaan_label(component: &Component) -> String {
+    match component.soort.as_str() {
+        "LANDELIJK" => "landelijk".to_string(),
+        _ => match component.orgaan.as_deref() {
+            Some("PROVINCIALE_STATEN") => {
+                format!("provinciale staten {}", component.gebied.as_deref().unwrap_or("?"))
+            }
+            Some("WATERSCHAP") => {
+                format!("waterschap {}", component.gebied.as_deref().unwrap_or("?"))
+            }
+            _ => format!("gemeenteraad {}", component.gebied.as_deref().unwrap_or("?")),
+        },
+    }
+}
+
+fn build_motivering(
+    eigen: &serde_json::Map<String, serde_json::Value>,
+    voldoet_transparantie: bool,
+    uitkomsten: &[ComponentUitkomst],
+    totaal: i64,
+) -> String {
+    let toegekend: Vec<_> = uitkomsten.iter().filter(|u| u.toegekend).collect();
+    let afgewezen: Vec<_> = uitkomsten.iter().filter(|u| !u.toegekend).collect();
+
+    let mut delen: Vec<String> = Vec::new();
+
+    if !voldoet_transparantie {
+        let mut redenen = Vec::new();
+        let b = |k: &str| eigen.get(k).and_then(|v| v.as_bool());
+        if b("ontvangt_anonieme_giften") == Some(true) {
+            redenen.push("de partij ontvangt anonieme giften");
+        }
+        if b("ontvangt_giften_niet_ingezetenen") == Some(true) {
+            redenen.push("de partij ontvangt giften van niet-ingezetenen");
+        }
+        if b("voldoet_aan_meldplicht_giften") == Some(false) {
+            redenen.push("de partij voldoet niet aan de meldplicht voor giften van € 10.000 of meer");
+        }
+        if b("financien_openbaar_op_website") == Some(false) {
+            redenen.push("de partij maakt haar financiën niet openbaar op haar website");
+        }
+        delen.push(format!(
+            "De aanvraag wordt afgewezen omdat niet aan de transparantie-eisen van artikel 5 \
+             van de Wet op de politieke partijen is voldaan: {}.",
+            redenen.join("; ")
+        ));
+        return delen.join(" ");
+    }
+
+    delen.push(
+        "De aanvraag voldoet aan de transparantie-eisen van artikel 5 van de Wet op de \
+         politieke partijen."
+            .to_string(),
+    );
+
+    if !toegekend.is_empty() {
+        delen.push(format!(
+            "Op grond van de artikelen 6 tot en met 12 wordt de subsidie vastgesteld op {} \
+             voor {} onderdelen, overeenkomstig de specificatie bij dit besluit.",
+            euro(totaal),
+            toegekend.len()
+        ));
+    }
+    for u in &afgewezen {
+        if u.component.soort == "LANDELIJK" {
+            let leden = eigen
+                .get("aantal_betalende_leden")
+                .and_then(|v| v.as_i64())
+                .unwrap_or(0);
+            let reden = if u.component.zetels < 1 {
+                "de partij heeft geen zetel in de Eerste of Tweede Kamer"
+            } else if leden < 1000 {
+                "de partij heeft minder dan duizend betalende leden"
+            } else {
+                "niet aan de voorwaarden van artikel 6 is voldaan"
+            };
+            delen.push(format!(
+                "Het landelijke onderdeel wordt afgewezen omdat {reden} (artikel 6)."
+            ));
+        } else {
+            delen.push(format!(
+                "Het onderdeel {} wordt afgewezen omdat daar geen zetel is toegewezen (artikel 7).",
+                orgaan_label(&u.component)
+            ));
+        }
+    }
+    if toegekend.is_empty() && afgewezen.is_empty() {
+        delen.push("De aanvraag bevat geen onderdelen.".to_string());
+    }
+    delen.join(" ")
+}
+
+/// Voer de wet uit voor elke component van een jaaraanvraag en stel het
+/// samengestelde besluit op.
+pub async fn evaluate_jaaraanvraag(
     corpus: Arc<LawCorpus>,
-    params: BTreeMap<String, Value>,
+    componenten: Vec<Component>,
+    eigen: serde_json::Map<String, serde_json::Value>,
     date: String,
-) -> anyhow::Result<BesluitUitkomst> {
+) -> anyhow::Result<JaaruitkomstUitkomst> {
     tokio::task::spawn_blocking(move || {
         let service = service_with_corpus(&corpus)?;
 
-        let checks = service
-            .evaluate_law(
-                WPP_ID,
-                &[
-                    "voldoet_aan_transparantie",
-                    "heeft_recht_landelijk",
-                    "heeft_recht_decentraal",
-                ],
-                params.clone(),
-                &date,
-            )
-            .map_err(|e| anyhow::anyhow!("toetsing voorwaarden mislukt: {e}"))?;
+        let mut uitkomsten: Vec<ComponentUitkomst> = Vec::new();
+        let mut totaal: i64 = 0;
+        let mut betaal_totaal: i64 = 0;
+        let mut bezwaartermijn_weken = 0;
+        let mut motivering_vereist = false;
+        let mut voldoet_transparantie = true;
 
-        // Request only the besluit-article's direct outputs; hook outputs
-        // (betaalopdracht, bezwaartermijn, motivering) arrive reactively.
-        let besluit = service
-            .evaluate_law(
-                WPP_ID,
-                &["subsidie_toegekend", "subsidiebedrag"],
-                params.clone(),
-                &date,
-            )
-            .map_err(|e| anyhow::anyhow!("subsidiebesluit berekenen mislukt: {e}"))?;
+        for component in &componenten {
+            let params = component_params(component, &eigen);
+            let result = service
+                .evaluate_law(
+                    WPP_ID,
+                    &["subsidie_toegekend", "subsidiebedrag"],
+                    params.clone(),
+                    &date,
+                )
+                .map_err(|e| {
+                    anyhow::anyhow!(
+                        "berekening onderdeel {} mislukt: {e}",
+                        component.key
+                    )
+                })?;
 
-        let toegekend = as_bool(&besluit.outputs, "subsidie_toegekend");
-        let bedrag = as_int(&besluit.outputs, "subsidiebedrag");
-        let voldoet_transparantie = as_bool(&checks.outputs, "voldoet_aan_transparantie");
-        let niveau = match params.get("niveau") {
-            Some(Value::String(s)) => s.clone(),
-            _ => "LANDELIJK".to_string(),
-        };
+            let toegekend = as_bool(&result.outputs, "subsidie_toegekend");
+            let bedrag = as_int(&result.outputs, "subsidiebedrag");
+            totaal += bedrag;
+            betaal_totaal += as_int(&result.outputs, "betaalopdracht_bedrag");
+            bezwaartermijn_weken = as_int(&result.outputs, "bezwaartermijn_weken");
+            motivering_vereist |= as_bool(&result.outputs, "motivering_vereist");
 
-        let motivering =
-            build_motivering(&params, toegekend, bedrag, voldoet_transparantie, &niveau);
+            uitkomsten.push(ComponentUitkomst {
+                component: component.clone(),
+                toegekend,
+                bedrag,
+            });
+        }
 
-        Ok(BesluitUitkomst {
+        // Transparantie geldt op rechtspersoonsniveau; één toets volstaat.
+        if let Some(component) = componenten.first() {
+            let checks = service
+                .evaluate_law(
+                    WPP_ID,
+                    &["voldoet_aan_transparantie"],
+                    component_params(component, &eigen),
+                    &date,
+                )
+                .map_err(|e| anyhow::anyhow!("toetsing transparantie mislukt: {e}"))?;
+            voldoet_transparantie = as_bool(&checks.outputs, "voldoet_aan_transparantie");
+        }
+
+        let toegekend = uitkomsten.iter().any(|u| u.toegekend);
+        let motivering = build_motivering(&eigen, voldoet_transparantie, &uitkomsten, totaal);
+
+        Ok(JaaruitkomstUitkomst {
             subsidie_toegekend: toegekend,
-            subsidiebedrag: bedrag,
-            betaalopdracht_vereist: as_bool(&besluit.outputs, "betaalopdracht_vereist"),
-            betaalopdracht_bedrag: as_int(&besluit.outputs, "betaalopdracht_bedrag"),
-            bezwaartermijn_weken: as_int(&besluit.outputs, "bezwaartermijn_weken"),
-            motivering_vereist: as_bool(&besluit.outputs, "motivering_vereist"),
+            subsidiebedrag: totaal,
+            betaalopdracht_vereist: betaal_totaal > 0,
+            betaalopdracht_bedrag: betaal_totaal,
+            bezwaartermijn_weken,
+            motivering_vereist,
             voldoet_aan_transparantie: voldoet_transparantie,
-            heeft_recht_landelijk: as_bool(&checks.outputs, "heeft_recht_landelijk"),
-            heeft_recht_decentraal: as_bool(&checks.outputs, "heeft_recht_decentraal"),
-            outputs: serde_json::to_value(&besluit.outputs)?,
+            componenten: uitkomsten,
             motivering,
         })
     })
@@ -236,8 +299,7 @@ pub async fn evaluate_besluit(
 }
 
 /// Compute the bezwaartermijn dates after bekendmaking (AWB 6:8), with the
-/// weekend extension from the Algemene termijnenwet (art. 1) applied to the
-/// einddatum. The orchestration layer chains the two laws, conform RFC-008.
+/// weekend extension from the Algemene termijnenwet (art. 1).
 pub async fn evaluate_bezwaartermijn(
     corpus: Arc<LawCorpus>,
     bekendmaking_datum: String,
@@ -265,7 +327,6 @@ pub async fn evaluate_bezwaartermijn(
         };
         let einddatum = as_date(&result.outputs, "bezwaartermijn_einddatum");
 
-        // Algemene termijnenwet art. 1: einde op za/zo schuift naar maandag.
         let mut atw_params = BTreeMap::new();
         atw_params.insert("einddatum".to_string(), Value::String(einddatum.clone()));
         let verlengd = service
@@ -283,14 +344,4 @@ pub async fn evaluate_bezwaartermijn(
         })
     })
     .await?
-}
-
-/// Convert JSON parameters (as stored/submitted) to engine values.
-pub fn json_params_to_engine(
-    params: &serde_json::Map<String, serde_json::Value>,
-) -> BTreeMap<String, Value> {
-    params
-        .iter()
-        .map(|(k, v)| (k.clone(), Value::from(v)))
-        .collect()
 }

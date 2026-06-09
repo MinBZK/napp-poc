@@ -1,9 +1,12 @@
 //! SQLite persistence: aanvragen, besluiten, betaalopdrachten.
 //!
-//! The besluit-state follows RFC-008: the engine stays stateless per stage;
-//! this layer persists the accumulated outputs and the current stage.
+//! Het aanvraagmodel volgt de rechtspersoon (Wpp art. 27): één samengestelde
+//! jaaraanvraag per partij per subsidiejaar, met componenten (landelijk en
+//! per decentraal orgaan/gebied). Het besluit is één beschikking met een
+//! specificatie per component en één totaalbedrag. De engine blijft
+//! stateless (RFC-008); deze laag persisteert de besluit-state.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sqlx::{Row, SqlitePool};
 
 pub async fn init(pool: &SqlitePool) -> anyhow::Result<()> {
@@ -13,8 +16,8 @@ pub async fn init(pool: &SqlitePool) -> anyhow::Result<()> {
             id TEXT PRIMARY KEY,
             kvk_nummer TEXT NOT NULL,
             partij_naam TEXT NOT NULL,
-            niveau TEXT NOT NULL,
-            gemeente TEXT,
+            subsidiejaar INTEGER NOT NULL,
+            componenten TEXT NOT NULL,
             parameters TEXT NOT NULL,
             status TEXT NOT NULL DEFAULT 'BEHANDELING',
             aanvraag_datum TEXT NOT NULL,
@@ -26,7 +29,7 @@ pub async fn init(pool: &SqlitePool) -> anyhow::Result<()> {
             aanvraag_id TEXT NOT NULL UNIQUE REFERENCES aanvragen(id),
             subsidie_toegekend INTEGER NOT NULL,
             subsidiebedrag INTEGER NOT NULL,
-            outputs TEXT NOT NULL,
+            componenten TEXT NOT NULL,
             motivering TEXT NOT NULL,
             besluit_datum TEXT NOT NULL,
             bekendmaking_datum TEXT,
@@ -50,13 +53,42 @@ pub async fn init(pool: &SqlitePool) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Eén aanspraak binnen een aanvraag: de landelijke component of een
+/// decentraal orgaan/gebied. De gegevens komen uit het partijregister en
+/// worden bij indiening bevroren (zoals een beschikking hoort te doen).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Component {
+    /// "LANDELIJK" of "{orgaan}:{gebied_code}"
+    pub key: String,
+    pub soort: String, // LANDELIJK | DECENTRAAL
+    #[serde(default)]
+    pub orgaan: Option<String>,
+    #[serde(default)]
+    pub gebied_code: Option<String>,
+    #[serde(default)]
+    pub gebied: Option<String>,
+    /// Kamerzetels (landelijk) of zetels in het orgaan (decentraal).
+    pub zetels: i64,
+    #[serde(default)]
+    pub inwoneraantal: i64,
+}
+
+/// Uitkomst per component, vastgelegd in het besluit.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ComponentUitkomst {
+    #[serde(flatten)]
+    pub component: Component,
+    pub toegekend: bool,
+    pub bedrag: i64,
+}
+
 #[derive(Debug, Serialize)]
 pub struct Aanvraag {
     pub id: String,
     pub kvk_nummer: String,
     pub partij_naam: String,
-    pub niveau: String,
-    pub gemeente: Option<String>,
+    pub subsidiejaar: i64,
+    pub componenten: Vec<Component>,
     pub parameters: serde_json::Value,
     pub status: String,
     pub aanvraag_datum: String,
@@ -69,7 +101,7 @@ pub struct Besluit {
     pub aanvraag_id: String,
     pub subsidie_toegekend: bool,
     pub subsidiebedrag: i64,
-    pub outputs: serde_json::Value,
+    pub componenten: Vec<ComponentUitkomst>,
     pub motivering: String,
     pub besluit_datum: String,
     pub bekendmaking_datum: Option<String>,
@@ -93,8 +125,9 @@ fn row_to_aanvraag(row: &sqlx::sqlite::SqliteRow) -> Aanvraag {
         id: row.get("id"),
         kvk_nummer: row.get("kvk_nummer"),
         partij_naam: row.get("partij_naam"),
-        niveau: row.get("niveau"),
-        gemeente: row.get("gemeente"),
+        subsidiejaar: row.get("subsidiejaar"),
+        componenten: serde_json::from_str(row.get::<String, _>("componenten").as_str())
+            .unwrap_or_default(),
         parameters: serde_json::from_str(row.get::<String, _>("parameters").as_str())
             .unwrap_or(serde_json::Value::Null),
         status: row.get("status"),
@@ -109,8 +142,8 @@ fn row_to_besluit(row: &sqlx::sqlite::SqliteRow) -> Besluit {
         aanvraag_id: row.get("aanvraag_id"),
         subsidie_toegekend: row.get::<i64, _>("subsidie_toegekend") != 0,
         subsidiebedrag: row.get("subsidiebedrag"),
-        outputs: serde_json::from_str(row.get::<String, _>("outputs").as_str())
-            .unwrap_or(serde_json::Value::Null),
+        componenten: serde_json::from_str(row.get::<String, _>("componenten").as_str())
+            .unwrap_or_default(),
         motivering: row.get("motivering"),
         besluit_datum: row.get("besluit_datum"),
         bekendmaking_datum: row.get("bekendmaking_datum"),
@@ -126,20 +159,20 @@ pub async fn insert_aanvraag(
     id: &str,
     kvk_nummer: &str,
     partij_naam: &str,
-    niveau: &str,
-    gemeente: Option<&str>,
+    subsidiejaar: i64,
+    componenten_json: &str,
     parameters_json: &str,
     aanvraag_datum: &str,
 ) -> anyhow::Result<()> {
     sqlx::query(
-        "INSERT INTO aanvragen (id, kvk_nummer, partij_naam, niveau, gemeente, parameters, aanvraag_datum)
+        "INSERT INTO aanvragen (id, kvk_nummer, partij_naam, subsidiejaar, componenten, parameters, aanvraag_datum)
          VALUES (?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(id)
     .bind(kvk_nummer)
     .bind(partij_naam)
-    .bind(niveau)
-    .bind(gemeente)
+    .bind(subsidiejaar)
+    .bind(componenten_json)
     .bind(parameters_json)
     .bind(aanvraag_datum)
     .execute(pool)
@@ -175,11 +208,7 @@ pub async fn get_aanvraag(pool: &SqlitePool, id: &str) -> anyhow::Result<Option<
     Ok(row.as_ref().map(row_to_aanvraag))
 }
 
-pub async fn set_aanvraag_status(
-    pool: &SqlitePool,
-    id: &str,
-    status: &str,
-) -> anyhow::Result<()> {
+pub async fn set_aanvraag_status(pool: &SqlitePool, id: &str, status: &str) -> anyhow::Result<()> {
     sqlx::query("UPDATE aanvragen SET status = ?, updated_at = datetime('now') WHERE id = ?")
         .bind(status)
         .bind(id)
@@ -188,27 +217,70 @@ pub async fn set_aanvraag_status(
     Ok(())
 }
 
+/// Componentsleutels van deze partij die in het subsidiejaar al bezet zijn:
+/// in behandeling, of besloten met toekenning. Een afgewezen component mag
+/// opnieuw worden aangevraagd.
+pub async fn bezette_componenten(
+    pool: &SqlitePool,
+    kvk: &str,
+    subsidiejaar: i64,
+) -> anyhow::Result<std::collections::HashMap<String, String>> {
+    let rows = sqlx::query(
+        "SELECT a.id, a.componenten, a.status, b.componenten AS besluit_componenten
+         FROM aanvragen a LEFT JOIN besluiten b ON b.aanvraag_id = a.id
+         WHERE a.kvk_nummer = ? AND a.subsidiejaar = ?",
+    )
+    .bind(kvk)
+    .bind(subsidiejaar)
+    .fetch_all(pool)
+    .await?;
+
+    let mut bezet = std::collections::HashMap::new();
+    for row in rows {
+        let status: String = row.get("status");
+        if status == "BEHANDELING" {
+            let componenten: Vec<Component> =
+                serde_json::from_str(row.get::<String, _>("componenten").as_str())
+                    .unwrap_or_default();
+            for c in componenten {
+                bezet.insert(c.key, "IN_BEHANDELING".to_string());
+            }
+        } else if let Ok(uitkomsten) = serde_json::from_str::<Vec<ComponentUitkomst>>(
+            row.get::<Option<String>, _>("besluit_componenten")
+                .unwrap_or_default()
+                .as_str(),
+        ) {
+            for u in uitkomsten {
+                if u.toegekend {
+                    bezet.insert(u.component.key, "TOEGEKEND".to_string());
+                }
+            }
+        }
+    }
+    Ok(bezet)
+}
+
 #[allow(clippy::too_many_arguments)]
 pub async fn insert_besluit(
     pool: &SqlitePool,
     id: &str,
     aanvraag_id: &str,
     toegekend: bool,
-    bedrag: i64,
-    outputs_json: &str,
+    totaal: i64,
+    componenten_json: &str,
     motivering: &str,
     besluit_datum: &str,
     beoordelaar: &str,
 ) -> anyhow::Result<()> {
     sqlx::query(
-        "INSERT INTO besluiten (id, aanvraag_id, subsidie_toegekend, subsidiebedrag, outputs, motivering, besluit_datum, beoordelaar)
+        "INSERT INTO besluiten (id, aanvraag_id, subsidie_toegekend, subsidiebedrag, componenten, motivering, besluit_datum, beoordelaar)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(id)
     .bind(aanvraag_id)
     .bind(toegekend as i64)
-    .bind(bedrag)
-    .bind(outputs_json)
+    .bind(totaal)
+    .bind(componenten_json)
     .bind(motivering)
     .bind(besluit_datum)
     .bind(beoordelaar)
@@ -283,23 +355,24 @@ pub async fn list_betaalopdrachten(pool: &SqlitePool) -> anyhow::Result<Vec<Beta
         .collect())
 }
 
-/// Public register entry: only bekendgemaakte besluiten are listed.
+/// Openbaar register: alleen bekendgemaakte besluiten.
 #[derive(Debug, Serialize)]
 pub struct RegisterEntry {
     pub partij_naam: String,
-    pub niveau: String,
-    pub gemeente: Option<String>,
+    pub subsidiejaar: i64,
     pub subsidie_toegekend: bool,
     pub subsidiebedrag: i64,
+    pub aantal_componenten: i64,
     pub besluit_datum: String,
     pub bekendmaking_datum: String,
     pub bezwaartermijn_einddatum: Option<String>,
+    pub componenten: Vec<ComponentUitkomst>,
 }
 
 pub async fn list_register(pool: &SqlitePool) -> anyhow::Result<Vec<RegisterEntry>> {
     let rows = sqlx::query(
-        "SELECT a.partij_naam, a.niveau, a.gemeente, b.subsidie_toegekend, b.subsidiebedrag,
-                b.besluit_datum, b.bekendmaking_datum, b.bezwaartermijn_einddatum
+        "SELECT a.partij_naam, a.subsidiejaar, b.subsidie_toegekend, b.subsidiebedrag,
+                b.componenten, b.besluit_datum, b.bekendmaking_datum, b.bezwaartermijn_einddatum
          FROM besluiten b JOIN aanvragen a ON a.id = b.aanvraag_id
          WHERE b.bekendmaking_datum IS NOT NULL
          ORDER BY b.bekendmaking_datum DESC",
@@ -308,15 +381,21 @@ pub async fn list_register(pool: &SqlitePool) -> anyhow::Result<Vec<RegisterEntr
     .await?;
     Ok(rows
         .iter()
-        .map(|row| RegisterEntry {
-            partij_naam: row.get("partij_naam"),
-            niveau: row.get("niveau"),
-            gemeente: row.get("gemeente"),
-            subsidie_toegekend: row.get::<i64, _>("subsidie_toegekend") != 0,
-            subsidiebedrag: row.get("subsidiebedrag"),
-            besluit_datum: row.get("besluit_datum"),
-            bekendmaking_datum: row.get("bekendmaking_datum"),
-            bezwaartermijn_einddatum: row.get("bezwaartermijn_einddatum"),
+        .map(|row| {
+            let componenten: Vec<ComponentUitkomst> =
+                serde_json::from_str(row.get::<String, _>("componenten").as_str())
+                    .unwrap_or_default();
+            RegisterEntry {
+                partij_naam: row.get("partij_naam"),
+                subsidiejaar: row.get("subsidiejaar"),
+                subsidie_toegekend: row.get::<i64, _>("subsidie_toegekend") != 0,
+                subsidiebedrag: row.get("subsidiebedrag"),
+                aantal_componenten: componenten.len() as i64,
+                besluit_datum: row.get("besluit_datum"),
+                bekendmaking_datum: row.get("bekendmaking_datum"),
+                bezwaartermijn_einddatum: row.get("bezwaartermijn_einddatum"),
+                componenten,
+            }
         })
         .collect())
 }
@@ -328,15 +407,7 @@ pub struct Statistieken {
     pub aantal_toegekend: i64,
     pub aantal_afgewezen: i64,
     pub totaal_toegekend_bedrag: i64,
-    pub per_niveau: Vec<NiveauStat>,
     pub per_maand: Vec<MaandStat>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct NiveauStat {
-    pub niveau: String,
-    pub aantal: i64,
-    pub totaal_bedrag: i64,
 }
 
 #[derive(Debug, Serialize)]
@@ -363,14 +434,6 @@ pub async fn statistieken(pool: &SqlitePool) -> anyhow::Result<Statistieken> {
     .fetch_one(pool)
     .await?;
 
-    let niveau_rows = sqlx::query(
-        "SELECT a.niveau AS niveau, COUNT(*) AS aantal, COALESCE(SUM(b.subsidiebedrag), 0) AS totaal
-         FROM besluiten b JOIN aanvragen a ON a.id = b.aanvraag_id
-         WHERE b.subsidie_toegekend = 1 GROUP BY a.niveau",
-    )
-    .fetch_all(pool)
-    .await?;
-
     let maand_rows = sqlx::query(
         "SELECT strftime('%Y-%m', a.aanvraag_datum) AS maand,
                 COUNT(*) AS aantal,
@@ -387,14 +450,6 @@ pub async fn statistieken(pool: &SqlitePool) -> anyhow::Result<Statistieken> {
         aantal_toegekend,
         aantal_afgewezen: aantal_besluiten - aantal_toegekend,
         totaal_toegekend_bedrag,
-        per_niveau: niveau_rows
-            .iter()
-            .map(|r| NiveauStat {
-                niveau: r.get("niveau"),
-                aantal: r.get("aantal"),
-                totaal_bedrag: r.get("totaal"),
-            })
-            .collect(),
         per_maand: maand_rows
             .iter()
             .map(|r| MaandStat {

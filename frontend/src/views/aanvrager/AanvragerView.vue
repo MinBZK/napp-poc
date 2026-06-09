@@ -177,8 +177,8 @@ watch(() => session.aanvrager, laadAanvragen);
             @click="router.push(`/aanvraag/${item.aanvraag.id}`)"
           >
             <nldd-title-cell
-              :text="item.aanvraag.niveau === 'LANDELIJK' ? 'Landelijke subsidie' : 'Decentrale subsidie'"
-              :supporting-text="`Ingediend op ${datum(item.aanvraag.aanvraag_datum)}`"
+              :text="`Jaaraanvraag ${item.aanvraag.subsidiejaar}`"
+              :supporting-text="`${item.aanvraag.componenten.length} onderdelen · ingediend op ${datum(item.aanvraag.aanvraag_datum)}`"
             ></nldd-title-cell>
             <nldd-text-cell
               v-if="item.besluit"

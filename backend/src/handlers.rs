@@ -107,35 +107,91 @@ pub async fn eherkenning_login(
     })))
 }
 
-/// Registergegevens van de ingelogde partij: landelijke zetels (Kiesraad),
-/// decentrale uitslagen (Kiesraad) en gebieden met inwoneraantal (CBS).
-pub async fn mijn_registratie(session: Session) -> Result<Json<serde_json::Value>, ApiError> {
+/// Aanspraken van de ingelogde rechtspersoon volgens het partijregister,
+/// met per onderdeel de beschikbaarheid voor het subsidiejaar. De aanvraag
+/// volgt de rechtspersoon: een centraal georganiseerde partij ziet hier al
+/// haar landelijke en decentrale aanspraken; een afdeling met eigen
+/// rechtspersoon alleen de hare.
+pub async fn mijn_registratie(
+    State(state): State<AppState>,
+    session: Session,
+) -> Result<Json<serde_json::Value>, ApiError> {
     let Some(kvk) = session_kvk(&session).await else {
         return Err(forbidden());
     };
+    let jaar = chrono::Utc::now().format("%Y").to_string().parse::<i64>().unwrap_or(2026);
     let partij = crate::register::partij_by_kvk(&kvk);
-    let uitslagen: Vec<serde_json::Value> = partij
-        .map(|p| {
-            p.decentrale_uitslagen
-                .iter()
-                .map(|u| {
-                    let gebied = crate::register::gebied_by_code(&u.gebied_code);
-                    json!({
-                        "orgaan": u.orgaan,
-                        "gebied_code": u.gebied_code,
-                        "gebied": gebied.map(|g| g.naam.clone()),
-                        "zetels": u.zetels,
-                        "inwoneraantal": gebied.map(|g| g.inwoneraantal).unwrap_or(0),
-                    })
-                })
-                .collect()
+    let bezet = db::bezette_componenten(&state.pool, &kvk, jaar)
+        .await
+        .map_err(internal_error)?;
+
+    let componenten = aanspraken_voor(&kvk);
+    let aanspraken: Vec<serde_json::Value> = componenten
+        .iter()
+        .map(|c| {
+            let status = bezet
+                .get(&c.key)
+                .cloned()
+                .unwrap_or_else(|| "BESCHIKBAAR".to_string());
+            let mut v = serde_json::to_value(c).unwrap_or_default();
+            v["status"] = json!(status);
+            v
         })
-        .unwrap_or_default();
+        .collect();
+
     Ok(Json(json!({
-        "partij": partij.map(|p| json!({"naam": p.naam, "kamerzetels": p.kamerzetels})),
-        "decentrale_uitslagen": uitslagen,
-        "gebieden": crate::register::register().gebieden,
+        "partij": partij.map(|p| json!({
+            "naam": p.naam,
+            "kamerzetels": p.kamerzetels,
+            "organisatiemodel": p.organisatiemodel,
+        })),
+        "subsidiejaar": jaar,
+        "aanspraken": aanspraken,
     })))
+}
+
+/// Bouw de componenten (aanspraken) van een rechtspersoon uit het register.
+/// Een onbekende organisatie krijgt één landelijke component met nul zetels:
+/// de aanvraagroute blijft open (AWB 4:1), de wet wijst af.
+fn aanspraken_voor(kvk: &str) -> Vec<db::Component> {
+    let Some(partij) = crate::register::partij_by_kvk(kvk) else {
+        return vec![db::Component {
+            key: "LANDELIJK".into(),
+            soort: "LANDELIJK".into(),
+            orgaan: None,
+            gebied_code: None,
+            gebied: None,
+            zetels: 0,
+            inwoneraantal: 0,
+        }];
+    };
+    let mut componenten = Vec::new();
+    // Landelijke component alleen voor partijen met kamerzetels; een
+    // afdeling of lokale partij heeft die aanspraak niet.
+    if partij.kamerzetels > 0 || partij.decentrale_uitslagen.is_empty() {
+        componenten.push(db::Component {
+            key: "LANDELIJK".into(),
+            soort: "LANDELIJK".into(),
+            orgaan: None,
+            gebied_code: None,
+            gebied: None,
+            zetels: partij.kamerzetels,
+            inwoneraantal: 0,
+        });
+    }
+    for u in &partij.decentrale_uitslagen {
+        let gebied = crate::register::gebied_by_code(&u.gebied_code);
+        componenten.push(db::Component {
+            key: format!("{}:{}", u.orgaan, u.gebied_code),
+            soort: "DECENTRAAL".into(),
+            orgaan: Some(u.orgaan.clone()),
+            gebied_code: Some(u.gebied_code.clone()),
+            gebied: gebied.map(|g| g.naam.clone()),
+            zetels: u.zetels,
+            inwoneraantal: gebied.map(|g| g.inwoneraantal).unwrap_or(0),
+        });
+    }
+    componenten
 }
 
 /// Demo-voorbeelden voor de gemockte eHerkenning-login (alleen metadata).
@@ -207,10 +263,9 @@ pub async fn me(session: Session) -> Result<Json<serde_json::Value>, ApiError> {
 
 #[derive(Deserialize)]
 pub struct NieuweAanvraag {
-    pub niveau: String,
-    /// GEMEENTERAAD | PROVINCIALE_STATEN | WATERSCHAP (decentraal)
-    pub orgaan: Option<String>,
-    pub gemeente: Option<String>,
+    /// Sleutels van de aan te vragen onderdelen ("LANDELIJK" of "{orgaan}:{code}").
+    pub componenten: Vec<String>,
+    /// Eigen opgaven: aantal_betalende_leden en de vier transparantieverklaringen.
     pub parameters: serde_json::Map<String, serde_json::Value>,
 }
 
@@ -227,59 +282,41 @@ pub async fn create_aanvraag(
         .await
         .ok()
         .flatten()
-        .unwrap_or_else(|| "Onbekende partij".to_string());
+        .unwrap_or_else(|| "Onbekende organisatie".to_string());
+    let jaar = chrono::Utc::now().format("%Y").to_string().parse::<i64>().unwrap_or(2026);
 
-    if body.niveau != "LANDELIJK" && body.niveau != "DECENTRAAL" {
-        return Err(bad_request("Niveau moet LANDELIJK of DECENTRAAL zijn."));
+    if body.componenten.is_empty() {
+        return Err(bad_request("Kies ten minste één onderdeel om aan te vragen."));
     }
 
-    // Zetels en inwoneraantal komen uit de officiële bronnen (Kiesraad, CBS)
-    // via het partijregister — wat de client daarvoor instuurt wordt
-    // genegeerd. Alleen eigen opgaven (ledenaantal, verklaringen) komen uit
-    // het formulier. Onbekend in het register betekent nul zetels: de
-    // aanvraag mag worden ingediend, de wet wijst af.
-    let mut params = serde_json::Map::new();
-    params.insert("niveau".to_string(), json!(body.niveau));
-
-    if body.niveau == "LANDELIJK" {
-        params.insert("orgaan".to_string(), json!("GEMEENTERAAD"));
-        let kamerzetels = crate::register::partij_by_kvk(&kvk)
-            .map(|p| p.kamerzetels)
-            .unwrap_or(0);
-        params.insert("aantal_kamerzetels".to_string(), json!(kamerzetels));
-        let leden = body
-            .parameters
-            .get("aantal_betalende_leden")
-            .and_then(|v| v.as_i64())
-            .unwrap_or(0);
-        params.insert("aantal_betalende_leden".to_string(), json!(leden));
-        params.insert("aantal_raadszetels".to_string(), json!(0));
-        params.insert("inwoneraantal_gemeente".to_string(), json!(0));
-    } else {
-        let orgaan = body.orgaan.as_deref().unwrap_or("GEMEENTERAAD");
-        if !["GEMEENTERAAD", "PROVINCIALE_STATEN", "WATERSCHAP"].contains(&orgaan) {
-            return Err(bad_request("Onbekend decentraal orgaan."));
-        }
-        let Some(gebied_code) = body.gemeente.as_deref().filter(|g| !g.trim().is_empty()) else {
-            return Err(bad_request("Kies een gebied voor een decentrale aanvraag."));
+    // De componenten komen uit het register, nooit uit de client: de client
+    // stuurt alleen sleutels; gegevens (zetels, inwoneraantallen) worden hier
+    // bevroren op registerwaarden.
+    let beschikbaar = aanspraken_voor(&kvk);
+    let mut componenten: Vec<db::Component> = Vec::new();
+    for key in &body.componenten {
+        let Some(c) = beschikbaar.iter().find(|c| &c.key == key) else {
+            return Err(bad_request(&format!(
+                "Onderdeel '{key}' hoort niet bij uw registratie."
+            )));
         };
-        let Some(gebied) = crate::register::gebied_by_code(gebied_code) else {
-            return Err(bad_request("Onbekend gebied."));
-        };
-        if gebied.orgaan != orgaan {
-            return Err(bad_request("Gebied hoort niet bij het gekozen orgaan."));
-        }
-        params.insert("orgaan".to_string(), json!(orgaan));
-        let raadszetels = crate::register::uitslag_by_kvk_gebied(&kvk, gebied_code)
-            .map(|u| u.zetels)
-            .unwrap_or(0);
-        let inwoners = gebied.inwoneraantal;
-        params.insert("aantal_raadszetels".to_string(), json!(raadszetels));
-        params.insert("inwoneraantal_gemeente".to_string(), json!(inwoners));
-        params.insert("aantal_kamerzetels".to_string(), json!(0));
-        params.insert("aantal_betalende_leden".to_string(), json!(0));
+        componenten.push(c.clone());
     }
 
+    // Dubbeldetectie: onderdelen die dit jaar al lopen of zijn toegekend.
+    let bezet = db::bezette_componenten(&state.pool, &kvk, jaar)
+        .await
+        .map_err(internal_error)?;
+    if let Some(c) = componenten.iter().find(|c| bezet.contains_key(&c.key)) {
+        return Err(bad_request(&format!(
+            "Onderdeel '{}' is voor {jaar} al aangevraagd of toegekend.",
+            c.key
+        )));
+    }
+
+    // Eigen opgaven: verklaringen verplicht, ledental optioneel (alleen
+    // relevant voor de landelijke component).
+    let mut eigen = serde_json::Map::new();
     for key in [
         "ontvangt_anonieme_giften",
         "ontvangt_giften_niet_ingezetenen",
@@ -287,35 +324,33 @@ pub async fn create_aanvraag(
         "financien_openbaar_op_website",
     ] {
         let Some(waarde) = body.parameters.get(key).and_then(|v| v.as_bool()) else {
-            return Err(bad_request(&format!(
-                "Verplichte verklaring '{key}' ontbreekt."
-            )));
+            return Err(bad_request(&format!("Verplichte verklaring '{key}' ontbreekt.")));
         };
-        params.insert(key.to_string(), json!(waarde));
+        eigen.insert(key.to_string(), json!(waarde));
     }
+    let leden = body
+        .parameters
+        .get("aantal_betalende_leden")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
+    eigen.insert("aantal_betalende_leden".to_string(), json!(leden));
 
     let id = Uuid::new_v4().to_string();
     let vandaag = Utc::now().format("%Y-%m-%d").to_string();
-    let params_json = serde_json::to_string(&params).map_err(internal_error)?;
-    let gebied_naam = body
-        .gemeente
-        .as_deref()
-        .and_then(crate::register::gebied_by_code)
-        .map(|g| g.naam.clone());
     db::insert_aanvraag(
         &state.pool,
         &id,
         &kvk,
         &partij,
-        &body.niveau,
-        gebied_naam.as_deref(),
-        &params_json,
+        jaar,
+        &serde_json::to_string(&componenten).map_err(internal_error)?,
+        &serde_json::to_string(&eigen).map_err(internal_error)?,
         &vandaag,
     )
     .await
     .map_err(internal_error)?;
 
-    Ok(Json(json!({"id": id, "status": "BEHANDELING"})))
+    Ok(Json(json!({"id": id, "status": "BEHANDELING", "subsidiejaar": jaar})))
 }
 
 pub async fn list_aanvragen(
@@ -366,7 +401,7 @@ pub async fn get_aanvraag(
 // Beoordelen (beoordelaar)
 // ---------------------------------------------------------------------------
 
-/// Proefberekening: voer de wet uit zonder iets vast te leggen.
+/// Proefberekening: voer de wet per onderdeel uit zonder iets vast te leggen.
 pub async fn proefberekening(
     State(state): State<AppState>,
     session: Session,
@@ -382,9 +417,8 @@ pub async fn proefberekening(
     Ok(Json(serde_json::to_value(uitkomst).map_err(internal_error)?))
 }
 
-/// Besluit vaststellen: de engine bepaalt de uitkomst, de beoordelaar stelt
-/// het besluit vast. Bij toekenning ontstaat automatisch een betaalopdracht
-/// (de side-effect uit artikel 16 van de wet).
+/// Besluit vaststellen: de wet bepaalt per onderdeel; samen één beschikking.
+/// Bij toekenning ontstaat één betaalopdracht aan de rechtspersoon (art. 27).
 pub async fn stel_besluit_vast(
     State(state): State<AppState>,
     session: Session,
@@ -405,7 +439,6 @@ pub async fn stel_besluit_vast(
     let uitkomst = run_engine(&state, &aanvraag).await?;
     let besluit_id = Uuid::new_v4().to_string();
     let vandaag = Utc::now().format("%Y-%m-%d").to_string();
-    let outputs_json = serde_json::to_string(&uitkomst.outputs).map_err(internal_error)?;
 
     db::insert_besluit(
         &state.pool,
@@ -413,7 +446,7 @@ pub async fn stel_besluit_vast(
         &id,
         uitkomst.subsidie_toegekend,
         uitkomst.subsidiebedrag,
-        &outputs_json,
+        &serde_json::to_string(&uitkomst.componenten).map_err(internal_error)?,
         &uitkomst.motivering,
         &vandaag,
         &beoordelaar,
@@ -424,7 +457,7 @@ pub async fn stel_besluit_vast(
         .await
         .map_err(internal_error)?;
 
-    // Side-effect uit art. 16: betaalopdracht naar het (gemockte) betaalsysteem.
+    // Side-effect uit art. 16/27: één betaalopdracht aan de rechtspersoon.
     if uitkomst.betaalopdracht_vereist {
         let opdracht_id = Uuid::new_v4().to_string();
         db::insert_betaalopdracht(
@@ -447,6 +480,24 @@ pub async fn stel_besluit_vast(
         "besluit_id": besluit_id,
         "uitkomst": uitkomst,
     })))
+}
+
+async fn run_engine(
+    state: &AppState,
+    aanvraag: &db::Aanvraag,
+) -> Result<engine::JaaruitkomstUitkomst, ApiError> {
+    let serde_json::Value::Object(eigen) = aanvraag.parameters.clone() else {
+        return Err(internal_error("aanvraagparameters zijn geen object"));
+    };
+    let vandaag = Utc::now().format("%Y-%m-%d").to_string();
+    engine::evaluate_jaaraanvraag(
+        state.corpus.clone(),
+        aanvraag.componenten.clone(),
+        eigen,
+        vandaag,
+    )
+    .await
+    .map_err(internal_error)
 }
 
 /// Bekendmaking: het besluit wordt bekendgemaakt; de AWB (6:8) bepaalt de
@@ -495,20 +546,6 @@ pub async fn bekendmaking(
         "bezwaartermijn_startdatum": termijn.startdatum,
         "bezwaartermijn_einddatum": termijn.einddatum,
     })))
-}
-
-async fn run_engine(
-    state: &AppState,
-    aanvraag: &db::Aanvraag,
-) -> Result<engine::BesluitUitkomst, ApiError> {
-    let serde_json::Value::Object(params_map) = &aanvraag.parameters else {
-        return Err(internal_error("aanvraagparameters zijn geen object"));
-    };
-    let params = engine::json_params_to_engine(params_map);
-    let vandaag = Utc::now().format("%Y-%m-%d").to_string();
-    engine::evaluate_besluit(state.corpus.clone(), params, vandaag)
-        .await
-        .map_err(internal_error)
 }
 
 // ---------------------------------------------------------------------------

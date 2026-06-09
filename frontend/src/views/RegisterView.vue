@@ -81,7 +81,7 @@ onMounted(async () => {
 
       <nldd-table
         v-else
-        columns="minmax(200px,1.4fr) 120px minmax(120px,1fr) 130px 150px 170px"
+        columns="minmax(200px,1.4fr) 90px 120px 130px 160px 170px"
         sm-columns="minmax(160px,1fr) 130px"
         accessible-label="Openbaar register van subsidiebesluiten"
         empty-text="Nog geen bekendgemaakte besluiten"
@@ -89,16 +89,16 @@ onMounted(async () => {
       >
         <nldd-table-row slot="header">
           <nldd-text-cell text="Partij"></nldd-text-cell>
-          <nldd-text-cell text="Niveau" hide-below="md"></nldd-text-cell>
-          <nldd-text-cell text="Gemeente" hide-below="md"></nldd-text-cell>
+          <nldd-text-cell text="Jaar" hide-below="md"></nldd-text-cell>
+          <nldd-text-cell text="Onderdelen" horizontal-alignment="right" hide-below="md"></nldd-text-cell>
           <nldd-text-cell text="Besluit"></nldd-text-cell>
           <nldd-text-cell text="Bedrag" horizontal-alignment="right" hide-below="md"></nldd-text-cell>
           <nldd-text-cell text="Bekendgemaakt" hide-below="md"></nldd-text-cell>
         </nldd-table-row>
         <nldd-table-row v-for="(entry, i) in entries" :key="i">
           <nldd-text-cell :text="entry.partij_naam"></nldd-text-cell>
-          <nldd-text-cell :text="entry.niveau === 'LANDELIJK' ? 'Landelijk' : 'Decentraal'" hide-below="md"></nldd-text-cell>
-          <nldd-text-cell :text="entry.gemeente ?? '—'" color="secondary" hide-below="md"></nldd-text-cell>
+          <nldd-text-cell :text="String(entry.subsidiejaar)" hide-below="md"></nldd-text-cell>
+          <nldd-text-cell :text="String(entry.aantal_componenten)" horizontal-alignment="right" hide-below="md"></nldd-text-cell>
           <nldd-cell>
             <nldd-tag
               :color="entry.subsidie_toegekend ? 'success' : 'critical'"

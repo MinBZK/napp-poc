@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import PortalHeader from '../../components/PortalHeader.vue';
 import NBanner from '../../components/NBanner.vue';
@@ -11,6 +11,19 @@ const route = useRoute();
 const router = useRouter();
 const item = ref(null);
 const fout = ref('');
+
+const componenten = computed(() => item.value?.besluit?.componenten ?? []);
+const toegekendeComponenten = computed(() => componenten.value.filter((c) => c.toegekend));
+
+function componentLabel(c) {
+  if (c.soort === 'LANDELIJK') return 'Landelijke subsidie';
+  const orgaan = {
+    GEMEENTERAAD: 'Gemeenteraad',
+    PROVINCIALE_STATEN: 'Provinciale staten',
+    WATERSCHAP: 'Waterschap',
+  }[c.orgaan] ?? c.orgaan;
+  return `${orgaan} ${c.gebied ?? ''}`;
+}
 
 onMounted(async () => {
   try {
@@ -34,7 +47,7 @@ onMounted(async () => {
     </nldd-simple-section>
 
     <template v-else-if="item">
-      <nldd-simple-section width="720px">
+      <nldd-simple-section width="820px">
         <nldd-button
           variant="neutral-transparent"
           size="sm"
@@ -46,9 +59,7 @@ onMounted(async () => {
 
         <nldd-title size="2">
           <span slot="overline">{{ item.aanvraag.partij_naam }}</span>
-          <h2>
-            {{ item.aanvraag.niveau === 'LANDELIJK' ? 'Aanvraag landelijke subsidie' : 'Aanvraag decentrale subsidie' }}
-          </h2>
+          <h2>Jaaraanvraag {{ item.aanvraag.subsidiejaar }} · {{ item.aanvraag.componenten.length }} onderdelen</h2>
         </nldd-title>
         <nldd-spacer size="24"></nldd-spacer>
 
@@ -67,6 +78,37 @@ onMounted(async () => {
           supporting-text="De Napp toetst uw aanvraag aan de Wet op de politieke partijen."
         />
         <nldd-spacer size="32"></nldd-spacer>
+
+        <template v-if="item.besluit">
+          <nldd-title size="4"><h3>Specificatie per onderdeel</h3></nldd-title>
+          <nldd-spacer size="12"></nldd-spacer>
+          <nldd-table
+            columns="minmax(220px,1fr) 110px 120px 150px"
+            accessible-label="Specificatie van het besluit"
+          >
+            <nldd-table-row slot="header">
+              <nldd-text-cell text="Onderdeel"></nldd-text-cell>
+              <nldd-text-cell text="Zetels" horizontal-alignment="right"></nldd-text-cell>
+              <nldd-text-cell text="Besluit"></nldd-text-cell>
+              <nldd-text-cell text="Bedrag" horizontal-alignment="right"></nldd-text-cell>
+            </nldd-table-row>
+            <nldd-table-row v-for="c in componenten" :key="c.key">
+              <nldd-text-cell :text="componentLabel(c)"></nldd-text-cell>
+              <nldd-text-cell :text="String(c.zetels)" horizontal-alignment="right"></nldd-text-cell>
+              <nldd-cell>
+                <nldd-tag
+                  :color="c.toegekend ? 'success' : 'critical'"
+                  :text="c.toegekend ? 'Toegekend' : 'Afgewezen'"
+                ></nldd-tag>
+              </nldd-cell>
+              <nldd-text-cell
+                :text="c.toegekend ? euro(c.bedrag) : '—'"
+                horizontal-alignment="right"
+              ></nldd-text-cell>
+            </nldd-table-row>
+          </nldd-table>
+          <nldd-spacer size="32"></nldd-spacer>
+        </template>
 
         <nldd-title size="4"><h3>Verloop van uw aanvraag</h3></nldd-title>
         <nldd-spacer size="12"></nldd-spacer>

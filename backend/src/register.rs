@@ -22,8 +22,14 @@ use std::sync::OnceLock;
 pub struct Partij {
     pub kvk_nummer: String,
     pub naam: String,
+    /// CENTRAAL (afdelingen onder een KvK) of DECENTRAAL (afdelingen als
+    /// eigen rechtspersoon) — Wpp-organisatiemodellen.
+    #[serde(default)]
+    pub organisatiemodel: String,
     /// Zetels in Eerste + Tweede Kamer (bron: Kiesraad, TK2025).
     pub kamerzetels: i64,
+    #[serde(default)]
+    pub moederpartij_kvk: Option<String>,
     pub decentrale_uitslagen: Vec<Uitslag>,
 }
 

@@ -15,42 +15,10 @@ const uitkomst = ref(null);
 const fout = ref('');
 const bezig = ref(false);
 
-const params = computed(() => item.value?.aanvraag.parameters ?? {});
-
-const gegevens = computed(() => {
-  const p = params.value;
-  const a = item.value?.aanvraag;
-  if (!a) return [];
-  const rows = [
-    { label: 'Partij', waarde: a.partij_naam },
-    { label: 'KVK-nummer', waarde: a.kvk_nummer },
-    { label: 'Niveau', waarde: a.niveau === 'LANDELIJK' ? 'Landelijk' : 'Decentraal' },
-  ];
-  if (a.niveau === 'LANDELIJK') {
-    rows.push(
-      { label: 'Kamerzetels (EK + TK) · bron: Kiesraad', waarde: String(p.aantal_kamerzetels ?? 0) },
-      { label: 'Betalende leden · eigen opgave', waarde: String(p.aantal_betalende_leden ?? 0) },
-    );
-  } else {
-    const orgaanLabels = {
-      GEMEENTERAAD: 'Gemeenteraad',
-      PROVINCIALE_STATEN: 'Provinciale staten',
-      WATERSCHAP: 'Waterschap',
-    };
-    rows.push(
-      { label: 'Orgaan', waarde: orgaanLabels[p.orgaan] ?? p.orgaan ?? 'Onbekend' },
-      { label: 'Gebied', waarde: a.gemeente || 'Onbekend' },
-      { label: 'Zetels · bron: Kiesraad', waarde: String(p.aantal_raadszetels ?? 0) },
-    );
-    if (p.orgaan === 'GEMEENTERAAD') {
-      rows.push({ label: 'Inwoneraantal gemeente · bron: CBS', waarde: String(p.inwoneraantal_gemeente ?? 0) });
-    }
-  }
-  return rows;
-});
+const eigen = computed(() => item.value?.aanvraag.parameters ?? {});
 
 const verklaringen = computed(() => {
-  const p = params.value;
+  const p = eigen.value;
   return [
     { label: 'Geen anonieme giften', ok: p.ontvangt_anonieme_giften === false },
     { label: 'Geen giften van niet-ingezetenen', ok: p.ontvangt_giften_niet_ingezetenen === false },
@@ -58,6 +26,38 @@ const verklaringen = computed(() => {
     { label: 'Financiën openbaar op website', ok: p.financien_openbaar_op_website === true },
   ];
 });
+
+// De specificatie: uit het besluit (na vaststelling) of de proefberekening.
+const specificatie = computed(
+  () => item.value?.besluit?.componenten ?? uitkomst.value?.componenten ?? [],
+);
+
+const samenvattingPerGroep = computed(() => {
+  const groepen = new Map();
+  for (const c of specificatie.value) {
+    const naam = c.soort === 'LANDELIJK'
+      ? 'Landelijk'
+      : { GEMEENTERAAD: 'Gemeenteraden', PROVINCIALE_STATEN: 'Provinciale staten', WATERSCHAP: 'Waterschappen' }[c.orgaan] ?? c.orgaan;
+    const g = groepen.get(naam) ?? { naam, aantal: 0, toegekend: 0, bedrag: 0 };
+    g.aantal += 1;
+    if (c.toegekend) {
+      g.toegekend += 1;
+      g.bedrag += c.bedrag;
+    }
+    groepen.set(naam, g);
+  }
+  return [...groepen.values()];
+});
+
+function componentLabel(c) {
+  if (c.soort === 'LANDELIJK') return 'Landelijke subsidie';
+  const orgaan = {
+    GEMEENTERAAD: 'Gemeenteraad',
+    PROVINCIALE_STATEN: 'Provinciale staten',
+    WATERSCHAP: 'Waterschap',
+  }[c.orgaan] ?? c.orgaan;
+  return `${orgaan} ${c.gebied ?? ''}`;
+}
 
 async function laad() {
   try {
@@ -105,7 +105,7 @@ onMounted(laad);
     <PortalHeader
       slot="header"
       subtitle="Beoordelingsomgeving"
-      :items="[{ text: 'Werkvoorraad', to: '/' }, { text: 'Scenario\u2019s', to: '/scenarios' }]"
+      :items="[{ text: 'Werkvoorraad', to: '/' }, { text: 'Scenario’s', to: '/scenarios' }]"
     />
 
     <template v-if="item">
@@ -120,19 +120,23 @@ onMounted(laad);
         <nldd-spacer size="16"></nldd-spacer>
 
         <nldd-title size="2">
-          <span slot="overline">Beoordeling subsidieaanvraag</span>
+          <span slot="overline">Jaaraanvraag {{ item.aanvraag.subsidiejaar }} · KVK {{ item.aanvraag.kvk_nummer }}</span>
           <h2>{{ item.aanvraag.partij_naam }}</h2>
         </nldd-title>
         <nldd-spacer size="24"></nldd-spacer>
 
         <nldd-one-half-one-half-section padding-block="0">
           <div slot="left">
-            <nldd-title size="4"><h3>Aanvraaggegevens</h3></nldd-title>
+            <nldd-title size="4"><h3>Eigen opgaven</h3></nldd-title>
             <nldd-spacer size="12"></nldd-spacer>
             <nldd-list variant="box">
-              <nldd-list-item v-for="rij in gegevens" :key="rij.label" size="sm">
-                <nldd-text-cell :text="rij.label" color="secondary"></nldd-text-cell>
-                <nldd-text-cell :text="rij.waarde" horizontal-alignment="right"></nldd-text-cell>
+              <nldd-list-item size="sm">
+                <nldd-text-cell text="Onderdelen in deze aanvraag" color="secondary"></nldd-text-cell>
+                <nldd-text-cell :text="String(item.aanvraag.componenten.length)" horizontal-alignment="right"></nldd-text-cell>
+              </nldd-list-item>
+              <nldd-list-item size="sm">
+                <nldd-text-cell text="Betalende leden · eigen opgave" color="secondary"></nldd-text-cell>
+                <nldd-text-cell :text="String(eigen.aantal_betalende_leden ?? 0)" horizontal-alignment="right"></nldd-text-cell>
               </nldd-list-item>
             </nldd-list>
             <nldd-spacer size="24"></nldd-spacer>
@@ -150,85 +154,11 @@ onMounted(laad);
                 <nldd-text-cell :text="v.label"></nldd-text-cell>
               </nldd-list-item>
             </nldd-list>
-          </div>
 
-          <div slot="right">
-            <!-- Nog te besluiten: proefberekening + vaststellen -->
-            <template v-if="item.aanvraag.status === 'BEHANDELING' && uitkomst">
-              <nldd-title size="4"><h3>Uitkomst volgens de wet</h3></nldd-title>
-              <nldd-spacer size="12"></nldd-spacer>
-              <NBanner
-                :variant="uitkomst.subsidie_toegekend ? 'success' : 'critical'"
-                :text="uitkomst.subsidie_toegekend
-                  ? `Toekenning: ${euro(uitkomst.subsidiebedrag)}`
-                  : 'Afwijzing'"
-                :supporting-text="uitkomst.motivering"
-              />
-              <nldd-spacer size="16"></nldd-spacer>
-              <nldd-box>
-                <nldd-container padding="16" gap="4">
-                  <nldd-list variant="simple">
-                    <nldd-list-item size="sm">
-                      <nldd-icon-cell
-                        :icon="uitkomst.voldoet_aan_transparantie ? 'check-mark-circle' : 'dismiss-circle'"
-                        :color="uitkomst.voldoet_aan_transparantie ? 'success' : 'critical'"
-                        size="20"
-                      ></nldd-icon-cell>
-                      <nldd-spacer-cell size="8"></nldd-spacer-cell>
-                      <nldd-text-cell text="Transparantie-eisen (art. 5)"></nldd-text-cell>
-                    </nldd-list-item>
-                    <nldd-list-item size="sm">
-                      <nldd-icon-cell
-                        :icon="(item.aanvraag.niveau === 'LANDELIJK' ? uitkomst.heeft_recht_landelijk : uitkomst.heeft_recht_decentraal) ? 'check-mark-circle' : 'dismiss-circle'"
-                        :color="(item.aanvraag.niveau === 'LANDELIJK' ? uitkomst.heeft_recht_landelijk : uitkomst.heeft_recht_decentraal) ? 'success' : 'critical'"
-                        size="20"
-                      ></nldd-icon-cell>
-                      <nldd-spacer-cell size="8"></nldd-spacer-cell>
-                      <nldd-text-cell
-                        :text="item.aanvraag.niveau === 'LANDELIJK' ? 'Recht op subsidie landelijk (art. 6)' : 'Recht op subsidie decentraal (art. 7)'"
-                      ></nldd-text-cell>
-                    </nldd-list-item>
-                    <nldd-list-item size="sm">
-                      <nldd-icon-cell icon="euro-sign" size="20" color="secondary"></nldd-icon-cell>
-                      <nldd-spacer-cell size="8"></nldd-spacer-cell>
-                      <nldd-text-cell
-                        text="Betaalopdracht (art. 16)"
-                        :supporting-text="uitkomst.betaalopdracht_vereist ? euro(uitkomst.betaalopdracht_bedrag) : 'Niet van toepassing'"
-                      ></nldd-text-cell>
-                    </nldd-list-item>
-                    <nldd-list-item size="sm">
-                      <nldd-icon-cell icon="clock" size="20" color="secondary"></nldd-icon-cell>
-                      <nldd-spacer-cell size="8"></nldd-spacer-cell>
-                      <nldd-text-cell
-                        text="Bezwaartermijn (AWB 6:7)"
-                        :supporting-text="`${uitkomst.bezwaartermijn_weken} weken na bekendmaking`"
-                      ></nldd-text-cell>
-                    </nldd-list-item>
-                  </nldd-list>
-                </nldd-container>
-              </nldd-box>
+            <template v-if="item.besluit">
               <nldd-spacer size="24"></nldd-spacer>
-              <nldd-button
-                variant="primary"
-                :text="uitkomst.subsidie_toegekend ? 'Besluit vaststellen: toekennen' : 'Besluit vaststellen: afwijzen'"
-                start-icon="check-mark"
-                :disabled="bezig || undefined"
-                @click="stelVast"
-              ></nldd-button>
-            </template>
-
-            <!-- Besloten: bekendmaken of bezwaarfase -->
-            <template v-else-if="item.besluit">
-              <nldd-title size="4"><h3>Besluit</h3></nldd-title>
+              <nldd-title size="4"><h3>Verloop</h3></nldd-title>
               <nldd-spacer size="12"></nldd-spacer>
-              <NBanner
-                :variant="item.besluit.subsidie_toegekend ? 'success' : 'critical'"
-                :text="item.besluit.subsidie_toegekend
-                  ? `Toegekend: ${euro(item.besluit.subsidiebedrag)}`
-                  : 'Afgewezen'"
-                :supporting-text="item.besluit.motivering"
-              />
-              <nldd-spacer size="16"></nldd-spacer>
               <LifecycleTimeline :aanvraag="item.aanvraag" :besluit="item.besluit" />
               <nldd-spacer size="16"></nldd-spacer>
               <nldd-button
@@ -246,6 +176,75 @@ onMounted(laad);
                   {{ datum(item.besluit.bezwaartermijn_einddatum) }}.
                 </p>
               </nldd-rich-text>
+            </template>
+          </div>
+
+          <div slot="right">
+            <nldd-title size="4">
+              <h3>{{ item.besluit ? 'Besluit' : 'Uitkomst volgens de wet' }}</h3>
+            </nldd-title>
+            <nldd-spacer size="12"></nldd-spacer>
+
+            <template v-if="item.besluit || uitkomst">
+              <NBanner
+                :variant="(item.besluit ?? uitkomst).subsidie_toegekend ? 'success' : 'critical'"
+                :text="(item.besluit ?? uitkomst).subsidie_toegekend
+                  ? `${item.besluit ? 'Toegekend' : 'Toekenning'}: ${euro((item.besluit ?? uitkomst).subsidiebedrag)}`
+                  : 'Afwijzing'"
+                :supporting-text="(item.besluit ?? uitkomst).motivering"
+              />
+              <nldd-spacer size="16"></nldd-spacer>
+
+              <nldd-list variant="box">
+                <nldd-list-item v-for="g in samenvattingPerGroep" :key="g.naam" size="sm">
+                  <nldd-text-cell
+                    :text="g.naam"
+                    :supporting-text="`${g.toegekend} van ${g.aantal} toegekend`"
+                  ></nldd-text-cell>
+                  <nldd-text-cell :text="euro(g.bedrag)" horizontal-alignment="right"></nldd-text-cell>
+                </nldd-list-item>
+              </nldd-list>
+              <nldd-spacer size="16"></nldd-spacer>
+
+              <nldd-button
+                v-if="item.aanvraag.status === 'BEHANDELING' && uitkomst"
+                variant="primary"
+                :text="uitkomst.subsidie_toegekend
+                  ? `Besluit vaststellen: toekennen (${euro(uitkomst.subsidiebedrag)})`
+                  : 'Besluit vaststellen: afwijzen'"
+                start-icon="check-mark"
+                :disabled="bezig || undefined"
+                @click="stelVast"
+              ></nldd-button>
+
+              <nldd-spacer size="24"></nldd-spacer>
+              <nldd-title size="5"><h4>Specificatie per onderdeel</h4></nldd-title>
+              <nldd-spacer size="8"></nldd-spacer>
+              <nldd-table
+                columns="minmax(180px,1fr) 70px 110px 130px"
+                accessible-label="Specificatie per onderdeel"
+              >
+                <nldd-table-row slot="header">
+                  <nldd-text-cell text="Onderdeel"></nldd-text-cell>
+                  <nldd-text-cell text="Zetels" horizontal-alignment="right"></nldd-text-cell>
+                  <nldd-text-cell text="Besluit"></nldd-text-cell>
+                  <nldd-text-cell text="Bedrag" horizontal-alignment="right"></nldd-text-cell>
+                </nldd-table-row>
+                <nldd-table-row v-for="c in specificatie" :key="c.key">
+                  <nldd-text-cell :text="componentLabel(c)"></nldd-text-cell>
+                  <nldd-text-cell :text="String(c.zetels)" horizontal-alignment="right"></nldd-text-cell>
+                  <nldd-cell>
+                    <nldd-tag
+                      :color="c.toegekend ? 'success' : 'critical'"
+                      :text="c.toegekend ? 'Toegekend' : 'Afgewezen'"
+                    ></nldd-tag>
+                  </nldd-cell>
+                  <nldd-text-cell
+                    :text="c.toegekend ? euro(c.bedrag) : '—'"
+                    horizontal-alignment="right"
+                  ></nldd-text-cell>
+                </nldd-table-row>
+              </nldd-table>
             </template>
           </div>
         </nldd-one-half-one-half-section>
