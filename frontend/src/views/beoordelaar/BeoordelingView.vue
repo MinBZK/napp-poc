@@ -138,6 +138,10 @@ onMounted(laad);
                 <nldd-text-cell text="Betalende leden · eigen opgave" color="secondary"></nldd-text-cell>
                 <nldd-text-cell :text="String(eigen.aantal_betalende_leden ?? 0)" horizontal-alignment="right"></nldd-text-cell>
               </nldd-list-item>
+              <nldd-list-item v-if="item.aanvraag.beslistermijn_einddatum" size="sm">
+                <nldd-text-cell text="Beslistermijn · AWB 4:13" color="secondary"></nldd-text-cell>
+                <nldd-text-cell :text="datum(item.aanvraag.beslistermijn_einddatum)" horizontal-alignment="right"></nldd-text-cell>
+              </nldd-list-item>
             </nldd-list>
             <nldd-spacer size="24"></nldd-spacer>
 

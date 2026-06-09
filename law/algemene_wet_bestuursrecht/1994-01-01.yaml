@@ -60,6 +60,34 @@ articles:
           - output: motivering_vereist
             value: true
 
+  - number: '4:13'
+    text: |-
+      1. Een beschikking dient te worden gegeven binnen de bij wettelijk
+      voorschrift bepaalde termijn of, bij het ontbreken van zulk een
+      termijn, binnen een redelijke termijn na ontvangst van de aanvraag.
+      2. De in het eerste lid bedoelde redelijke termijn is in ieder geval
+      verstreken wanneer het bestuursorgaan binnen acht weken na ontvangst
+      van de aanvraag geen beschikking heeft gegeven, noch een mededeling
+      als bedoeld in artikel 4:14, derde lid, heeft gedaan.
+    url: https://wetten.overheid.nl/BWBR0005537/2024-01-01#Artikel4:13
+    machine_readable:
+      execution:
+        parameters:
+          - name: aanvraag_datum
+            type: date
+            required: true
+            description: Datum van ontvangst van de aanvraag
+        output:
+          - name: beslistermijn_einddatum
+            type: date
+        actions:
+          # Redelijke termijn: acht weken na ontvangst van de aanvraag.
+          - output: beslistermijn_einddatum
+            value:
+              operation: DATE_ADD
+              date: $aanvraag_datum
+              weeks: 8
+
   - number: '6:7'
     text: |-
       De termijn voor het indienen van een bezwaar- of

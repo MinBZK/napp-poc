@@ -36,3 +36,15 @@ Feature: Termijnverlenging volgens de Algemene termijnenwet
       | bekendmaking_datum | 2026-06-09 |
     When the bezwaartermijn is calculated including the termijnenwet
     Then the verlengde einddatum is "2026-07-21"
+
+  Scenario: Beslistermijn is acht weken na ontvangst van de aanvraag
+    Given an application with the following data:
+      | aanvraag_datum | 2026-06-09 |
+    When the beslistermijn is calculated including the termijnenwet
+    Then the verlengde einddatum is "2026-08-04"
+
+  Scenario: Beslistermijn die in het weekend eindigt schuift naar maandag
+    Given an application with the following data:
+      | aanvraag_datum | 2026-06-13 |
+    When the beslistermijn is calculated including the termijnenwet
+    Then the verlengde einddatum is "2026-08-10"

@@ -21,6 +21,7 @@ pub async fn init(pool: &SqlitePool) -> anyhow::Result<()> {
             parameters TEXT NOT NULL,
             status TEXT NOT NULL DEFAULT 'BEHANDELING',
             aanvraag_datum TEXT NOT NULL,
+            beslistermijn_einddatum TEXT,
             created_at TEXT NOT NULL DEFAULT (datetime('now')),
             updated_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
@@ -92,6 +93,7 @@ pub struct Aanvraag {
     pub parameters: serde_json::Value,
     pub status: String,
     pub aanvraag_datum: String,
+    pub beslistermijn_einddatum: Option<String>,
     pub created_at: String,
 }
 
@@ -132,6 +134,7 @@ fn row_to_aanvraag(row: &sqlx::sqlite::SqliteRow) -> Aanvraag {
             .unwrap_or(serde_json::Value::Null),
         status: row.get("status"),
         aanvraag_datum: row.get("aanvraag_datum"),
+        beslistermijn_einddatum: row.get("beslistermijn_einddatum"),
         created_at: row.get("created_at"),
     }
 }
@@ -163,10 +166,11 @@ pub async fn insert_aanvraag(
     componenten_json: &str,
     parameters_json: &str,
     aanvraag_datum: &str,
+    beslistermijn_einddatum: Option<&str>,
 ) -> anyhow::Result<()> {
     sqlx::query(
-        "INSERT INTO aanvragen (id, kvk_nummer, partij_naam, subsidiejaar, componenten, parameters, aanvraag_datum)
-         VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO aanvragen (id, kvk_nummer, partij_naam, subsidiejaar, componenten, parameters, aanvraag_datum, beslistermijn_einddatum)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(id)
     .bind(kvk_nummer)
@@ -175,6 +179,7 @@ pub async fn insert_aanvraag(
     .bind(componenten_json)
     .bind(parameters_json)
     .bind(aanvraag_datum)
+    .bind(beslistermijn_einddatum)
     .execute(pool)
     .await?;
     Ok(())

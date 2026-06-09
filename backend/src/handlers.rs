@@ -337,6 +337,11 @@ pub async fn create_aanvraag(
 
     let id = Uuid::new_v4().to_string();
     let vandaag = Utc::now().format("%Y-%m-%d").to_string();
+    // AWB 4:13: de Napp moet binnen acht weken na ontvangst beslissen;
+    // de Algemene termijnenwet verlengt een einde in het weekend.
+    let beslistermijn = engine::evaluate_beslistermijn(state.corpus.clone(), vandaag.clone())
+        .await
+        .map_err(internal_error)?;
     db::insert_aanvraag(
         &state.pool,
         &id,
@@ -346,11 +351,17 @@ pub async fn create_aanvraag(
         &serde_json::to_string(&componenten).map_err(internal_error)?,
         &serde_json::to_string(&eigen).map_err(internal_error)?,
         &vandaag,
+        Some(&beslistermijn),
     )
     .await
     .map_err(internal_error)?;
 
-    Ok(Json(json!({"id": id, "status": "BEHANDELING", "subsidiejaar": jaar})))
+    Ok(Json(json!({
+        "id": id,
+        "status": "BEHANDELING",
+        "subsidiejaar": jaar,
+        "beslistermijn_einddatum": beslistermijn,
+    })))
 }
 
 /// Indicatieve berekening voor de aanvrager: de wet uitgevoerd op de

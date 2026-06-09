@@ -166,7 +166,7 @@ watch(() => session.beoordelaar, laad);
               <nldd-title-cell
                 :text="item.aanvraag.partij_naam"
                 :overline="`Jaaraanvraag ${item.aanvraag.subsidiejaar}`"
-                :supporting-text="`${item.aanvraag.componenten.length} onderdelen · KVK ${item.aanvraag.kvk_nummer} · ingediend ${datum(item.aanvraag.aanvraag_datum)}`"
+                :supporting-text="`${item.aanvraag.componenten.length} onderdelen · ingediend ${datum(item.aanvraag.aanvraag_datum)}${item.aanvraag.beslistermijn_einddatum && !item.besluit ? ` · beslissen vóór ${datum(item.aanvraag.beslistermijn_einddatum)} (AWB 4:13)` : ''}`"
               ></nldd-title-cell>
               <nldd-text-cell
                 v-if="item.besluit"

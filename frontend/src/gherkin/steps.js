@@ -96,6 +96,30 @@ export const stepDefinitions = [
     },
   },
   {
+    pattern: /^the beslistermijn is calculated including the termijnenwet$/,
+    execute: (ctx, engine) => {
+      try {
+        const awb = engine.executeMultiple(
+          'algemene_wet_bestuursrecht',
+          ['beslistermijn_einddatum'],
+          ctx.parameters,
+          ctx.calculationDate ?? '2026-06-01',
+        );
+        ctx.result = engine.executeMultiple(
+          'algemene_termijnenwet',
+          ['verlengde_einddatum'],
+          { ...ctx.parameters, einddatum: awb.outputs.beslistermijn_einddatum },
+          ctx.calculationDate ?? '2026-06-01',
+        );
+        ctx.error = null;
+      } catch (e) {
+        ctx.error = e;
+        ctx.result = null;
+      }
+      ctx.executed = true;
+    },
+  },
+  {
     pattern: /^the bezwaartermijn is calculated including the termijnenwet$/,
     execute: (ctx, engine) => {
       try {

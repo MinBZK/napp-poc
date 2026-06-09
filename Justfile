@@ -58,3 +58,7 @@ dev:
 
 # All quality checks
 check: format lint law-validate bdd
+
+# Vul een draaiende backend met demo-dossiers
+seed:
+    ./scripts/seed_demo.sh

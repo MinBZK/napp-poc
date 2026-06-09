@@ -298,6 +298,40 @@ pub async fn evaluate_jaaraanvraag(
     .await?
 }
 
+/// Beslistermijn voor een aanvraag (AWB 4:13: acht weken na ontvangst),
+/// verlengd volgens de Algemene termijnenwet als het einde in het weekend
+/// valt.
+pub async fn evaluate_beslistermijn(
+    corpus: Arc<LawCorpus>,
+    aanvraag_datum: String,
+) -> anyhow::Result<String> {
+    tokio::task::spawn_blocking(move || {
+        let service = service_with_corpus(&corpus)?;
+        let mut params = BTreeMap::new();
+        params.insert(
+            "aanvraag_datum".to_string(),
+            Value::String(aanvraag_datum.clone()),
+        );
+        let result = service
+            .evaluate_law(AWB_ID, &["beslistermijn_einddatum"], params, &aanvraag_datum)
+            .map_err(|e| anyhow::anyhow!("beslistermijn berekenen mislukt: {e}"))?;
+        let einddatum = match result.outputs.get("beslistermijn_einddatum") {
+            Some(Value::String(s)) => s.clone(),
+            other => format!("{other:?}"),
+        };
+        let mut atw_params = BTreeMap::new();
+        atw_params.insert("einddatum".to_string(), Value::String(einddatum));
+        let verlengd = service
+            .evaluate_law(ATW_ID, &["verlengde_einddatum"], atw_params, &aanvraag_datum)
+            .map_err(|e| anyhow::anyhow!("termijnverlenging berekenen mislukt: {e}"))?;
+        Ok(match verlengd.outputs.get("verlengde_einddatum") {
+            Some(Value::String(s)) => s.clone(),
+            other => format!("{other:?}"),
+        })
+    })
+    .await?
+}
+
 /// Compute the bezwaartermijn dates after bekendmaking (AWB 6:8), with the
 /// weekend extension from the Algemene termijnenwet (art. 1).
 pub async fn evaluate_bezwaartermijn(
