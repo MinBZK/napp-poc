@@ -12,6 +12,7 @@ use crate::state::LawCorpus;
 
 pub const WPP_ID: &str = "wet_op_de_politieke_partijen";
 pub const AWB_ID: &str = "algemene_wet_bestuursrecht";
+pub const ATW_ID: &str = "algemene_termijnenwet";
 
 /// Outcome of the besluit evaluation, including reactive hook outputs and
 /// the intermediate checks used for the motivering.
@@ -48,6 +49,9 @@ fn service_with_corpus(corpus: &LawCorpus) -> anyhow::Result<LawExecutionService
     service
         .load_law(&corpus.awb)
         .map_err(|e| anyhow::anyhow!("laden AWB mislukt: {e}"))?;
+    service
+        .load_law(&corpus.termijnenwet)
+        .map_err(|e| anyhow::anyhow!("laden Algemene termijnenwet mislukt: {e}"))?;
     Ok(service)
 }
 
@@ -231,7 +235,9 @@ pub async fn evaluate_besluit(
     .await?
 }
 
-/// Compute the bezwaartermijn dates after bekendmaking (AWB 6:8).
+/// Compute the bezwaartermijn dates after bekendmaking (AWB 6:8), with the
+/// weekend extension from the Algemene termijnenwet (art. 1) applied to the
+/// einddatum. The orchestration layer chains the two laws, conform RFC-008.
 pub async fn evaluate_bezwaartermijn(
     corpus: Arc<LawCorpus>,
     bekendmaking_datum: String,
@@ -251,15 +257,29 @@ pub async fn evaluate_bezwaartermijn(
                 &bekendmaking_datum,
             )
             .map_err(|e| anyhow::anyhow!("bezwaartermijn berekenen mislukt: {e}"))?;
-        let as_date = |name: &str| -> String {
-            match result.outputs.get(name) {
+        let as_date = |outputs: &BTreeMap<String, Value>, name: &str| -> String {
+            match outputs.get(name) {
                 Some(Value::String(s)) => s.clone(),
                 other => format!("{other:?}"),
             }
         };
+        let einddatum = as_date(&result.outputs, "bezwaartermijn_einddatum");
+
+        // Algemene termijnenwet art. 1: einde op za/zo schuift naar maandag.
+        let mut atw_params = BTreeMap::new();
+        atw_params.insert("einddatum".to_string(), Value::String(einddatum.clone()));
+        let verlengd = service
+            .evaluate_law(
+                ATW_ID,
+                &["verlengde_einddatum"],
+                atw_params,
+                &bekendmaking_datum,
+            )
+            .map_err(|e| anyhow::anyhow!("termijnverlenging berekenen mislukt: {e}"))?;
+
         Ok(BezwaartermijnUitkomst {
-            startdatum: as_date("bezwaartermijn_startdatum"),
-            einddatum: as_date("bezwaartermijn_einddatum"),
+            startdatum: as_date(&result.outputs, "bezwaartermijn_startdatum"),
+            einddatum: as_date(&verlengd.outputs, "verlengde_einddatum"),
         })
     })
     .await?

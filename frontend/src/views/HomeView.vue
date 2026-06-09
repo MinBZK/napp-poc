@@ -1,25 +1,31 @@
 <script setup>
-import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import PortalHeader from '../components/PortalHeader.vue';
-import { api } from '../api.js';
-import { euro } from '../format.js';
 
 const router = useRouter();
-const stats = ref(null);
 
 const navItems = [
   { text: 'Home', to: '/' },
   { text: 'Openbaar register', to: '/register' },
 ];
 
-onMounted(async () => {
-  try {
-    stats.value = await api.statistieken();
-  } catch {
-    stats.value = null;
-  }
-});
+const stappen = [
+  {
+    titel: 'U dient een aanvraag in',
+    tekst:
+      'Log in met eHerkenning namens uw partij en vul de gegevens over zetels, leden en transparantie in.',
+  },
+  {
+    titel: 'De Napp beoordeelt uw aanvraag',
+    tekst:
+      'Wij toetsen uw aanvraag aan de Wet op de politieke partijen en stellen de hoogte van de subsidie vast.',
+  },
+  {
+    titel: 'U ontvangt een besluit',
+    tekst:
+      'Bij toekenning betalen wij de subsidie uit. Na bekendmaking kunt u zes weken bezwaar maken.',
+  },
+];
 </script>
 
 <template>
@@ -32,35 +38,58 @@ onMounted(async () => {
 
     <nldd-simple-section>
       <nldd-title size="1">
-        <span slot="overline">Wet op de politieke partijen</span>
-        <h1>Subsidies voor politieke partijen, uitgevoerd als wet</h1>
+        <span slot="overline">Nederlandse autoriteit politieke partijen</span>
+        <h1>Subsidie voor politieke partijen</h1>
       </nldd-title>
       <nldd-spacer size="16"></nldd-spacer>
       <nldd-rich-text>
         <p>
-          De Nederlandse autoriteit politieke partijen (Napp) verstrekt subsidies aan
-          landelijke en decentrale politieke partijen. De voorwaarden en de hoogte van
-          de subsidie volgen rechtstreeks uit de wet: elke aanvraag wordt beoordeeld
-          door de wet zelf uit te voeren, machine-leesbaar en controleerbaar.
+          De Napp verstrekt subsidie aan landelijke en decentrale politieke partijen
+          en houdt toezicht op de financiering van partijen. Op grond van de Wet op
+          de politieke partijen hebben partijen met vertegenwoordiging in de Eerste
+          of Tweede Kamer, gemeenteraden of provinciale staten recht op subsidie.
         </p>
       </nldd-rich-text>
+      <nldd-spacer size="20"></nldd-spacer>
+      <nldd-button
+        variant="primary"
+        text="Subsidie aanvragen"
+        end-icon="arrow-right"
+        href="/aanvrager/"
+      ></nldd-button>
     </nldd-simple-section>
 
     <nldd-simple-section background="tinted">
       <nldd-title size="2" slot="header">
-        <h2>Eén wet, drie ingangen</h2>
+        <h2>Hoe werkt het?</h2>
+      </nldd-title>
+      <nldd-list variant="simple">
+        <nldd-list-item v-for="(stap, i) in stappen" :key="stap.titel" size="md">
+          <nldd-timeline-track-cell
+            step="past"
+            :child="i === 0 ? 'first' : i === stappen.length - 1 ? 'last' : 'between'"
+          ></nldd-timeline-track-cell>
+          <nldd-spacer-cell size="12"></nldd-spacer-cell>
+          <nldd-text-cell :text="stap.titel" :supporting-text="stap.tekst"></nldd-text-cell>
+        </nldd-list-item>
+      </nldd-list>
+    </nldd-simple-section>
+
+    <nldd-simple-section>
+      <nldd-title size="2" slot="header">
+        <h2>Direct regelen</h2>
       </nldd-title>
       <nldd-collection layout="grid" item-width="300px">
-        <nldd-card accessible-label="Politieke partijen">
+        <nldd-card accessible-label="Subsidie aanvragen">
           <nldd-container padding="20">
             <nldd-icon name="apartment-building" size="32" color="lintblauw"></nldd-icon>
             <nldd-spacer size="12"></nldd-spacer>
-            <nldd-title size="4"><h3>Politieke partijen</h3></nldd-title>
+            <nldd-title size="4"><h3>Voor politieke partijen</h3></nldd-title>
             <nldd-spacer size="8"></nldd-spacer>
             <nldd-rich-text>
               <p>
-                Vraag subsidie aan met eHerkenning in het subsidieportaal en volg uw
-                aanvraag door het hele besluitproces.
+                Vraag subsidie aan, volg de behandeling van uw aanvraag en bekijk
+                uw besluiten in het subsidieportaal.
               </p>
             </nldd-rich-text>
             <nldd-spacer size="16"></nldd-spacer>
@@ -72,37 +101,16 @@ onMounted(async () => {
             ></nldd-button>
           </nldd-container>
         </nldd-card>
-        <nldd-card accessible-label="Medewerkers van de Napp">
-          <nldd-container padding="20">
-            <nldd-icon name="shield-check-mark" size="32" color="lintblauw"></nldd-icon>
-            <nldd-spacer size="12"></nldd-spacer>
-            <nldd-title size="4"><h3>Medewerkers van de Napp</h3></nldd-title>
-            <nldd-spacer size="8"></nldd-spacer>
-            <nldd-rich-text>
-              <p>
-                Beoordelaars loggen in met SSO Rijk in de aparte
-                beoordelingsomgeving. De wet berekent; u toetst en besluit.
-              </p>
-            </nldd-rich-text>
-            <nldd-spacer size="16"></nldd-spacer>
-            <nldd-button
-              variant="secondary"
-              text="Naar de beoordelingsomgeving"
-              end-icon="arrow-right"
-              href="/beoordelaar/"
-            ></nldd-button>
-          </nldd-container>
-        </nldd-card>
         <nldd-card accessible-label="Openbaar register">
           <nldd-container padding="20">
             <nldd-icon name="books-vertical" size="32" color="lintblauw"></nldd-icon>
             <nldd-spacer size="12"></nldd-spacer>
-            <nldd-title size="4"><h3>Iedereen</h3></nldd-title>
+            <nldd-title size="4"><h3>Voor iedereen</h3></nldd-title>
             <nldd-spacer size="8"></nldd-spacer>
             <nldd-rich-text>
               <p>
-                Het openbare register toont alle bekendgemaakte subsidiebesluiten en
-                statistieken over aanvragen en toekenningen. Geen login nodig.
+                In het openbare register vindt u alle bekendgemaakte
+                subsidiebesluiten en statistieken over aanvragen en toekenningen.
               </p>
             </nldd-rich-text>
             <nldd-spacer size="16"></nldd-spacer>
@@ -117,56 +125,24 @@ onMounted(async () => {
       </nldd-collection>
     </nldd-simple-section>
 
-    <nldd-two-thirds-one-third-section>
-      <div slot="left">
-        <nldd-title size="2"><h2>De wet als uitvoerbare regels</h2></nldd-title>
-        <nldd-spacer size="12"></nldd-spacer>
-        <nldd-rich-text>
-          <p>
-            Dit portaal draait op een machine-leesbare versie van de Wet op de
-            politieke partijen. Het subsidiebesluit (artikel 15) is een beschikking
-            in de zin van de Algemene wet bestuursrecht: de motiveringsplicht
-            (AWB 3:46), de bezwaartermijn van zes weken (AWB 6:7) en de berekening
-            van de termijn na bekendmaking (AWB 6:8) haken automatisch aan op elk
-            besluit.
-          </p>
-          <p>
-            De bedragen en staffels staan in een aparte ministeriële regeling. Zodra
-            de definitieve wettekst beschikbaar is, wordt de wet vervangen zonder
-            dat dit portaal verandert.
-          </p>
-        </nldd-rich-text>
-      </div>
-      <div slot="right">
-        <nldd-card v-if="stats" accessible-label="Kerncijfers">
-          <nldd-container padding="20" gap="8">
-            <nldd-title size="5"><h3>Tot nu toe</h3></nldd-title>
-            <nldd-list variant="simple">
-              <nldd-list-item size="md">
-                <nldd-text-cell text="Aanvragen" :supporting-text="String(stats.aantal_aanvragen)"></nldd-text-cell>
-              </nldd-list-item>
-              <nldd-list-item size="md">
-                <nldd-text-cell text="Toegekend" :supporting-text="String(stats.aantal_toegekend)"></nldd-text-cell>
-              </nldd-list-item>
-              <nldd-list-item size="md">
-                <nldd-text-cell text="Totaal toegekend bedrag" :supporting-text="euro(stats.totaal_toegekend_bedrag)"></nldd-text-cell>
-              </nldd-list-item>
-            </nldd-list>
-          </nldd-container>
-        </nldd-card>
-      </div>
-    </nldd-two-thirds-one-third-section>
-
     <nldd-page-footer>
-      <nldd-container padding="24">
+      <nldd-container padding="24" gap="8">
+        <nldd-title size="5"><p>Nederlandse autoriteit politieke partijen</p></nldd-title>
         <nldd-rich-text>
           <p>
-            Demonstratie-omgeving van de Nederlandse autoriteit politieke partijen.
-            Gebaseerd op het wetsvoorstel Wet op de politieke partijen (kamerstuk 36742);
-            bedragen en voorwaarden zijn indicatief.
+            De Napp is een onafhankelijke autoriteit, ingesteld bij de Wet op de
+            politieke partijen. Zij verstrekt subsidies aan politieke partijen en
+            houdt toezicht op de naleving van de financierings- en
+            transparantieregels.
           </p>
         </nldd-rich-text>
       </nldd-container>
+      <nldd-page-footer-legal-bar slot="legal-bar">
+        <nldd-page-footer-legal-bar-item href="/register" text="Openbaar register"></nldd-page-footer-legal-bar-item>
+        <nldd-page-footer-legal-bar-item href="#" text="Contact"></nldd-page-footer-legal-bar-item>
+        <nldd-page-footer-legal-bar-item href="#" text="Toegankelijkheid"></nldd-page-footer-legal-bar-item>
+        <nldd-page-footer-legal-bar-item href="#" text="Privacy"></nldd-page-footer-legal-bar-item>
+      </nldd-page-footer-legal-bar>
     </nldd-page-footer>
   </nldd-page>
 </template>

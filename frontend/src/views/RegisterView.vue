@@ -135,9 +135,18 @@ onMounted(async () => {
     <nldd-page-footer>
       <nldd-container padding="24">
         <nldd-rich-text>
-          <p>Nederlandse autoriteit politieke partijen — demonstratie-omgeving.</p>
+          <p>
+            Dit register wordt bijgehouden door de Nederlandse autoriteit politieke
+            partijen op grond van de Wet op de politieke partijen.
+          </p>
         </nldd-rich-text>
       </nldd-container>
+      <nldd-page-footer-legal-bar slot="legal-bar">
+        <nldd-page-footer-legal-bar-item href="/" text="Home"></nldd-page-footer-legal-bar-item>
+        <nldd-page-footer-legal-bar-item href="#" text="Contact"></nldd-page-footer-legal-bar-item>
+        <nldd-page-footer-legal-bar-item href="#" text="Toegankelijkheid"></nldd-page-footer-legal-bar-item>
+        <nldd-page-footer-legal-bar-item href="#" text="Privacy"></nldd-page-footer-legal-bar-item>
+      </nldd-page-footer-legal-bar>
     </nldd-page-footer>
   </nldd-page>
 </template>

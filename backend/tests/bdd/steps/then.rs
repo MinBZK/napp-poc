@@ -75,3 +75,13 @@ fn check_bezwaartermijn(world: &mut NappWorld, expected: String) {
 fn check_motivering(world: &mut NappWorld) {
     assert_bool_output(world, "motivering_vereist", true);
 }
+
+#[then(regex = r#"^the verlengde einddatum is "([^"]+)"$"#)]
+fn check_verlengde_einddatum(world: &mut NappWorld, expected: String) {
+    assert_success(world);
+    let actual = world.get_output("verlengde_einddatum");
+    assert!(
+        matches!(actual, Some(Value::String(s)) if *s == expected),
+        "Expected verlengde_einddatum {expected}, got {actual:?}"
+    );
+}

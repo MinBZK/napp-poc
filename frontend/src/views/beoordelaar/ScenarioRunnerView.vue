@@ -19,6 +19,7 @@ const resultaten = ref([]);
 const bezig = ref(false);
 const fout = ref('');
 const klaar = ref(false);
+const open = ref(new Set());
 
 const totaal = computed(() =>
   resultaten.value.reduce((n, f) => n + f.scenarios.length, 0),
@@ -26,6 +27,38 @@ const totaal = computed(() =>
 const geslaagd = computed(() =>
   resultaten.value.reduce((n, f) => n + f.scenarios.filter((s) => s.passed).length, 0),
 );
+
+function sleutel(feature, scenario) {
+  return `${feature}::${scenario}`;
+}
+
+function toggle(feature, scenario) {
+  const k = sleutel(feature, scenario);
+  const next = new Set(open.value);
+  if (next.has(k)) {
+    next.delete(k);
+  } else {
+    next.add(k);
+  }
+  open.value = next;
+}
+
+function stapIcoon(status) {
+  if (status === 'geslaagd') return 'check-mark-circle';
+  if (status === 'mislukt') return 'dismiss-circle';
+  return 'circle-dashed';
+}
+
+function stapKleur(status) {
+  if (status === 'geslaagd') return 'success';
+  if (status === 'mislukt') return 'critical';
+  return 'secondary';
+}
+
+function tabelTekst(step) {
+  if (!step.dataTable) return '';
+  return step.dataTable.map((row) => `| ${row.join(' | ')} |`).join('\n');
+}
 
 async function run() {
   bezig.value = true;
@@ -55,7 +88,7 @@ onMounted(run);
     <PortalHeader
       slot="header"
       subtitle="Beoordelingsomgeving"
-      :items="[{ text: 'Werkvoorraad', to: '/' }, { text: 'Scenario\u2019s', to: '/scenarios' }]"
+      :items="[{ text: 'Werkvoorraad', to: '/' }, { text: 'Scenario’s', to: '/scenarios' }]"
     />
 
     <nldd-simple-section width="860px">
@@ -87,7 +120,8 @@ onMounted(run);
           Deze scenario's beschrijven hoe de Wet op de politieke partijen hoort te
           werken: welke partijen subsidie krijgen, welke aanvragen worden afgewezen
           en welke AWB-regels aanhaken. Ze worden hier live uitgevoerd door dezelfde
-          wet-engine die de besluiten neemt — in uw browser.
+          wet-engine die de besluiten neemt — in uw browser. Klik op een scenario
+          voor de volledige stappen.
         </p>
       </nldd-rich-text>
       <nldd-spacer size="24"></nldd-spacer>
@@ -110,24 +144,57 @@ onMounted(run);
         <nldd-title size="4"><h3>{{ feature.feature }}</h3></nldd-title>
         <nldd-spacer size="12"></nldd-spacer>
         <nldd-list variant="box">
-          <nldd-list-item v-for="scenario in feature.scenarios" :key="scenario.name" size="md">
-            <nldd-icon-cell
-              :icon="scenario.passed ? 'check-mark-circle' : 'dismiss-circle'"
-              :color="scenario.passed ? 'success' : 'critical'"
-              size="20"
-            ></nldd-icon-cell>
-            <nldd-text-cell :text="scenario.name">
-              <span v-if="!scenario.passed" slot="supporting-text">
-                {{ scenario.steps.find((s) => s.status === 'mislukt')?.error }}
-              </span>
-            </nldd-text-cell>
-            <nldd-cell width="fit-content">
-              <nldd-tag
+          <template v-for="scenario in feature.scenarios" :key="scenario.name">
+            <nldd-list-item
+              size="md"
+              type="button"
+              @click="toggle(feature.feature, scenario.name)"
+            >
+              <nldd-icon-cell
+                :icon="scenario.passed ? 'check-mark-circle' : 'dismiss-circle'"
                 :color="scenario.passed ? 'success' : 'critical'"
-                :text="scenario.passed ? 'Geslaagd' : 'Mislukt'"
-              ></nldd-tag>
-            </nldd-cell>
-          </nldd-list-item>
+                size="20"
+              ></nldd-icon-cell>
+              <nldd-text-cell :text="scenario.name">
+                <span v-if="!scenario.passed" slot="supporting-text">
+                  {{ scenario.steps.find((s) => s.status === 'mislukt')?.error }}
+                </span>
+              </nldd-text-cell>
+              <nldd-cell width="fit-content">
+                <nldd-tag
+                  :color="scenario.passed ? 'success' : 'critical'"
+                  :text="scenario.passed ? 'Geslaagd' : 'Mislukt'"
+                ></nldd-tag>
+              </nldd-cell>
+              <nldd-icon-cell
+                :icon="open.has(sleutel(feature.feature, scenario.name)) ? 'chevron-up' : 'chevron-down'"
+                size="16"
+                color="secondary"
+              ></nldd-icon-cell>
+            </nldd-list-item>
+
+            <template v-if="open.has(sleutel(feature.feature, scenario.name))">
+              <template v-for="(step, si) in scenario.steps" :key="si">
+                <nldd-list-item size="sm">
+                  <nldd-spacer-cell size="24"></nldd-spacer-cell>
+                  <nldd-icon-cell
+                    :icon="stapIcoon(step.status)"
+                    :color="stapKleur(step.status)"
+                    size="16"
+                  ></nldd-icon-cell>
+                  <nldd-text-cell size="sm" :text="`**${step.keyword}** ${step.text}`">
+                    <span v-if="step.error" slot="supporting-text">{{ step.error }}</span>
+                  </nldd-text-cell>
+                </nldd-list-item>
+                <nldd-list-item v-if="step.dataTable" size="sm">
+                  <nldd-spacer-cell size="48"></nldd-spacer-cell>
+                  <nldd-cell width="full" vertical-alignment="top">
+                    <nldd-code-viewer variant="simple" no-copy>{{ tabelTekst(step) }}</nldd-code-viewer>
+                  </nldd-cell>
+                </nldd-list-item>
+              </template>
+            </template>
+          </template>
         </nldd-list>
       </template>
     </nldd-simple-section>

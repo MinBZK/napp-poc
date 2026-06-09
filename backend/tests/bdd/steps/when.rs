@@ -9,3 +9,24 @@ use cucumber::when;
 fn execute_subsidiebesluit(world: &mut NappWorld) {
     world.execute_besluit();
 }
+
+#[when("the termijnverlenging is calculated")]
+fn execute_termijnverlenging(world: &mut NappWorld) {
+    world.execute("algemene_termijnenwet", &["verlengde_einddatum"]);
+}
+
+/// Orkestratie zoals de backend: eerst AWB 6:8 (einddatum), daarna de
+/// Algemene termijnenwet (weekend-verlenging) op die einddatum.
+#[when("the bezwaartermijn is calculated including the termijnenwet")]
+fn execute_bezwaartermijn_keten(world: &mut NappWorld) {
+    world.execute(
+        "algemene_wet_bestuursrecht",
+        &["bezwaartermijn_startdatum", "bezwaartermijn_einddatum"],
+    );
+    let einddatum = world
+        .get_output("bezwaartermijn_einddatum")
+        .cloned()
+        .expect("AWB 6:8 leverde geen einddatum");
+    world.parameters.insert("einddatum".to_string(), einddatum);
+    world.execute("algemene_termijnenwet", &["verlengde_einddatum"]);
+}

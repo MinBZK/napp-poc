@@ -13,6 +13,7 @@ const LAW_FILES: &[&str] = &[
     "law/wet_op_de_politieke_partijen/2026-01-01.yaml",
     "law/regeling_subsidiebedragen/2026-01-01.yaml",
     "law/algemene_wet_bestuursrecht/1994-01-01.yaml",
+    "law/algemene_termijnenwet/1964-04-01.yaml",
 ];
 
 #[derive(World)]
@@ -63,10 +64,14 @@ impl NappWorld {
     /// bezwaartermijn, motivering) arrive reactively in the result — never
     /// request them as primary outputs.
     pub fn execute_besluit(&mut self) {
-        let outputs = ["subsidie_toegekend", "subsidiebedrag"];
+        self.execute("wet_op_de_politieke_partijen", &["subsidie_toegekend", "subsidiebedrag"]);
+    }
+
+    /// Execute an arbitrary law for the given outputs.
+    pub fn execute(&mut self, law_id: &str, outputs: &[&str]) {
         match self.service.evaluate_law(
-            "wet_op_de_politieke_partijen",
-            &outputs,
+            law_id,
+            outputs,
             self.parameters.clone(),
             &self.calculation_date,
         ) {
