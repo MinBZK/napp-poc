@@ -212,15 +212,19 @@ onMounted(run);
                   {{ scenario.steps.find((s) => s.status === 'mislukt')?.error }}
                 </span>
               </nldd-text-cell>
-              <nldd-cell v-if="isAangepast(sleutel(feature.feature, scenario.name))" width="fit-content">
-                <nldd-tag color="accent" text="Aangepast"></nldd-tag>
-              </nldd-cell>
+              <template v-if="isAangepast(sleutel(feature.feature, scenario.name))">
+                <nldd-cell width="fit-content">
+                  <nldd-tag color="accent" text="Aangepast"></nldd-tag>
+                </nldd-cell>
+                <nldd-spacer-cell size="8"></nldd-spacer-cell>
+              </template>
               <nldd-cell width="fit-content">
                 <nldd-tag
                   :color="scenario.passed ? 'success' : 'critical'"
                   :text="scenario.passed ? 'Geslaagd' : 'Mislukt'"
                 ></nldd-tag>
               </nldd-cell>
+              <nldd-spacer-cell size="8"></nldd-spacer-cell>
               <nldd-icon-cell
                 :icon="open.has(sleutel(feature.feature, scenario.name)) ? 'chevron-up' : 'chevron-down'"
                 size="16"
@@ -271,9 +275,10 @@ onMounted(run);
                     ></nldd-button>
                     <nldd-button
                       v-if="isAangepast(sleutel(feature.feature, scenario.name))"
-                      variant="neutral-transparent"
+                      variant="secondary"
                       size="sm"
                       text="Herstel origineel"
+                      start-icon="arrow-2-counter-clockwise"
                       @click="herstel(feature.feature, scenario.name)"
                     ></nldd-button>
                   </nldd-button-group>

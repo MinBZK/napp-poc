@@ -187,6 +187,7 @@ watch(() => session.aanvrager, laadAanvragen);
                 :text="statusLabel(item.aanvraag.status, item.besluit)"
               ></nldd-tag>
             </nldd-cell>
+            <nldd-spacer-cell size="8"></nldd-spacer-cell>
             <nldd-icon-cell icon="chevron-right" size="16" color="secondary"></nldd-icon-cell>
           </nldd-list-item>
         </nldd-list>
