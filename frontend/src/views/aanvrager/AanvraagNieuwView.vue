@@ -9,8 +9,23 @@ import { session } from '../../session.js';
 const router = useRouter();
 
 const niveau = ref('LANDELIJK');
+const orgaan = ref('GEMEENTERAAD');
 const leden = ref(0);
 const gemeente = ref('');
+
+const ORGANEN = [
+  { waarde: 'GEMEENTERAAD', label: 'Gemeenteraad', gebiedLabel: 'Gemeente', zetelLabel: 'Behaalde raadszetels' },
+  { waarde: 'PROVINCIALE_STATEN', label: 'Provinciale staten', gebiedLabel: 'Provincie', zetelLabel: 'Behaalde statenzetels' },
+  { waarde: 'WATERSCHAP', label: 'Waterschap', gebiedLabel: 'Waterschap', zetelLabel: 'Zetels in het algemeen bestuur' },
+];
+const orgaanInfo = computed(() => ORGANEN.find((o) => o.waarde === orgaan.value));
+
+function kiesOrgaan(nieuw) {
+  if (nieuw && nieuw !== orgaan.value) {
+    orgaan.value = nieuw;
+    gemeente.value = '';
+  }
+}
 
 // Registergegevens (Kiesraad/CBS) van de ingelogde partij.
 const registratie = ref(null);
@@ -28,6 +43,9 @@ const bezig = ref(false);
 const geregistreerd = computed(() => Boolean(registratie.value?.partij));
 const kamerzetels = computed(() => registratie.value?.partij?.kamerzetels ?? 0);
 
+const gebieden = computed(() =>
+  (registratie.value?.gebieden ?? []).filter((g) => g.orgaan === orgaan.value),
+);
 const uitslag = computed(() =>
   registratie.value?.decentrale_uitslagen?.find((u) => u.gebied_code === gemeente.value) ?? null,
 );
@@ -62,6 +80,7 @@ async function verstuur() {
     };
     const result = await api.nieuweAanvraag({
       niveau: niveau.value,
+      orgaan: niveau.value === 'DECENTRAAL' ? orgaan.value : null,
       gemeente: niveau.value === 'DECENTRAAL' ? gemeente.value : null,
       parameters,
     });
@@ -196,14 +215,29 @@ watch(() => session.aanvrager, laadRegistratie);
           <nldd-form-section
             v-else
             text="Vertegenwoordiging"
-            supporting-text="Vereist: minimaal 1 zetel bij de laatste gemeenteraads- of statenverkiezing."
+            supporting-text="Vereist: minimaal 1 zetel bij de laatste verkiezing van het orgaan."
           >
-            <nldd-form-field label="Gemeente">
+            <nldd-form-field label="Orgaan">
+              <nldd-segmented-control
+                :value="orgaan"
+                name="orgaan"
+                width="full"
+                @change="kiesOrgaan($event.detail?.value)"
+              >
+                <nldd-segmented-control-item
+                  v-for="o in ORGANEN"
+                  :key="o.waarde"
+                  :value="o.waarde"
+                  :text="o.label"
+                ></nldd-segmented-control-item>
+              </nldd-segmented-control>
+            </nldd-form-field>
+            <nldd-form-field :label="orgaanInfo.gebiedLabel">
               <nldd-dropdown>
                 <select :value="gemeente" @change="gemeente = $event.target.value">
-                  <option value="" disabled>Kies een gemeente</option>
+                  <option value="" disabled>Kies een {{ orgaanInfo.gebiedLabel.toLowerCase() }}</option>
                   <option
-                    v-for="g in registratie?.gebieden ?? []"
+                    v-for="g in gebieden"
                     :key="g.code"
                     :value="g.code"
                   >
@@ -216,18 +250,18 @@ watch(() => session.aanvrager, laadRegistratie);
               <template v-if="!uitslag">
                 <NBanner
                   variant="warning"
-                  text="Geen zetels in deze gemeente"
-                  supporting-text="Volgens de uitslagen van de Kiesraad heeft uw partij in deze gemeente geen raadszetels. U kunt de aanvraag indienen, maar de wet zal haar afwijzen."
+                  text="Geen zetels in dit gebied"
+                  supporting-text="Volgens de uitslagen van de Kiesraad zijn aan uw partij hier geen zetels toegewezen. U kunt de aanvraag indienen, maar de wet zal haar afwijzen."
                 />
                 <nldd-spacer size="16"></nldd-spacer>
               </template>
-              <nldd-form-field label="Behaalde raadszetels">
+              <nldd-form-field :label="orgaanInfo.zetelLabel">
                 <nldd-text-field :value="String(uitslag?.zetels ?? 0)" readonly></nldd-text-field>
                 <nldd-form-field-help-text>
                   Bron: uitslagen Kiesraad.
                 </nldd-form-field-help-text>
               </nldd-form-field>
-              <nldd-form-field label="Inwoneraantal gemeente">
+              <nldd-form-field v-if="orgaan === 'GEMEENTERAAD'" label="Inwoneraantal gemeente">
                 <nldd-text-field :value="String(inwoneraantal ?? 0)" readonly></nldd-text-field>
                 <nldd-form-field-help-text>
                   Bron: CBS. Bepaalt het bedrag per zetel.

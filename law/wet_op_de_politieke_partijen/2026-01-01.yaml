@@ -143,10 +143,11 @@ articles:
   # ------------------------------------------------------------------
   - number: '7'
     text: |-
-      Een decentrale politieke partij heeft aanspraak op subsidie indien zij
-      ten minste een zetel heeft behaald bij de laatstgehouden verkiezing van
-      de gemeenteraad of provinciale staten, en voldoet aan de voorwaarden
-      van artikel 5.
+      Een decentrale politieke partij of afdeling heeft aanspraak op
+      subsidie indien aan haar bij de laatstgehouden verkiezing van de leden
+      van de gemeenteraad, provinciale staten of het algemeen bestuur van
+      een waterschap ten minste een zetel is toegewezen, en zij voldoet aan
+      de voorwaarden van artikel 5.
     url: https://www.tweedekamer.nl/kamerstukken/wetsvoorstellen/detail?qry=wetsvoorstel%3A36742
     machine_readable:
       execution:
@@ -236,14 +237,26 @@ articles:
   # ------------------------------------------------------------------
   - number: '12'
     text: |-
-      De subsidie voor een decentrale politieke partij bedraagt het aantal
-      behaalde raadszetels vermenigvuldigd met een bedrag per zetel dat
-      afhangt van het aantal inwoners van de gemeente. Het bedrag per zetel
-      wordt bij ministeriele regeling vastgesteld.
+      De subsidie voor een decentrale politieke partij of afdeling bedraagt
+      het aantal behaalde zetels vermenigvuldigd met een bedrag per zetel.
+      Voor gemeenteraadszetels hangt het bedrag af van het aantal inwoners
+      van de gemeente; voor zetels in provinciale staten en het algemeen
+      bestuur van een waterschap geldt een vast bedrag. De bedragen worden
+      bij ministeriele regeling vastgesteld.
     url: https://www.tweedekamer.nl/kamerstukken/wetsvoorstellen/detail?qry=wetsvoorstel%3A36742
     machine_readable:
       open_terms:
         - id: bedrag_per_raadszetel
+          type: amount
+          required: true
+          delegated_to: minister
+          delegation_type: MINISTERIELE_REGELING
+        - id: bedrag_per_statenzetel
+          type: amount
+          required: true
+          delegated_to: minister
+          delegation_type: MINISTERIELE_REGELING
+        - id: bedrag_per_waterschapszetel
           type: amount
           required: true
           delegated_to: minister
@@ -253,6 +266,11 @@ articles:
           - name: aantal_raadszetels
             type: number
             required: true
+            description: Zetels in het decentrale orgaan
+          - name: orgaan
+            type: string
+            required: true
+            description: GEMEENTERAAD, PROVINCIALE_STATEN of WATERSCHAP
         output:
           - name: subsidie_decentraal
             type: amount
@@ -263,7 +281,19 @@ articles:
             value:
               operation: MULTIPLY
               values:
-                - $bedrag_per_raadszetel
+                - operation: IF
+                  cases:
+                    - when:
+                        operation: EQUALS
+                        subject: $orgaan
+                        value: PROVINCIALE_STATEN
+                      then: $bedrag_per_statenzetel
+                    - when:
+                        operation: EQUALS
+                        subject: $orgaan
+                        value: WATERSCHAP
+                      then: $bedrag_per_waterschapszetel
+                  default: $bedrag_per_raadszetel
                 - $aantal_raadszetels
 
   # ------------------------------------------------------------------
@@ -297,6 +327,10 @@ articles:
           - name: inwoneraantal_gemeente
             type: number
             required: true
+          - name: orgaan
+            type: string
+            required: true
+            description: Decentraal orgaan (GEMEENTERAAD, PROVINCIALE_STATEN, WATERSCHAP)
           - name: ontvangt_anonieme_giften
             type: boolean
             required: true
@@ -354,6 +388,7 @@ articles:
               parameters:
                 aantal_raadszetels: $aantal_raadszetels
                 inwoneraantal_gemeente: $inwoneraantal_gemeente
+                orgaan: $orgaan
             type_spec:
               unit: eurocent
         output:

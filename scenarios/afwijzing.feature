@@ -10,6 +10,7 @@ Feature: Afwijzing van subsidieaanvragen
   Scenario: Landelijke partij zonder kamerzetels wordt afgewezen
     Given an application with the following data:
       | niveau                           | LANDELIJK |
+      | orgaan                           | GEMEENTERAAD |
       | aantal_kamerzetels               | 0         |
       | aantal_betalende_leden           | 5000      |
       | aantal_raadszetels               | 0         |
@@ -26,6 +27,7 @@ Feature: Afwijzing van subsidieaanvragen
   Scenario: Landelijke partij met minder dan duizend leden wordt afgewezen
     Given an application with the following data:
       | niveau                           | LANDELIJK |
+      | orgaan                           | GEMEENTERAAD |
       | aantal_kamerzetels               | 3         |
       | aantal_betalende_leden           | 999       |
       | aantal_raadszetels               | 0         |
@@ -41,6 +43,7 @@ Feature: Afwijzing van subsidieaanvragen
   Scenario: Partij die anonieme giften ontvangt wordt afgewezen
     Given an application with the following data:
       | niveau                           | LANDELIJK |
+      | orgaan                           | GEMEENTERAAD |
       | aantal_kamerzetels               | 10        |
       | aantal_betalende_leden           | 5000      |
       | aantal_raadszetels               | 0         |
@@ -56,6 +59,7 @@ Feature: Afwijzing van subsidieaanvragen
   Scenario: Partij die giften van niet-ingezetenen ontvangt wordt afgewezen
     Given an application with the following data:
       | niveau                           | LANDELIJK |
+      | orgaan                           | GEMEENTERAAD |
       | aantal_kamerzetels               | 10        |
       | aantal_betalende_leden           | 5000      |
       | aantal_raadszetels               | 0         |
@@ -71,6 +75,7 @@ Feature: Afwijzing van subsidieaanvragen
   Scenario: Partij die de meldplicht voor grote giften schendt wordt afgewezen
     Given an application with the following data:
       | niveau                           | DECENTRAAL |
+      | orgaan                           | GEMEENTERAAD |
       | aantal_kamerzetels               | 0          |
       | aantal_betalende_leden           | 0          |
       | aantal_raadszetels               | 4          |
@@ -86,6 +91,7 @@ Feature: Afwijzing van subsidieaanvragen
   Scenario: Partij die haar financien niet openbaar maakt wordt afgewezen
     Given an application with the following data:
       | niveau                           | DECENTRAAL |
+      | orgaan                           | GEMEENTERAAD |
       | aantal_kamerzetels               | 0          |
       | aantal_betalende_leden           | 0          |
       | aantal_raadszetels               | 4          |
@@ -101,6 +107,7 @@ Feature: Afwijzing van subsidieaanvragen
   Scenario: Decentrale partij zonder raadszetels wordt afgewezen
     Given an application with the following data:
       | niveau                           | DECENTRAAL |
+      | orgaan                           | GEMEENTERAAD |
       | aantal_kamerzetels               | 0          |
       | aantal_betalende_leden           | 0          |
       | aantal_raadszetels               | 0          |

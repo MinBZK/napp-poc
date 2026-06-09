@@ -129,3 +129,47 @@ articles:
                     value: 375000
                   then: 120000
               default: 161300
+
+  - number: '5'
+    text: |-
+      Het bedrag per zetel in provinciale staten bedraagt EUR 1.613.
+    url: https://wetten.overheid.nl/BWBR0000001/2026-01-01
+    machine_readable:
+      implements:
+        - law: wet_op_de_politieke_partijen
+          article: '12'
+          open_term: bedrag_per_statenzetel
+          gelet_op: Gelet op artikel 12 van de Wet op de politieke partijen
+      execution:
+        output:
+          - name: bedrag_per_statenzetel
+            type: amount
+            type_spec:
+              unit: eurocent
+        actions:
+          # Aanname: de AMvB met decentrale bedragen bestaat nog niet;
+          # gelijkgesteld aan de hoogste gemeentestaffel.
+          - output: bedrag_per_statenzetel
+            value: 161300
+
+  - number: '6'
+    text: |-
+      Het bedrag per zetel in het algemeen bestuur van een waterschap
+      bedraagt EUR 1.613.
+    url: https://wetten.overheid.nl/BWBR0000001/2026-01-01
+    machine_readable:
+      implements:
+        - law: wet_op_de_politieke_partijen
+          article: '12'
+          open_term: bedrag_per_waterschapszetel
+          gelet_op: Gelet op artikel 12 van de Wet op de politieke partijen
+      execution:
+        output:
+          - name: bedrag_per_waterschapszetel
+            type: amount
+            type_spec:
+              unit: eurocent
+        actions:
+          # Aanname: zie artikel 5.
+          - output: bedrag_per_waterschapszetel
+            value: 161300

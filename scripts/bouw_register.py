@@ -1,25 +1,30 @@
 #!/usr/bin/env python3
 """Bouwt backend/data/partijregister.json uit open data.
 
-Bronnen:
-- Verkiezingsuitslag Tweede Kamer 2025 (Kiesraad, data.overheid.nl, CSV):
-  landelijke partijen met kamerzetels.
-- Verkiezingsuitslagen Gemeenteraad 2026 (Kiesraad, data.overheid.nl, CSV):
-  raadszetels per lijst per gemeente.
-- CBS StatLine 37230ned (OData): inwoneraantal per gemeente (januari 2026).
+Bronnen (alle Kiesraad-datasets via data.overheid.nl, CBS via StatLine):
+- Verkiezingsuitslag Tweede Kamer 2025 (CSV): landelijke kamerzetels.
+- Verkiezingsuitslagen Gemeenteraad 2026 (CSV): raadszetels per gemeente.
+- Verkiezingsuitslagen Provinciale Staten 2023 (EML, Resultaat-bestanden):
+  statenzetels per provincie (gekozen kandidaten per lijst).
+- Verkiezingsuitslagen Waterschappen 2023 (EML, Resultaat-bestanden):
+  AB-zetels per waterschap.
+- CBS StatLine 37230ned (OData): inwoneraantal per gemeente en provincie
+  (januari 2026).
 
-De KvK-nummers zijn synthetisch (de koppeling rechtspersoon-aanduiding is
-geen open data); ze worden deterministisch afgeleid zodat het register
-reproduceerbaar is. Landelijke lijsten zijn één partij voor alle gemeenten;
-lokale lijsten zijn een eigen partij per gemeente (dezelfde naam in twee
-gemeenten is in werkelijkheid ook een andere partij).
+KvK-nummers zijn synthetisch en deterministisch: de koppeling
+rechtspersoon-aanduiding is geen open data en is precies wat de Napp bij
+registratie vastlegt.
 
-Decentrale orgaan-typen: het datamodel kent GEMEENTERAAD, PROVINCIALE_STATEN
-en WATERSCHAP. Gemeenteraden zijn gevuld uit GR2026. Voor provinciale staten
-(PS2023) en waterschappen (AB2023) publiceert de Kiesraad alleen
-stemmen-CSV's zonder zetels ("onderzoeksdata"); zetels staan in de EML's of
-zijn met D'Hondt uit de stemmen af te leiden (PS: wettelijke zetelaantallen
-per provincie, Kieswet C 2). Dat is een vervolgstap; de structuur is er al.
+Organisatiemodellen (Wpp, MvT bij art. 27): bij CENTRAAL georganiseerde
+partijen zijn afdelingen geen rechtspersoon en valt alles onder de
+landelijke vereniging (één KvK). Bij DECENTRAAL georganiseerde partijen is
+elke afdeling een eigen vereniging met eigen KvK. Welke partijen decentraal
+georganiseerd zijn volgt uit hun statuten en is geen open data; de set
+hieronder is een demo-aanname.
+
+Naamaliassen: lijstnamen verschillen per verkiezing (GROENLINKS en PvdA
+deden in 2023 apart mee, in TK2025 als gezamenlijke lijst). De alias-tabel
+koppelt varianten aan de TK2025-lijstnaam.
 
 Draaien: uv run scripts/bouw_register.py
 """
@@ -28,7 +33,9 @@ import csv
 import hashlib
 import io
 import json
+import re
 import urllib.request
+import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
 
@@ -41,25 +48,118 @@ GR2026_CSV = (
     "https://data.overheid.nl/sites/default/files/dataset/"
     "09cf04e7-11ac-4b53-a2cc-baccf95e82fd/resources/GR2026.csv"
 )
+PS2023_EML_ZIPS = [
+    "https://data.overheid.nl/sites/default/files/dataset/"
+    f"be8b7869-4a12-4446-abab-5cd0a436dc4f/resources/EML_bestanden_PS2023_deel_{i}.zip"
+    for i in (1, 2, 3)
+]
+AB2023_EML_ZIPS = [
+    "https://data.overheid.nl/sites/default/files/dataset/"
+    f"ee19bcda-0282-44a6-a464-44738afd755c/resources/EML_bestanden_AB2023_deel_{i}.zip"
+    for i in (1, 2, 3)
+]
 CBS_BEVOLKING = (
     "https://opendata.cbs.nl/ODataApi/odata/37230ned/TypedDataSet"
-    "?$filter=startswith(RegioS,'GM')%20and%20Perioden%20eq%20'2026MM01'"
+    "?$filter=(startswith(RegioS,'GM')%20or%20startswith(RegioS,'PV'))"
+    "%20and%20Perioden%20eq%20'2026MM01'"
     "&$select=RegioS,BevolkingAanHetBeginVanDePeriode_1&$top=10000&$format=json"
 )
 
+# CBS-codes van de twaalf provincies.
+PROVINCIE_CODES = {
+    "Groningen": "PV20", "Fryslan": "PV21", "Fryslân": "PV21", "Drenthe": "PV22",
+    "Overijssel": "PV23", "Flevoland": "PV24", "Gelderland": "PV25",
+    "Utrecht": "PV26", "Noord-Holland": "PV27", "Zuid-Holland": "PV28",
+    "Zeeland": "PV29", "Noord-Brabant": "PV30", "Limburg": "PV31",
+}
+
+# Demo-aanname: decentraal georganiseerde partijen (afdelingen met eigen
+# rechtspersoon en eigen KvK). Niet uit open data af te leiden.
+DECENTRAAL_GEORGANISEERD = {
+    "CDA",
+    "ChristenUnie",
+    "Staatkundig Gereformeerde Partij (SGP)",
+}
+
+# Lijstnaam-varianten → TK2025-lijstnaam.
+ALIASSEN = {
+    "GROENLINKS": "GROENLINKS / Partij van de Arbeid (PvdA)",
+    "Partij van de Arbeid (P.v.d.A.)": "GROENLINKS / Partij van de Arbeid (PvdA)",
+}
+
+CACHE = Path("/tmp/napp_bronnen")
 UIT = Path(__file__).resolve().parent.parent / "backend" / "data" / "partijregister.json"
 
 
 def haal(url: str) -> bytes:
+    CACHE.mkdir(exist_ok=True)
+    naam = CACHE / hashlib.sha1(url.encode()).hexdigest()
+    if naam.exists():
+        return naam.read_bytes()
     print(f"downloaden: {url[:90]}...")
     with urllib.request.urlopen(url) as response:
-        return response.read()
+        data = response.read()
+    naam.write_bytes(data)
+    return data
 
 
 def kvk_voor(sleutel: str) -> str:
     """Deterministisch synthetisch KvK-nummer (8 cijfers, begint met 9)."""
     digest = hashlib.sha1(sleutel.encode()).hexdigest()
     return "9" + str(int(digest, 16) % 10_000_000).zfill(7)
+
+
+def zetels_uit_resultaat_eml(xml_bytes: bytes) -> dict[str, int]:
+    """Zetels per lijst uit een Kiesraad Resultaat-EML: tel per lijst de
+    gekozen kandidaten (Elected = yes)."""
+    root = ET.fromstring(xml_bytes)
+
+    def tag(e):
+        return e.tag.split("}")[-1]
+
+    zetels: dict[str, int] = {}
+    huidige = None
+    for sel in root.iter():
+        if tag(sel) != "Selection":
+            continue
+        naam, gekozen, is_kandidaat = None, False, False
+        for k in sel.iter():
+            t = tag(k)
+            if t == "RegisteredName":
+                naam = (k.text or "").strip()
+            if t == "Candidate":
+                is_kandidaat = True
+            if t == "Elected" and (k.text or "").strip() == "yes":
+                gekozen = True
+        if naam is not None and not is_kandidaat:
+            huidige = naam
+            zetels.setdefault(huidige, 0)
+        elif is_kandidaat and gekozen and huidige:
+            zetels[huidige] += 1
+    return zetels
+
+
+def resultaten_uit_eml_zips(urls: list[str]) -> dict[str, dict[str, int]]:
+    """Map gebiedsnaam → (lijstnaam → zetels) uit Resultaat-EML's in zips."""
+    resultaten: dict[str, dict[str, int]] = {}
+    for url in urls:
+        zf = zipfile.ZipFile(io.BytesIO(haal(url)))
+        for naam in zf.namelist():
+            basis = naam.rsplit("/", 1)[-1]
+            if not (basis.startswith("Resultaat_") and basis.endswith(".eml.xml")):
+                continue
+            # Gebiedsnaam uit de mapnaam (PS: provincie, AB: waterschap).
+            gebied = naam.split("/")[1] if "/" in naam else basis
+            zetels = zetels_uit_resultaat_eml(zf.read(naam))
+            if zetels:
+                resultaten[gebied] = zetels
+    return resultaten
+
+
+def normaliseer_waterschap(mapnaam: str) -> str:
+    """Mapnaam ('HunzeenAas') → leesbare benadering van de naam."""
+    naam = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", mapnaam)
+    return naam.replace("_", " ").strip()
 
 
 def main() -> None:
@@ -75,8 +175,8 @@ def main() -> None:
     print(f"TK2025: {len(landelijk)} landelijke partijen met zetels")
 
     # --- GR2026: raadszetels per gemeente ---
-    gemeente_namen: dict[str, str] = {}
-    uitslagen: list[tuple[str, str, int]] = []  # (gemeentecode, lijstnaam, zetels)
+    gebied_namen: dict[str, str] = {}
+    uitslagen: list[tuple[str, str, str, int]] = []  # (orgaan, gebiedcode, lijst, zetels)
     tekst = io.StringIO(haal(GR2026_CSV).decode("utf-8-sig"))
     for rij in csv.DictReader(tekst, delimiter=";"):
         if rij["VeldType"] != "LijstAantalZetels":
@@ -85,18 +185,36 @@ def main() -> None:
         if not code.startswith("G"):
             continue
         gm = "GM" + code[1:]
-        gemeente_namen[gm] = rij["Regio"]
-        uitslagen.append((gm, rij["LijstNaam"], int(rij["Waarde"])))
-    print(f"GR2026: {len(uitslagen)} uitslagen in {len(gemeente_namen)} gemeenten")
+        gebied_namen[gm] = rij["Regio"]
+        uitslagen.append(("GEMEENTERAAD", gm, rij["LijstNaam"], int(rij["Waarde"])))
+    print(f"GR2026: {len(uitslagen)} uitslagen, {len(gebied_namen)} gemeenten")
 
-    # --- CBS: inwoneraantal per gemeente ---
+    # --- PS2023: statenzetels per provincie (EML) ---
+    ps = resultaten_uit_eml_zips(PS2023_EML_ZIPS)
+    for provincie, lijsten in ps.items():
+        code = PROVINCIE_CODES.get(provincie, f"PV_{provincie}")
+        gebied_namen[code] = provincie
+        for lijst, zetels in lijsten.items():
+            uitslagen.append(("PROVINCIALE_STATEN", code, lijst, zetels))
+    print(f"PS2023: {len(ps)} provincies")
+
+    # --- AB2023: waterschapszetels (EML) ---
+    ab = resultaten_uit_eml_zips(AB2023_EML_ZIPS)
+    for waterschap, lijsten in ab.items():
+        code = f"WS_{waterschap}"
+        gebied_namen[code] = normaliseer_waterschap(waterschap)
+        for lijst, zetels in lijsten.items():
+            uitslagen.append(("WATERSCHAP", code, lijst, zetels))
+    print(f"AB2023: {len(ab)} waterschappen")
+
+    # --- CBS: inwoneraantallen (gemeenten + provincies) ---
     cbs = json.loads(haal(CBS_BEVOLKING))
     inwoners = {
         rij["RegioS"].strip(): rij["BevolkingAanHetBeginVanDePeriode_1"]
         for rij in cbs["value"]
         if rij["BevolkingAanHetBeginVanDePeriode_1"] is not None
     }
-    print(f"CBS: inwoneraantallen voor {len(inwoners)} gemeenten")
+    print(f"CBS: inwoneraantallen voor {len(inwoners)} regio's")
 
     # --- Partijen samenstellen ---
     partijen: dict[str, dict] = {}
@@ -105,58 +223,92 @@ def main() -> None:
         partijen[kvk] = {
             "kvk_nummer": kvk,
             "naam": naam,
+            "organisatiemodel": "DECENTRAAL" if naam in DECENTRAAL_GEORGANISEERD else "CENTRAAL",
             "kamerzetels": zetels,
+            "moederpartij_kvk": None,
             "decentrale_uitslagen": [],
         }
 
-    landelijke_namen = set(landelijk)
-    for gm, lijstnaam, zetels in uitslagen:
+    for orgaan, gebied_code, lijstnaam, zetels in uitslagen:
         if zetels == 0:
             continue
-        if lijstnaam in landelijke_namen:
-            kvk = kvk_voor(f"landelijk|{lijstnaam}")
+        lijstnaam = ALIASSEN.get(lijstnaam, lijstnaam)
+        uitslag = {"orgaan": orgaan, "gebied_code": gebied_code, "zetels": zetels}
+
+        if lijstnaam in landelijk:
+            if lijstnaam in DECENTRAAL_GEORGANISEERD:
+                # Decentraal georganiseerd: de afdeling is een eigen
+                # rechtspersoon met eigen KvK (Wpp-model 2).
+                kvk = kvk_voor(f"afdeling|{lijstnaam}|{gebied_code}")
+                if kvk not in partijen:
+                    partijen[kvk] = {
+                        "kvk_nummer": kvk,
+                        "naam": f"{lijstnaam}, afdeling {gebied_namen[gebied_code]}",
+                        "organisatiemodel": "DECENTRAAL",
+                        "kamerzetels": 0,
+                        "moederpartij_kvk": kvk_voor(f"landelijk|{lijstnaam}"),
+                        "decentrale_uitslagen": [],
+                    }
+                partijen[kvk]["decentrale_uitslagen"].append(uitslag)
+            else:
+                # Centraal georganiseerd: alles onder de landelijke KvK.
+                partijen[kvk_voor(f"landelijk|{lijstnaam}")]["decentrale_uitslagen"].append(uitslag)
         else:
-            kvk = kvk_voor(f"lokaal|{gm}|{lijstnaam}")
+            # Lokale/provinciale/waterschapspartij: eigen rechtspersoon.
+            kvk = kvk_voor(f"lokaal|{gebied_code}|{lijstnaam}")
             if kvk not in partijen:
                 partijen[kvk] = {
                     "kvk_nummer": kvk,
                     "naam": lijstnaam,
+                    "organisatiemodel": "CENTRAAL",
                     "kamerzetels": 0,
+                    "moederpartij_kvk": None,
                     "decentrale_uitslagen": [],
                 }
-        partijen[kvk]["decentrale_uitslagen"].append(
-            {"orgaan": "GEMEENTERAAD", "gebied_code": gm, "zetels": zetels}
-        )
+            partijen[kvk]["decentrale_uitslagen"].append(uitslag)
 
+    orgaan_van_code: dict[str, str] = {}
+    for orgaan, code, _, _ in uitslagen:
+        orgaan_van_code[code] = orgaan
     gebieden = [
         {
-            "orgaan": "GEMEENTERAAD",
-            "code": gm,
+            "orgaan": orgaan_van_code.get(code, "GEMEENTERAAD"),
+            "code": code,
             "naam": naam,
-            "inwoneraantal": inwoners.get(gm, 0),
+            "inwoneraantal": inwoners.get(code, 0),
         }
-        for gm, naam in sorted(gemeente_namen.items(), key=lambda x: x[1])
+        for code, naam in sorted(gebied_namen.items(), key=lambda x: x[1])
     ]
 
     # --- Demo-voorbeelden voor de mock-login ---
     grootste = max(landelijk, key=landelijk.get)
-    kleinste = min(landelijk, key=landelijk.get)
     lokaal = max(
-        (p for p in partijen.values() if p["kamerzetels"] == 0 and p["decentrale_uitslagen"]),
+        (p for p in partijen.values()
+         if p["kamerzetels"] == 0 and p["moederpartij_kvk"] is None
+         and any(u["orgaan"] == "GEMEENTERAAD" for u in p["decentrale_uitslagen"])),
         key=lambda p: max(u["zetels"] for u in p["decentrale_uitslagen"]),
+    )
+    afdeling = next(
+        (p for p in sorted(partijen.values(), key=lambda x: x["naam"])
+         if p["moederpartij_kvk"] is not None),
+        None,
     )
     demo = [
         {"kvk_nummer": kvk_voor(f"landelijk|{grootste}"), "naam": grootste},
-        {"kvk_nummer": kvk_voor(f"landelijk|{kleinste}"), "naam": kleinste},
         {"kvk_nummer": lokaal["kvk_nummer"], "naam": lokaal["naam"]},
     ]
+    if afdeling:
+        demo.append({"kvk_nummer": afdeling["kvk_nummer"], "naam": afdeling["naam"]})
 
     register = {
         "bronnen": {
             "landelijk": "Verkiezingsuitslag Tweede Kamer 2025 (Kiesraad, data.overheid.nl)",
-            "decentraal": "Verkiezingsuitslagen Gemeenteraad 2026 (Kiesraad, data.overheid.nl)",
+            "gemeenteraden": "Verkiezingsuitslagen Gemeenteraad 2026 (Kiesraad, data.overheid.nl)",
+            "provinciale_staten": "Verkiezingsuitslagen Provinciale Staten 2023, Resultaat-EML (Kiesraad)",
+            "waterschappen": "Verkiezingsuitslagen Waterschappen 2023, Resultaat-EML (Kiesraad)",
             "inwoneraantallen": "CBS StatLine 37230ned, januari 2026",
             "kvk_nummers": "synthetisch (koppeling rechtspersoon-aanduiding is geen open data)",
+            "organisatiemodellen": "demo-aanname (volgt uit partijstatuten, geen open data)",
         },
         "partijen": sorted(partijen.values(), key=lambda p: (-p["kamerzetels"], p["naam"])),
         "gebieden": gebieden,

@@ -32,11 +32,19 @@ const gegevens = computed(() => {
       { label: 'Betalende leden · eigen opgave', waarde: String(p.aantal_betalende_leden ?? 0) },
     );
   } else {
+    const orgaanLabels = {
+      GEMEENTERAAD: 'Gemeenteraad',
+      PROVINCIALE_STATEN: 'Provinciale staten',
+      WATERSCHAP: 'Waterschap',
+    };
     rows.push(
-      { label: 'Gemeente of provincie', waarde: a.gemeente || 'Onbekend' },
-      { label: 'Raads- of statenzetels · bron: Kiesraad', waarde: String(p.aantal_raadszetels ?? 0) },
-      { label: 'Inwoneraantal gemeente · bron: CBS', waarde: String(p.inwoneraantal_gemeente ?? 0) },
+      { label: 'Orgaan', waarde: orgaanLabels[p.orgaan] ?? p.orgaan ?? 'Onbekend' },
+      { label: 'Gebied', waarde: a.gemeente || 'Onbekend' },
+      { label: 'Zetels · bron: Kiesraad', waarde: String(p.aantal_raadszetels ?? 0) },
     );
+    if (p.orgaan === 'GEMEENTERAAD') {
+      rows.push({ label: 'Inwoneraantal gemeente · bron: CBS', waarde: String(p.inwoneraantal_gemeente ?? 0) });
+    }
   }
   return rows;
 });

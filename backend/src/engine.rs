@@ -95,8 +95,8 @@ fn build_motivering(
             "artikel 6 en 8 van de Wet op de politieke partijen (kamerzetels, ledental en de bij \
              ministeriële regeling vastgestelde bedragen)"
         } else {
-            "artikel 7 en 12 van de Wet op de politieke partijen (raadszetels en het bij \
-             ministeriële regeling vastgestelde bedrag per zetel naar inwoneraantal)"
+            "artikel 7 en 12 van de Wet op de politieke partijen (zetels in het decentrale \
+             orgaan en het bij ministeriële regeling vastgestelde bedrag per zetel)"
         };
         return format!(
             "De aanvraag voldoet aan de transparantie-eisen van artikel 5 van de Wet op de \
@@ -156,8 +156,8 @@ fn build_motivering(
         }
     } else if as_int(params, "aantal_raadszetels") < 1 {
         redenen.push(
-            "de partij heeft geen zetel behaald bij de laatstgehouden decentrale verkiezing \
-             (artikel 7)"
+            "aan de partij is bij de laatstgehouden verkiezing van het decentrale orgaan geen \
+             zetel toegewezen (artikel 7)"
                 .to_string(),
         );
     }

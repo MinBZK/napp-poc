@@ -9,6 +9,7 @@ Feature: Subsidie voor decentrale politieke partijen
   Scenario: Lokale partij met 5 zetels in een middelgrote gemeente
     Given an application with the following data:
       | niveau                           | DECENTRAAL |
+      | orgaan                           | GEMEENTERAAD |
       | aantal_kamerzetels               | 0          |
       | aantal_betalende_leden           | 0          |
       | aantal_raadszetels               | 5          |
@@ -25,6 +26,7 @@ Feature: Subsidie voor decentrale politieke partijen
   Scenario: Lokale partij met 3 zetels in een kleine gemeente
     Given an application with the following data:
       | niveau                           | DECENTRAAL |
+      | orgaan                           | GEMEENTERAAD |
       | aantal_kamerzetels               | 0          |
       | aantal_betalende_leden           | 0          |
       | aantal_raadszetels               | 3          |
@@ -40,6 +42,7 @@ Feature: Subsidie voor decentrale politieke partijen
   Scenario: Stadspartij met 7 zetels in een grote stad
     Given an application with the following data:
       | niveau                           | DECENTRAAL |
+      | orgaan                           | GEMEENTERAAD |
       | aantal_kamerzetels               | 0          |
       | aantal_betalende_leden           | 0          |
       | aantal_raadszetels               | 7          |
@@ -55,6 +58,7 @@ Feature: Subsidie voor decentrale politieke partijen
   Scenario: Partij in gemeente precies op de staffelgrens van 375000 inwoners
     Given an application with the following data:
       | niveau                           | DECENTRAAL |
+      | orgaan                           | GEMEENTERAAD |
       | aantal_kamerzetels               | 0          |
       | aantal_betalende_leden           | 0          |
       | aantal_raadszetels               | 2          |
@@ -66,3 +70,35 @@ Feature: Subsidie voor decentrale politieke partijen
     When the subsidiebesluit is executed
     Then the subsidie is toegekend
     And the subsidiebedrag is "240000" eurocent
+
+  Scenario: Partij met 17 statenzetels in een provincie
+    Given an application with the following data:
+      | niveau                           | DECENTRAAL |
+      | orgaan                           | PROVINCIALE_STATEN |
+      | aantal_kamerzetels               | 0          |
+      | aantal_betalende_leden           | 0          |
+      | aantal_raadszetels               | 17         |
+      | inwoneraantal_gemeente           | 0          |
+      | ontvangt_anonieme_giften         | false      |
+      | ontvangt_giften_niet_ingezetenen | false      |
+      | voldoet_aan_meldplicht_giften    | true       |
+      | financien_openbaar_op_website    | true       |
+    When the subsidiebesluit is executed
+    Then the subsidie is toegekend
+    And the subsidiebedrag is "2742100" eurocent
+
+  Scenario: Partij met 4 zetels in het algemeen bestuur van een waterschap
+    Given an application with the following data:
+      | niveau                           | DECENTRAAL |
+      | orgaan                           | WATERSCHAP |
+      | aantal_kamerzetels               | 0          |
+      | aantal_betalende_leden           | 0          |
+      | aantal_raadszetels               | 4          |
+      | inwoneraantal_gemeente           | 0          |
+      | ontvangt_anonieme_giften         | false      |
+      | ontvangt_giften_niet_ingezetenen | false      |
+      | voldoet_aan_meldplicht_giften    | true       |
+      | financien_openbaar_op_website    | true       |
+    When the subsidiebesluit is executed
+    Then the subsidie is toegekend
+    And the subsidiebedrag is "645200" eurocent

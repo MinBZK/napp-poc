@@ -10,6 +10,7 @@ Feature: AWB-procedure rondom het subsidiebesluit
   Scenario: Toekenning is een beschikking met motiveringsplicht en bezwaartermijn
     Given an application with the following data:
       | niveau                           | LANDELIJK |
+      | orgaan                           | GEMEENTERAAD |
       | aantal_kamerzetels               | 10        |
       | aantal_betalende_leden           | 5000      |
       | aantal_raadszetels               | 0         |
@@ -26,6 +27,7 @@ Feature: AWB-procedure rondom het subsidiebesluit
   Scenario: Ook een afwijzing is een beschikking met bezwaartermijn
     Given an application with the following data:
       | niveau                           | LANDELIJK |
+      | orgaan                           | GEMEENTERAAD |
       | aantal_kamerzetels               | 0         |
       | aantal_betalende_leden           | 500       |
       | aantal_raadszetels               | 0         |

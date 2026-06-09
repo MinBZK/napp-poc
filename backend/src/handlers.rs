@@ -208,6 +208,8 @@ pub async fn me(session: Session) -> Result<Json<serde_json::Value>, ApiError> {
 #[derive(Deserialize)]
 pub struct NieuweAanvraag {
     pub niveau: String,
+    /// GEMEENTERAAD | PROVINCIALE_STATEN | WATERSCHAP (decentraal)
+    pub orgaan: Option<String>,
     pub gemeente: Option<String>,
     pub parameters: serde_json::Map<String, serde_json::Value>,
 }
@@ -240,6 +242,7 @@ pub async fn create_aanvraag(
     params.insert("niveau".to_string(), json!(body.niveau));
 
     if body.niveau == "LANDELIJK" {
+        params.insert("orgaan".to_string(), json!("GEMEENTERAAD"));
         let kamerzetels = crate::register::partij_by_kvk(&kvk)
             .map(|p| p.kamerzetels)
             .unwrap_or(0);
@@ -253,12 +256,20 @@ pub async fn create_aanvraag(
         params.insert("aantal_raadszetels".to_string(), json!(0));
         params.insert("inwoneraantal_gemeente".to_string(), json!(0));
     } else {
+        let orgaan = body.orgaan.as_deref().unwrap_or("GEMEENTERAAD");
+        if !["GEMEENTERAAD", "PROVINCIALE_STATEN", "WATERSCHAP"].contains(&orgaan) {
+            return Err(bad_request("Onbekend decentraal orgaan."));
+        }
         let Some(gebied_code) = body.gemeente.as_deref().filter(|g| !g.trim().is_empty()) else {
-            return Err(bad_request("Kies een gemeente voor een decentrale aanvraag."));
+            return Err(bad_request("Kies een gebied voor een decentrale aanvraag."));
         };
         let Some(gebied) = crate::register::gebied_by_code(gebied_code) else {
             return Err(bad_request("Onbekend gebied."));
         };
+        if gebied.orgaan != orgaan {
+            return Err(bad_request("Gebied hoort niet bij het gekozen orgaan."));
+        }
+        params.insert("orgaan".to_string(), json!(orgaan));
         let raadszetels = crate::register::uitslag_by_kvk_gebied(&kvk, gebied_code)
             .map(|u| u.zetels)
             .unwrap_or(0);
@@ -286,13 +297,18 @@ pub async fn create_aanvraag(
     let id = Uuid::new_v4().to_string();
     let vandaag = Utc::now().format("%Y-%m-%d").to_string();
     let params_json = serde_json::to_string(&params).map_err(internal_error)?;
+    let gebied_naam = body
+        .gemeente
+        .as_deref()
+        .and_then(crate::register::gebied_by_code)
+        .map(|g| g.naam.clone());
     db::insert_aanvraag(
         &state.pool,
         &id,
         &kvk,
         &partij,
         &body.niveau,
-        body.gemeente.as_deref(),
+        gebied_naam.as_deref(),
         &params_json,
         &vandaag,
     )
