@@ -183,11 +183,12 @@ fn build_motivering(
     );
 
     if !toegekend.is_empty() {
+        let n = toegekend.len();
         delen.push(format!(
             "Op grond van de artikelen 6 tot en met 12 wordt de subsidie vastgesteld op {} \
-             voor {} onderdelen, overeenkomstig de specificatie bij dit besluit.",
+             voor {n} {}, overeenkomstig de specificatie bij dit besluit.",
             euro(totaal),
-            toegekend.len()
+            if n == 1 { "onderdeel" } else { "onderdelen" }
         ));
     }
     for u in &afgewezen {

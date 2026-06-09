@@ -5,7 +5,7 @@ import PortalHeader from '../../components/PortalHeader.vue';
 import NBanner from '../../components/NBanner.vue';
 import { api } from '../../api.js';
 import { session } from '../../session.js';
-import { euro } from '../../format.js';
+import { euro, onderdelen } from '../../format.js';
 
 const router = useRouter();
 
@@ -328,7 +328,7 @@ watch(() => session.aanvrager, laadRegistratie);
               <nldd-text-cell
                 overline="Indicatieve uitkomst volgens de wet"
                 :text="proef.subsidie_toegekend ? euro(proef.subsidiebedrag) : 'Afwijzing'"
-                :supporting-text="`${proef.onderdelen_toegekend} van ${proef.onderdelen_totaal} onderdelen toegekend · dit is geen besluit`"
+                :supporting-text="`${proef.onderdelen_toegekend} van ${onderdelen(proef.onderdelen_totaal)} toegekend · dit is geen besluit`"
                 size="md"
               ></nldd-text-cell>
             </nldd-container>
@@ -339,7 +339,7 @@ watch(() => session.aanvrager, laadRegistratie);
         <nldd-button-group orientation="horizontal">
           <nldd-button
             variant="primary"
-            :text="`Aanvraag indienen (${aantalGeselecteerd} onderdelen)`"
+            :text="`Aanvraag indienen (${onderdelen(aantalGeselecteerd)})`"
             start-icon="paper-plane"
             :disabled="bezig || aantalGeselecteerd === 0 || undefined"
             @click="verstuur"

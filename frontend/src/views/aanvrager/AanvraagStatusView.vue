@@ -5,7 +5,7 @@ import PortalHeader from '../../components/PortalHeader.vue';
 import NBanner from '../../components/NBanner.vue';
 import LifecycleTimeline from '../../components/LifecycleTimeline.vue';
 import { api } from '../../api.js';
-import { euro, datum } from '../../format.js';
+import { euro, datum, onderdelen } from '../../format.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -59,7 +59,7 @@ onMounted(async () => {
 
         <nldd-title size="2">
           <span slot="overline">{{ item.aanvraag.partij_naam }}</span>
-          <h2>Jaaraanvraag {{ item.aanvraag.subsidiejaar }} · {{ item.aanvraag.componenten.length }} onderdelen</h2>
+          <h2>Jaaraanvraag {{ item.aanvraag.subsidiejaar }} · {{ onderdelen(item.aanvraag.componenten.length) }}</h2>
         </nldd-title>
         <nldd-spacer size="24"></nldd-spacer>
 

@@ -47,3 +47,7 @@ export function statusColor(status, besluit) {
   if (status === 'BESLUIT' || status === 'BEZWAAR') return 'success';
   return 'neutral';
 }
+
+export function onderdelen(n) {
+  return `${n} ${n === 1 ? 'onderdeel' : 'onderdelen'}`;
+}

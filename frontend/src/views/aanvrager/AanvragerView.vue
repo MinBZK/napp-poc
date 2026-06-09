@@ -178,7 +178,7 @@ watch(() => session.aanvrager, laadAanvragen);
           >
             <nldd-title-cell
               :text="`Jaaraanvraag ${item.aanvraag.subsidiejaar}`"
-              :supporting-text="`${item.aanvraag.componenten.length} onderdelen · ingediend op ${datum(item.aanvraag.aanvraag_datum)}`"
+              :supporting-text="`${onderdelen(item.aanvraag.componenten.length)} · ingediend op ${datum(item.aanvraag.aanvraag_datum)}`"
             ></nldd-title-cell>
             <nldd-text-cell
               v-if="item.besluit"
