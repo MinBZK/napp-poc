@@ -41,6 +41,7 @@ export const api = {
   aanvragen: () => apiGet('/api/aanvragen'),
   aanvraag: (id) => apiGet(`/api/aanvragen/${id}`),
   nieuweAanvraag: (payload) => apiPost('/api/aanvragen', payload),
+  proefAanspraken: (payload) => apiPost('/api/aanvragen/proef', payload),
   proefberekening: (id) => apiPost(`/api/aanvragen/${id}/proefberekening`),
   stelBesluitVast: (id) => apiPost(`/api/aanvragen/${id}/besluit`),
   bekendmaking: (id) => apiPost(`/api/aanvragen/${id}/bekendmaking`),

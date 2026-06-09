@@ -5,6 +5,7 @@ import PortalHeader from '../../components/PortalHeader.vue';
 import NBanner from '../../components/NBanner.vue';
 import { api } from '../../api.js';
 import { session } from '../../session.js';
+import { euro } from '../../format.js';
 
 const router = useRouter();
 
@@ -19,6 +20,8 @@ const financienOpenbaar = ref(false);
 
 const fout = ref('');
 const bezig = ref(false);
+const proef = ref(null);
+let proefTimer = null;
 
 const GROEPEN = [
   { soort: 'LANDELIJK', titel: 'Landelijk', kolom: 'Kamerzetels (EK + TK)' },
@@ -118,6 +121,35 @@ async function laadRegistratie() {
     registratie.value = null;
   }
 }
+
+async function herberekenProef() {
+  if (!geselecteerd.value.size) {
+    proef.value = null;
+    return;
+  }
+  try {
+    proef.value = await api.proefAanspraken({
+      componenten: [...geselecteerd.value],
+      parameters: {
+        aantal_betalende_leden: leden.value,
+        ontvangt_anonieme_giften: !geenAnoniemeGiften.value,
+        ontvangt_giften_niet_ingezetenen: !geenGiftenNietIngezetenen.value,
+        voldoet_aan_meldplicht_giften: meldplichtNageleefd.value,
+        financien_openbaar_op_website: financienOpenbaar.value,
+      },
+    });
+  } catch {
+    proef.value = null;
+  }
+}
+
+watch(
+  [geselecteerd, leden, geenAnoniemeGiften, geenGiftenNietIngezetenen, meldplichtNageleefd, financienOpenbaar],
+  () => {
+    clearTimeout(proefTimer);
+    proefTimer = setTimeout(herberekenProef, 400);
+  },
+);
 
 onMounted(laadRegistratie);
 watch(() => session.aanvrager, laadRegistratie);
@@ -273,12 +305,34 @@ watch(() => session.aanvrager, laadRegistratie);
         </nldd-container>
         <nldd-spacer size="24"></nldd-spacer>
 
+        <template v-if="landelijkGeselecteerd && leden < 1000">
+          <NBanner
+            variant="warning"
+            text="Minder dan duizend leden"
+            supporting-text="Voor de landelijke subsidie zijn minimaal 1.000 betalende leden vereist (artikel 6 Wpp). Met dit ledental wijst de wet het landelijke onderdeel af."
+          />
+          <nldd-spacer size="16"></nldd-spacer>
+        </template>
         <template v-if="!verklaringenCompleet">
           <NBanner
             variant="neutral"
             text="Let op"
             supporting-text="Een aanvraag zonder volledige verklaringen wordt door de wet afgewezen. U kunt wel indienen; het besluit volgt uit de wet."
           />
+          <nldd-spacer size="16"></nldd-spacer>
+        </template>
+
+        <template v-if="proef">
+          <nldd-box>
+            <nldd-container padding="16">
+              <nldd-text-cell
+                overline="Indicatieve uitkomst volgens de wet"
+                :text="proef.subsidie_toegekend ? euro(proef.subsidiebedrag) : 'Afwijzing'"
+                :supporting-text="`${proef.onderdelen_toegekend} van ${proef.onderdelen_totaal} onderdelen toegekend · dit is geen besluit`"
+                size="md"
+              ></nldd-text-cell>
+            </nldd-container>
+          </nldd-box>
           <nldd-spacer size="16"></nldd-spacer>
         </template>
 

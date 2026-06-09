@@ -60,14 +60,26 @@ SSO Rijk wordt actief zodra de `OIDC_*`-omgevingsvariabelen zijn gezet
 4. Het bekendgemaakte besluit verschijnt in het openbare register met
    statistieken.
 
-Zetelaantallen komen uit de echte verkiezingsuitslagen (Kiesraad) en
+Zetelaantallen komen uit de echte verkiezingsuitslagen (Kiesraad: TK2025
+en GR2026 als CSV, PS2023 en AB2023 uit de officiele Resultaat-EML's) en
 inwoneraantallen van het CBS; aanvragers declareren die niet zelf. De
-KvK-koppeling is synthetisch — die koppeling (rechtspersoon naar
+KvK-koppeling is synthetisch: die koppeling (rechtspersoon naar
 geregistreerde aanduiding) is precies wat de Napp bij registratie vastlegt
-en is geen open data. Het datamodel kent naast gemeenteraden ook
-provinciale staten en waterschappen; de zetel-import daarvoor is een
-vervolgstap (de Kiesraad publiceert voor PS2023/AB2023 alleen
-stemmen-CSV's zonder zetels).
+en is geen open data.
+
+De aanvraag volgt de rechtspersoon, conform de twee organisatiemodellen
+uit de Wpp (MvT bij art. 27). Een centraal georganiseerde partij (een
+vereniging, een KvK) dient een samengestelde jaaraanvraag in met al haar
+aanspraken als onderdelen: landelijk plus elk decentraal orgaan/gebied
+(gemeenteraad, provinciale staten, waterschap) waar de Kiesraad haar
+zetels toewees. Een decentraal georganiseerde partij heeft afdelingen met
+eigen rechtspersoonlijkheid; elke afdeling logt zelf in en vraagt alleen
+haar eigen gebied aan. De wet rekent per onderdeel; de som, de
+specificatie en de ene betaalopdracht aan de rechtspersoon zijn
+orchestratie. Onderdelen die al lopen of zijn toegekend voor het
+subsidiejaar zijn geblokkeerd voor herhaalaanvraag; na een afwijzing kan
+het opnieuw. Tijdens het invullen toont het formulier een indicatieve
+uitkomst, live berekend door dezelfde wet-engine.
 
 De scenario-runner in de beoordelingsomgeving draait dezelfde 21 scenario's
 live in de browser op de naar WASM gecompileerde engine: het bewijs dat de

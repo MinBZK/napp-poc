@@ -353,6 +353,54 @@ pub async fn create_aanvraag(
     Ok(Json(json!({"id": id, "status": "BEHANDELING", "subsidiejaar": jaar})))
 }
 
+/// Indicatieve berekening voor de aanvrager: de wet uitgevoerd op de
+/// gekozen onderdelen, zonder iets vast te leggen. Zo ziet de partij bij het
+/// invullen al wat de wet zou beslissen.
+pub async fn proef_aanspraken(
+    State(state): State<AppState>,
+    session: Session,
+    Json(body): Json<NieuweAanvraag>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let Some(kvk) = session_kvk(&session).await else {
+        return Err(forbidden());
+    };
+    let beschikbaar = aanspraken_voor(&kvk);
+    let componenten: Vec<db::Component> = beschikbaar
+        .into_iter()
+        .filter(|c| body.componenten.contains(&c.key))
+        .collect();
+    if componenten.is_empty() {
+        return Err(bad_request("Geen onderdelen gekozen."));
+    }
+    let mut eigen = serde_json::Map::new();
+    for key in [
+        "ontvangt_anonieme_giften",
+        "ontvangt_giften_niet_ingezetenen",
+        "voldoet_aan_meldplicht_giften",
+        "financien_openbaar_op_website",
+    ] {
+        let waarde = body.parameters.get(key).and_then(|v| v.as_bool()).unwrap_or(false);
+        eigen.insert(key.to_string(), json!(waarde));
+    }
+    let leden = body
+        .parameters
+        .get("aantal_betalende_leden")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
+    eigen.insert("aantal_betalende_leden".to_string(), json!(leden));
+
+    let vandaag = Utc::now().format("%Y-%m-%d").to_string();
+    let uitkomst = engine::evaluate_jaaraanvraag(state.corpus.clone(), componenten, eigen, vandaag)
+        .await
+        .map_err(internal_error)?;
+    Ok(Json(json!({
+        "subsidie_toegekend": uitkomst.subsidie_toegekend,
+        "subsidiebedrag": uitkomst.subsidiebedrag,
+        "onderdelen_toegekend": uitkomst.componenten.iter().filter(|c| c.toegekend).count(),
+        "onderdelen_totaal": uitkomst.componenten.len(),
+    })))
+}
+
 pub async fn list_aanvragen(
     State(state): State<AppState>,
     session: Session,
