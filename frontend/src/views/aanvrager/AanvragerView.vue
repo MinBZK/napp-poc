@@ -5,7 +5,7 @@ import PortalHeader from '../../components/PortalHeader.vue';
 import NBanner from '../../components/NBanner.vue';
 import { api } from '../../api.js';
 import { session, refreshSession } from '../../session.js';
-import { euro, datum, statusLabel, statusColor } from '../../format.js';
+import { euro, datum, onderdelen, statusLabel, statusColor } from '../../format.js';
 
 const router = useRouter();
 
