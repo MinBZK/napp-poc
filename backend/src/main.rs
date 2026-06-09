@@ -6,6 +6,7 @@
 mod db;
 mod engine;
 mod handlers;
+mod register;
 mod state;
 
 use std::sync::Arc;
@@ -80,6 +81,7 @@ async fn main() -> anyhow::Result<()> {
             "/api/eherkenning/logout",
             post(handlers::eherkenning_logout),
         )
+        .route("/api/mijn-registratie", get(handlers::mijn_registratie))
         .route("/api/aanvragen", post(handlers::create_aanvraag))
         .route("/api/aanvragen", get(handlers::list_aanvragen))
         .route("/api/aanvragen/{id}", get(handlers::get_aanvraag))

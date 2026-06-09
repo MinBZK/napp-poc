@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import PortalHeader from '../../components/PortalHeader.vue';
 import NBanner from '../../components/NBanner.vue';
@@ -9,11 +9,11 @@ import { session } from '../../session.js';
 const router = useRouter();
 
 const niveau = ref('LANDELIJK');
-const kamerzetels = ref(0);
 const leden = ref(0);
-const raadszetels = ref(0);
 const gemeente = ref('');
-const inwoners = ref(0);
+
+// Registergegevens (Kiesraad/CBS) van de ingelogde partij.
+const registratie = ref(null);
 
 // Verklaringen, positief geformuleerd; de wet kent verboden, dus de eerste
 // twee worden geinverteerd verstuurd.
@@ -24,6 +24,17 @@ const financienOpenbaar = ref(false);
 
 const fout = ref('');
 const bezig = ref(false);
+
+const geregistreerd = computed(() => Boolean(registratie.value?.partij));
+const kamerzetels = computed(() => registratie.value?.partij?.kamerzetels ?? 0);
+
+const uitslag = computed(() =>
+  registratie.value?.decentrale_uitslagen?.find((u) => u.gemeente === gemeente.value) ?? null,
+);
+const inwoneraantal = computed(
+  () =>
+    registratie.value?.gemeenten?.find((g) => g.naam === gemeente.value)?.inwoneraantal ?? null,
+);
 
 const verklaringenCompleet = computed(
   () =>
@@ -43,10 +54,7 @@ async function verstuur() {
   bezig.value = true;
   try {
     const parameters = {
-      aantal_kamerzetels: kamerzetels.value,
       aantal_betalende_leden: leden.value,
-      aantal_raadszetels: raadszetels.value,
-      inwoneraantal_gemeente: inwoners.value,
       ontvangt_anonieme_giften: !geenAnoniemeGiften.value,
       ontvangt_giften_niet_ingezetenen: !geenGiftenNietIngezetenen.value,
       voldoet_aan_meldplicht_giften: meldplichtNageleefd.value,
@@ -64,6 +72,18 @@ async function verstuur() {
     bezig.value = false;
   }
 }
+
+async function laadRegistratie() {
+  if (!session.aanvrager) return;
+  try {
+    registratie.value = await api.mijnRegistratie();
+  } catch {
+    registratie.value = null;
+  }
+}
+
+onMounted(laadRegistratie);
+watch(() => session.aanvrager, laadRegistratie);
 </script>
 
 <template>
@@ -100,8 +120,11 @@ async function verstuur() {
         <nldd-spacer size="12"></nldd-spacer>
         <nldd-rich-text>
           <p>
-            De Napp toetst uw aanvraag aan de Wet op de politieke partijen. U ontvangt
-            een besluit met motivering; daarna geldt een bezwaartermijn van zes weken.
+            De Napp toetst uw aanvraag aan de Wet op de politieke partijen.
+            Zetelaantallen komen uit de uitslagen van de Kiesraad en
+            inwoneraantallen uit de cijfers van het CBS; die hoeft u niet zelf
+            op te geven. U ontvangt een besluit met motivering; daarna geldt een
+            bezwaartermijn van zes weken.
           </p>
         </nldd-rich-text>
         <nldd-spacer size="24"></nldd-spacer>
@@ -129,15 +152,30 @@ async function verstuur() {
             text="Vertegenwoordiging en leden"
             supporting-text="Vereist: minimaal 1 kamerzetel en 1.000 betalende leden."
           >
+            <template v-if="registratie && !geregistreerd">
+              <NBanner
+                variant="warning"
+                text="Geen registratie gevonden"
+                supporting-text="Uw organisatie staat niet in het partijregister van de Napp. U kunt de aanvraag indienen, maar zonder geregistreerde kamerzetels zal de wet haar afwijzen."
+              />
+              <nldd-spacer size="16"></nldd-spacer>
+            </template>
+            <template v-else-if="registratie && kamerzetels === 0">
+              <NBanner
+                variant="warning"
+                text="Geen kamerzetels"
+                supporting-text="Volgens de uitslagen van de Kiesraad heeft uw partij geen zetels in de Eerste of Tweede Kamer. U kunt de aanvraag indienen, maar de wet zal haar afwijzen."
+              />
+              <nldd-spacer size="16"></nldd-spacer>
+            </template>
             <nldd-form-field label="Zetels in Eerste en Tweede Kamer">
-              <nldd-number-field
-                :value="kamerzetels"
-                name="kamerzetels"
-                min="0"
-                max="225"
-                @input="kamerzetels = num($event)"
-                @change="kamerzetels = num($event)"
-              ></nldd-number-field>
+              <nldd-text-field
+                :value="String(kamerzetels)"
+                readonly
+              ></nldd-text-field>
+              <nldd-form-field-help-text>
+                Bron: uitslagen Kiesraad, via het partijregister van de Napp.
+              </nldd-form-field-help-text>
             </nldd-form-field>
             <nldd-form-field label="Betalende leden">
               <nldd-number-field
@@ -149,7 +187,8 @@ async function verstuur() {
                 @change="leden = num($event)"
               ></nldd-number-field>
               <nldd-form-field-help-text>
-                Leden die jaarlijks ten minste € 12 contributie betalen.
+                Eigen opgave: leden die jaarlijks ten minste € 12 contributie
+                betalen.
               </nldd-form-field-help-text>
             </nldd-form-field>
           </nldd-form-section>
@@ -159,37 +198,42 @@ async function verstuur() {
             text="Vertegenwoordiging"
             supporting-text="Vereist: minimaal 1 zetel bij de laatste gemeenteraads- of statenverkiezing."
           >
-            <nldd-form-field label="Gemeente of provincie">
-              <nldd-text-field
-                :value="gemeente"
-                name="gemeente"
-                placeholder="Bijvoorbeeld: Utrecht"
-                @input="gemeente = $event.detail?.value ?? $event.target?.value ?? ''"
-              ></nldd-text-field>
+            <nldd-form-field label="Gemeente">
+              <nldd-dropdown>
+                <select :value="gemeente" @change="gemeente = $event.target.value">
+                  <option value="" disabled>Kies een gemeente</option>
+                  <option
+                    v-for="g in registratie?.gemeenten ?? []"
+                    :key="g.naam"
+                    :value="g.naam"
+                  >
+                    {{ g.naam }}
+                  </option>
+                </select>
+              </nldd-dropdown>
             </nldd-form-field>
-            <nldd-form-field label="Behaalde raads- of statenzetels">
-              <nldd-number-field
-                :value="raadszetels"
-                name="raadszetels"
-                min="0"
-                max="55"
-                @input="raadszetels = num($event)"
-                @change="raadszetels = num($event)"
-              ></nldd-number-field>
-            </nldd-form-field>
-            <nldd-form-field label="Inwoneraantal gemeente">
-              <nldd-number-field
-                :value="inwoners"
-                name="inwoners"
-                min="0"
-                step="1000"
-                @input="inwoners = num($event)"
-                @change="inwoners = num($event)"
-              ></nldd-number-field>
-              <nldd-form-field-help-text>
-                Het bedrag per zetel hangt af van het inwoneraantal.
-              </nldd-form-field-help-text>
-            </nldd-form-field>
+            <template v-if="gemeente">
+              <template v-if="!uitslag">
+                <NBanner
+                  variant="warning"
+                  text="Geen zetels in deze gemeente"
+                  supporting-text="Volgens de uitslagen van de Kiesraad heeft uw partij in deze gemeente geen raadszetels. U kunt de aanvraag indienen, maar de wet zal haar afwijzen."
+                />
+                <nldd-spacer size="16"></nldd-spacer>
+              </template>
+              <nldd-form-field label="Behaalde raadszetels">
+                <nldd-text-field :value="String(uitslag?.raadszetels ?? 0)" readonly></nldd-text-field>
+                <nldd-form-field-help-text>
+                  Bron: uitslagen Kiesraad.
+                </nldd-form-field-help-text>
+              </nldd-form-field>
+              <nldd-form-field label="Inwoneraantal gemeente">
+                <nldd-text-field :value="String(inwoneraantal ?? 0)" readonly></nldd-text-field>
+                <nldd-form-field-help-text>
+                  Bron: CBS. Bepaalt het bedrag per zetel.
+                </nldd-form-field-help-text>
+              </nldd-form-field>
+            </template>
           </nldd-form-section>
 
           <nldd-form-section
@@ -242,7 +286,7 @@ async function verstuur() {
                 type="submit"
                 text="Aanvraag indienen"
                 start-icon="paper-plane"
-                :disabled="bezig || undefined"
+                :disabled="bezig || (niveau === 'DECENTRAAL' && !gemeente) || undefined"
               ></nldd-button>
               <nldd-button
                 variant="neutral-transparent"

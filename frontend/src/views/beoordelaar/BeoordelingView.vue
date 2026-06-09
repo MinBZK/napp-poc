@@ -28,14 +28,14 @@ const gegevens = computed(() => {
   ];
   if (a.niveau === 'LANDELIJK') {
     rows.push(
-      { label: 'Kamerzetels (EK + TK)', waarde: String(p.aantal_kamerzetels ?? 0) },
-      { label: 'Betalende leden', waarde: String(p.aantal_betalende_leden ?? 0) },
+      { label: 'Kamerzetels (EK + TK) · bron: Kiesraad', waarde: String(p.aantal_kamerzetels ?? 0) },
+      { label: 'Betalende leden · eigen opgave', waarde: String(p.aantal_betalende_leden ?? 0) },
     );
   } else {
     rows.push(
       { label: 'Gemeente of provincie', waarde: a.gemeente || 'Onbekend' },
-      { label: 'Raads- of statenzetels', waarde: String(p.aantal_raadszetels ?? 0) },
-      { label: 'Inwoneraantal gemeente', waarde: String(p.inwoneraantal_gemeente ?? 0) },
+      { label: 'Raads- of statenzetels · bron: Kiesraad', waarde: String(p.aantal_raadszetels ?? 0) },
+      { label: 'Inwoneraantal gemeente · bron: CBS', waarde: String(p.inwoneraantal_gemeente ?? 0) },
     );
   }
   return rows;

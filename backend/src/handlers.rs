@@ -73,30 +73,64 @@ async fn session_beoordelaar(session: &Session) -> Option<String> {
 #[derive(Deserialize)]
 pub struct EherkenningLogin {
     pub kvk_nummer: String,
-    pub partij_naam: String,
 }
 
-/// MOCK eHerkenning-login voor aanvragers (politieke partijen).
+/// MOCK eHerkenning-login voor aanvragers. eHerkenning levert alleen de
+/// identiteit van de rechtspersoon (KvK); de partijnaam volgt uit het
+/// partijregister van de Napp. Een onbekend KvK-nummer kan gewoon inloggen
+/// en aanvragen — de wet wijst dan af (AWB 4:1: iedereen mag aanvragen).
 pub async fn eherkenning_login(
     session: Session,
     Json(body): Json<EherkenningLogin>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    if body.kvk_nummer.trim().is_empty() || body.partij_naam.trim().is_empty() {
-        return Err(bad_request("KVK-nummer en partijnaam zijn verplicht."));
+    let kvk = body.kvk_nummer.trim().to_string();
+    if !kvk.chars().all(|c| c.is_ascii_digit()) || kvk.len() != 8 {
+        return Err(bad_request("Vul een geldig KVK-nummer in (8 cijfers)."));
     }
+    let naam = match crate::register::partij_by_kvk(&kvk) {
+        Some(partij) => partij.naam.to_string(),
+        None => format!("Organisatie {kvk}"),
+    };
     session
-        .insert(SESSION_KEY_EH_KVK, body.kvk_nummer.trim().to_string())
+        .insert(SESSION_KEY_EH_KVK, kvk.clone())
         .await
         .map_err(internal_error)?;
     session
-        .insert(SESSION_KEY_EH_PARTIJ, body.partij_naam.trim().to_string())
+        .insert(SESSION_KEY_EH_PARTIJ, naam.clone())
         .await
         .map_err(internal_error)?;
     Ok(Json(json!({
         "rol": "aanvrager",
-        "kvk_nummer": body.kvk_nummer.trim(),
-        "partij_naam": body.partij_naam.trim(),
+        "kvk_nummer": kvk,
+        "partij_naam": naam,
         "mock": true,
+    })))
+}
+
+/// Registergegevens van de ingelogde partij: landelijke zetels (Kiesraad),
+/// decentrale uitslagen (Kiesraad) en gemeenten met inwoneraantal (CBS).
+pub async fn mijn_registratie(session: Session) -> Result<Json<serde_json::Value>, ApiError> {
+    let Some(kvk) = session_kvk(&session).await else {
+        return Err(forbidden());
+    };
+    let partij = crate::register::partij_by_kvk(&kvk);
+    let uitslagen: Vec<serde_json::Value> = crate::register::decentrale_uitslagen_by_kvk(&kvk)
+        .into_iter()
+        .map(|u| {
+            let inwoners = crate::register::gemeente_by_naam(u.gemeente)
+                .map(|g| g.inwoneraantal)
+                .unwrap_or(0);
+            json!({
+                "gemeente": u.gemeente,
+                "raadszetels": u.raadszetels,
+                "inwoneraantal": inwoners,
+            })
+        })
+        .collect();
+    Ok(Json(json!({
+        "partij": partij.map(|p| json!({"naam": p.naam, "kamerzetels": p.kamerzetels})),
+        "decentrale_uitslagen": uitslagen,
+        "gemeenten": crate::register::GEMEENTEN,
     })))
 }
 
@@ -188,29 +222,55 @@ pub async fn create_aanvraag(
         return Err(bad_request("Niveau moet LANDELIJK of DECENTRAAL zijn."));
     }
 
-    // De engine resolvet alle inputs eager — vul ontbrekende parameters van
-    // de andere track aan met neutrale waarden.
-    let mut params = body.parameters.clone();
+    // Zetels en inwoneraantal komen uit de officiële bronnen (Kiesraad, CBS)
+    // via het partijregister — wat de client daarvoor instuurt wordt
+    // genegeerd. Alleen eigen opgaven (ledenaantal, verklaringen) komen uit
+    // het formulier. Onbekend in het register betekent nul zetels: de
+    // aanvraag mag worden ingediend, de wet wijst af.
+    let mut params = serde_json::Map::new();
     params.insert("niveau".to_string(), json!(body.niveau));
-    for (key, default) in [
-        ("aantal_kamerzetels", json!(0)),
-        ("aantal_betalende_leden", json!(0)),
-        ("aantal_raadszetels", json!(0)),
-        ("inwoneraantal_gemeente", json!(0)),
-    ] {
-        params.entry(key.to_string()).or_insert(default);
+
+    if body.niveau == "LANDELIJK" {
+        let kamerzetels = crate::register::partij_by_kvk(&kvk)
+            .map(|p| p.kamerzetels)
+            .unwrap_or(0);
+        params.insert("aantal_kamerzetels".to_string(), json!(kamerzetels));
+        let leden = body
+            .parameters
+            .get("aantal_betalende_leden")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0);
+        params.insert("aantal_betalende_leden".to_string(), json!(leden));
+        params.insert("aantal_raadszetels".to_string(), json!(0));
+        params.insert("inwoneraantal_gemeente".to_string(), json!(0));
+    } else {
+        let Some(gemeente) = body.gemeente.as_deref().filter(|g| !g.trim().is_empty()) else {
+            return Err(bad_request("Kies een gemeente voor een decentrale aanvraag."));
+        };
+        let raadszetels = crate::register::uitslag_by_kvk_gemeente(&kvk, gemeente)
+            .map(|u| u.raadszetels)
+            .unwrap_or(0);
+        let inwoners = crate::register::gemeente_by_naam(gemeente)
+            .map(|g| g.inwoneraantal)
+            .unwrap_or(0);
+        params.insert("aantal_raadszetels".to_string(), json!(raadszetels));
+        params.insert("inwoneraantal_gemeente".to_string(), json!(inwoners));
+        params.insert("aantal_kamerzetels".to_string(), json!(0));
+        params.insert("aantal_betalende_leden".to_string(), json!(0));
     }
+
     for key in [
         "ontvangt_anonieme_giften",
         "ontvangt_giften_niet_ingezetenen",
         "voldoet_aan_meldplicht_giften",
         "financien_openbaar_op_website",
     ] {
-        if !params.contains_key(key) {
+        let Some(waarde) = body.parameters.get(key).and_then(|v| v.as_bool()) else {
             return Err(bad_request(&format!(
                 "Verplichte verklaring '{key}' ontbreekt."
             )));
-        }
+        };
+        params.insert(key.to_string(), json!(waarde));
     }
 
     let id = Uuid::new_v4().to_string();

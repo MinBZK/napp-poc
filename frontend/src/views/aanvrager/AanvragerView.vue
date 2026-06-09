@@ -10,7 +10,6 @@ import { euro, datum, statusLabel, statusColor } from '../../format.js';
 const router = useRouter();
 
 const kvk = ref('');
-const partij = ref('');
 const loginFout = ref('');
 const bezig = ref(false);
 
@@ -37,13 +36,9 @@ async function login() {
     loginFout.value = 'Vul een geldig KVK-nummer in (8 cijfers).';
     return;
   }
-  if (!partij.value.trim()) {
-    loginFout.value = 'Vul de naam van uw partij in.';
-    return;
-  }
   bezig.value = true;
   try {
-    await api.eherkenningLogin(kvk.value.trim(), partij.value.trim());
+    await api.eherkenningLogin(kvk.value.trim());
     await refreshSession();
   } catch (e) {
     loginFout.value = e.message;
@@ -100,7 +95,7 @@ watch(() => session.aanvrager, laadAanvragen);
         <NBanner
           variant="warning"
           text="Demo-omgeving"
-          supporting-text="eHerkenning is in deze demonstratie gesimuleerd. Vul een fictief KVK-nummer en partijnaam in."
+          supporting-text="eHerkenning is gesimuleerd: alleen het KVK-nummer telt. Geregistreerde demo-partijen: 87654321 (Vrijheid en Vooruitgang), 23456789 (Algemene Volkspartij), 34567890 (Partij voor Stad en Land), 45678901 (Nieuw Geluid). Elk ander nummer logt in als ongeregistreerde organisatie."
         />
         <nldd-spacer size="24"></nldd-spacer>
         <nldd-card accessible-label="eHerkenning-login">
@@ -118,14 +113,6 @@ watch(() => session.aanvrager, laadAanvragen);
                 <nldd-form-field-error-text id="kvk-fout">
                   Vul een geldig KVK-nummer in (8 cijfers).
                 </nldd-form-field-error-text>
-              </nldd-form-field>
-              <nldd-form-field label="Naam politieke partij">
-                <nldd-text-field
-                  name="partij"
-                  :value="partij"
-                  placeholder="Bijvoorbeeld: Partij voor de Demo"
-                  @input="partij = $event.detail?.value ?? $event.target?.value ?? ''"
-                ></nldd-text-field>
               </nldd-form-field>
               <nldd-form-actions>
                 <nldd-button

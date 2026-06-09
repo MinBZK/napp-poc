@@ -32,9 +32,10 @@ export function apiPost(path, data) {
 
 export const api = {
   me: () => apiGet('/api/me'),
-  eherkenningLogin: (kvkNummer, partijNaam) =>
-    apiPost('/api/eherkenning/login', { kvk_nummer: kvkNummer, partij_naam: partijNaam }),
+  eherkenningLogin: (kvkNummer) =>
+    apiPost('/api/eherkenning/login', { kvk_nummer: kvkNummer }),
   eherkenningLogout: () => apiPost('/api/eherkenning/logout'),
+  mijnRegistratie: () => apiGet('/api/mijn-registratie'),
   ssoMockLogin: (naam) => apiPost('/api/sso/mock-login', { naam }),
   aanvragen: () => apiGet('/api/aanvragen'),
   aanvraag: (id) => apiGet(`/api/aanvragen/${id}`),
