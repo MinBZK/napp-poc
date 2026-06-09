@@ -55,11 +55,6 @@ function stapKleur(status) {
   return 'secondary';
 }
 
-function tabelTekst(step) {
-  if (!step.dataTable) return '';
-  return step.dataTable.map((row) => `| ${row.join(' | ')} |`).join('\n');
-}
-
 async function run() {
   bezig.value = true;
   fout.value = '';
@@ -186,12 +181,19 @@ onMounted(run);
                     <span v-if="step.error" slot="supporting-text">{{ step.error }}</span>
                   </nldd-text-cell>
                 </nldd-list-item>
-                <nldd-list-item v-if="step.dataTable" size="sm">
-                  <nldd-spacer-cell size="48"></nldd-spacer-cell>
-                  <nldd-cell width="full" vertical-alignment="top">
-                    <nldd-code-viewer variant="simple" no-copy>{{ tabelTekst(step) }}</nldd-code-viewer>
-                  </nldd-cell>
-                </nldd-list-item>
+                <template v-if="step.dataTable">
+                  <nldd-list-item v-for="rij in step.dataTable" :key="rij[0]" size="sm">
+                    <nldd-spacer-cell size="48"></nldd-spacer-cell>
+                    <nldd-text-cell size="sm" :text="rij[0]" color="secondary"></nldd-text-cell>
+                    <nldd-text-cell
+                      size="sm"
+                      :text="rij[1]"
+                      width="fit-content"
+                      horizontal-alignment="right"
+                    ></nldd-text-cell>
+                    <nldd-spacer-cell size="16"></nldd-spacer-cell>
+                  </nldd-list-item>
+                </template>
               </template>
             </template>
           </template>
