@@ -181,6 +181,7 @@ watch(() => session.aanvrager, laadAanvragen);
               :text="euro(item.besluit.subsidiebedrag)"
               horizontal-alignment="right"
             ></nldd-text-cell>
+            <nldd-spacer-cell size="12"></nldd-spacer-cell>
             <nldd-cell width="fit-content">
               <nldd-tag
                 :color="statusColor(item.aanvraag.status, item.besluit)"

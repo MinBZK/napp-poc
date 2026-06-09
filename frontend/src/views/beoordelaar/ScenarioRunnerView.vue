@@ -207,6 +207,7 @@ onMounted(run);
                 :color="scenario.passed ? 'success' : 'critical'"
                 size="20"
               ></nldd-icon-cell>
+              <nldd-spacer-cell size="8"></nldd-spacer-cell>
               <nldd-text-cell :text="scenario.name">
                 <span v-if="!scenario.passed" slot="supporting-text">
                   {{ scenario.steps.find((s) => s.status === 'mislukt')?.error }}
@@ -241,6 +242,7 @@ onMounted(run);
                     :color="stapKleur(step.status)"
                     size="16"
                   ></nldd-icon-cell>
+                  <nldd-spacer-cell size="8"></nldd-spacer-cell>
                   <nldd-text-cell size="sm" :text="`**${step.keyword}** ${step.text}`">
                     <span v-if="step.error" slot="supporting-text">{{ step.error }}</span>
                   </nldd-text-cell>

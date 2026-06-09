@@ -33,8 +33,8 @@ export function statusLabel(status, besluit) {
       return besluit?.subsidie_toegekend ? 'Toegekend' : 'Afgewezen';
     case 'BEZWAAR':
       return besluit?.subsidie_toegekend
-        ? 'Toegekend — bezwaartermijn loopt'
-        : 'Afgewezen — bezwaartermijn loopt';
+        ? 'Toegekend · bezwaartermijn loopt'
+        : 'Afgewezen · bezwaartermijn loopt';
     default:
       return status;
   }

@@ -138,6 +138,7 @@ onMounted(laad);
                   :color="v.ok ? 'success' : 'critical'"
                   size="20"
                 ></nldd-icon-cell>
+                <nldd-spacer-cell size="8"></nldd-spacer-cell>
                 <nldd-text-cell :text="v.label"></nldd-text-cell>
               </nldd-list-item>
             </nldd-list>
@@ -165,6 +166,7 @@ onMounted(laad);
                         :color="uitkomst.voldoet_aan_transparantie ? 'success' : 'critical'"
                         size="20"
                       ></nldd-icon-cell>
+                      <nldd-spacer-cell size="8"></nldd-spacer-cell>
                       <nldd-text-cell text="Transparantie-eisen (art. 5)"></nldd-text-cell>
                     </nldd-list-item>
                     <nldd-list-item size="sm">
@@ -173,12 +175,14 @@ onMounted(laad);
                         :color="(item.aanvraag.niveau === 'LANDELIJK' ? uitkomst.heeft_recht_landelijk : uitkomst.heeft_recht_decentraal) ? 'success' : 'critical'"
                         size="20"
                       ></nldd-icon-cell>
+                      <nldd-spacer-cell size="8"></nldd-spacer-cell>
                       <nldd-text-cell
                         :text="item.aanvraag.niveau === 'LANDELIJK' ? 'Recht op subsidie landelijk (art. 6)' : 'Recht op subsidie decentraal (art. 7)'"
                       ></nldd-text-cell>
                     </nldd-list-item>
                     <nldd-list-item size="sm">
                       <nldd-icon-cell icon="euro-sign" size="20" color="secondary"></nldd-icon-cell>
+                      <nldd-spacer-cell size="8"></nldd-spacer-cell>
                       <nldd-text-cell
                         text="Betaalopdracht (art. 16)"
                         :supporting-text="uitkomst.betaalopdracht_vereist ? euro(uitkomst.betaalopdracht_bedrag) : 'Niet van toepassing'"
@@ -186,6 +190,7 @@ onMounted(laad);
                     </nldd-list-item>
                     <nldd-list-item size="sm">
                       <nldd-icon-cell icon="clock" size="20" color="secondary"></nldd-icon-cell>
+                      <nldd-spacer-cell size="8"></nldd-spacer-cell>
                       <nldd-text-cell
                         text="Bezwaartermijn (AWB 6:7)"
                         :supporting-text="`${uitkomst.bezwaartermijn_weken} weken na bekendmaking`"
