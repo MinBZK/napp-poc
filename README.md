@@ -16,6 +16,7 @@ tekst er is, wordt het YAML-bestand vervangen zonder dat de rest verandert.
 | `law/` | Machine-leesbare wetten: Wpp (twee subsidietracks + betaalopdracht-hook), regeling met bedragen (IoC), AWB-subset (procedure + hooks 3:46/6:7/6:8), Algemene termijnenwet (weekend-verlenging) |
 | `scenarios/` | 21 Gherkin-scenario's die vastleggen hoe de wet hoort te werken |
 | `backend/` | Axum-orchestratielaag: aanvragen, besluiten (RFC-008 besluit-state), betaalopdrachten, openbaar register; SQLite; SSO Rijk via regelrecht-auth (OIDC) met demo-fallback |
+| `backend/data/` | Partijregister-snapshot uit open data: TK2025- en GR2026-uitslagen (Kiesraad, data.overheid.nl) en inwoneraantallen (CBS StatLine). Regenereren: `uv run scripts/bouw_register.py` |
 | `frontend/` | Drie gescheiden ingangen (Vue 3 + NLDD design system): publiek (landing + register), subsidieportaal voor partijen (mock-eHerkenning), beoordelingsomgeving voor de Napp (incl. in-browser scenario-runner op de WASM-engine) |
 
 ## Draaien
@@ -58,6 +59,15 @@ SSO Rijk wordt actief zodra de `OIDC_*`-omgevingsvariabelen zijn gezet
    RFC-012).
 4. Het bekendgemaakte besluit verschijnt in het openbare register met
    statistieken.
+
+Zetelaantallen komen uit de echte verkiezingsuitslagen (Kiesraad) en
+inwoneraantallen van het CBS; aanvragers declareren die niet zelf. De
+KvK-koppeling is synthetisch — die koppeling (rechtspersoon naar
+geregistreerde aanduiding) is precies wat de Napp bij registratie vastlegt
+en is geen open data. Het datamodel kent naast gemeenteraden ook
+provinciale staten en waterschappen; de zetel-import daarvoor is een
+vervolgstap (de Kiesraad publiceert voor PS2023/AB2023 alleen
+stemmen-CSV's zonder zetels).
 
 De scenario-runner in de beoordelingsomgeving draait dezelfde 21 scenario's
 live in de browser op de naar WASM gecompileerde engine: het bewijs dat de

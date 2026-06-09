@@ -29,11 +29,11 @@ const geregistreerd = computed(() => Boolean(registratie.value?.partij));
 const kamerzetels = computed(() => registratie.value?.partij?.kamerzetels ?? 0);
 
 const uitslag = computed(() =>
-  registratie.value?.decentrale_uitslagen?.find((u) => u.gemeente === gemeente.value) ?? null,
+  registratie.value?.decentrale_uitslagen?.find((u) => u.gebied_code === gemeente.value) ?? null,
 );
 const inwoneraantal = computed(
   () =>
-    registratie.value?.gemeenten?.find((g) => g.naam === gemeente.value)?.inwoneraantal ?? null,
+    registratie.value?.gebieden?.find((g) => g.code === gemeente.value)?.inwoneraantal ?? null,
 );
 
 const verklaringenCompleet = computed(
@@ -203,9 +203,9 @@ watch(() => session.aanvrager, laadRegistratie);
                 <select :value="gemeente" @change="gemeente = $event.target.value">
                   <option value="" disabled>Kies een gemeente</option>
                   <option
-                    v-for="g in registratie?.gemeenten ?? []"
-                    :key="g.naam"
-                    :value="g.naam"
+                    v-for="g in registratie?.gebieden ?? []"
+                    :key="g.code"
+                    :value="g.code"
                   >
                     {{ g.naam }}
                   </option>
@@ -222,7 +222,7 @@ watch(() => session.aanvrager, laadRegistratie);
                 <nldd-spacer size="16"></nldd-spacer>
               </template>
               <nldd-form-field label="Behaalde raadszetels">
-                <nldd-text-field :value="String(uitslag?.raadszetels ?? 0)" readonly></nldd-text-field>
+                <nldd-text-field :value="String(uitslag?.zetels ?? 0)" readonly></nldd-text-field>
                 <nldd-form-field-help-text>
                   Bron: uitslagen Kiesraad.
                 </nldd-form-field-help-text>

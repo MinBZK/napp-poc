@@ -36,6 +36,7 @@ export const api = {
     apiPost('/api/eherkenning/login', { kvk_nummer: kvkNummer }),
   eherkenningLogout: () => apiPost('/api/eherkenning/logout'),
   mijnRegistratie: () => apiGet('/api/mijn-registratie'),
+  registerDemo: () => apiGet('/api/register/demo'),
   ssoMockLogin: (naam) => apiPost('/api/sso/mock-login', { naam }),
   aanvragen: () => apiGet('/api/aanvragen'),
   aanvraag: (id) => apiGet(`/api/aanvragen/${id}`),

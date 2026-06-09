@@ -15,6 +15,17 @@ const bezig = ref(false);
 
 const aanvragen = ref([]);
 const laden = ref(false);
+const demoVoorbeelden = ref([]);
+
+const demoTekst = computed(() => {
+  if (!demoVoorbeelden.value.length) {
+    return 'eHerkenning is gesimuleerd: alleen het KVK-nummer telt.';
+  }
+  const voorbeelden = demoVoorbeelden.value
+    .map((d) => `${d.kvk_nummer} (${d.naam})`)
+    .join(', ');
+  return `eHerkenning is gesimuleerd: alleen het KVK-nummer telt. Probeer bijvoorbeeld ${voorbeelden}. Elk ander nummer logt in als ongeregistreerde organisatie.`;
+});
 
 const navItems = computed(() =>
   session.aanvrager
@@ -63,7 +74,14 @@ async function laadAanvragen() {
   }
 }
 
-onMounted(laadAanvragen);
+onMounted(async () => {
+  laadAanvragen();
+  try {
+    demoVoorbeelden.value = await api.registerDemo();
+  } catch {
+    demoVoorbeelden.value = [];
+  }
+});
 watch(() => session.aanvrager, laadAanvragen);
 </script>
 
@@ -95,7 +113,7 @@ watch(() => session.aanvrager, laadAanvragen);
         <NBanner
           variant="warning"
           text="Demo-omgeving"
-          supporting-text="eHerkenning is gesimuleerd: alleen het KVK-nummer telt. Geregistreerde demo-partijen: 87654321 (Vrijheid en Vooruitgang), 23456789 (Algemene Volkspartij), 34567890 (Partij voor Stad en Land), 45678901 (Nieuw Geluid). Elk ander nummer logt in als ongeregistreerde organisatie."
+          :supporting-text="demoTekst"
         />
         <nldd-spacer size="24"></nldd-spacer>
         <nldd-card accessible-label="eHerkenning-login">

@@ -108,30 +108,39 @@ pub async fn eherkenning_login(
 }
 
 /// Registergegevens van de ingelogde partij: landelijke zetels (Kiesraad),
-/// decentrale uitslagen (Kiesraad) en gemeenten met inwoneraantal (CBS).
+/// decentrale uitslagen (Kiesraad) en gebieden met inwoneraantal (CBS).
 pub async fn mijn_registratie(session: Session) -> Result<Json<serde_json::Value>, ApiError> {
     let Some(kvk) = session_kvk(&session).await else {
         return Err(forbidden());
     };
     let partij = crate::register::partij_by_kvk(&kvk);
-    let uitslagen: Vec<serde_json::Value> = crate::register::decentrale_uitslagen_by_kvk(&kvk)
-        .into_iter()
-        .map(|u| {
-            let inwoners = crate::register::gemeente_by_naam(u.gemeente)
-                .map(|g| g.inwoneraantal)
-                .unwrap_or(0);
-            json!({
-                "gemeente": u.gemeente,
-                "raadszetels": u.raadszetels,
-                "inwoneraantal": inwoners,
-            })
+    let uitslagen: Vec<serde_json::Value> = partij
+        .map(|p| {
+            p.decentrale_uitslagen
+                .iter()
+                .map(|u| {
+                    let gebied = crate::register::gebied_by_code(&u.gebied_code);
+                    json!({
+                        "orgaan": u.orgaan,
+                        "gebied_code": u.gebied_code,
+                        "gebied": gebied.map(|g| g.naam.clone()),
+                        "zetels": u.zetels,
+                        "inwoneraantal": gebied.map(|g| g.inwoneraantal).unwrap_or(0),
+                    })
+                })
+                .collect()
         })
-        .collect();
+        .unwrap_or_default();
     Ok(Json(json!({
         "partij": partij.map(|p| json!({"naam": p.naam, "kamerzetels": p.kamerzetels})),
         "decentrale_uitslagen": uitslagen,
-        "gemeenten": crate::register::GEMEENTEN,
+        "gebieden": crate::register::register().gebieden,
     })))
+}
+
+/// Demo-voorbeelden voor de gemockte eHerkenning-login (alleen metadata).
+pub async fn register_demo() -> Json<serde_json::Value> {
+    Json(json!(crate::register::register().demo_voorbeelden))
 }
 
 pub async fn eherkenning_logout(session: Session) -> Result<Json<serde_json::Value>, ApiError> {
@@ -244,15 +253,16 @@ pub async fn create_aanvraag(
         params.insert("aantal_raadszetels".to_string(), json!(0));
         params.insert("inwoneraantal_gemeente".to_string(), json!(0));
     } else {
-        let Some(gemeente) = body.gemeente.as_deref().filter(|g| !g.trim().is_empty()) else {
+        let Some(gebied_code) = body.gemeente.as_deref().filter(|g| !g.trim().is_empty()) else {
             return Err(bad_request("Kies een gemeente voor een decentrale aanvraag."));
         };
-        let raadszetels = crate::register::uitslag_by_kvk_gemeente(&kvk, gemeente)
-            .map(|u| u.raadszetels)
+        let Some(gebied) = crate::register::gebied_by_code(gebied_code) else {
+            return Err(bad_request("Onbekend gebied."));
+        };
+        let raadszetels = crate::register::uitslag_by_kvk_gebied(&kvk, gebied_code)
+            .map(|u| u.zetels)
             .unwrap_or(0);
-        let inwoners = crate::register::gemeente_by_naam(gemeente)
-            .map(|g| g.inwoneraantal)
-            .unwrap_or(0);
+        let inwoners = gebied.inwoneraantal;
         params.insert("aantal_raadszetels".to_string(), json!(raadszetels));
         params.insert("inwoneraantal_gemeente".to_string(), json!(inwoners));
         params.insert("aantal_kamerzetels".to_string(), json!(0));
