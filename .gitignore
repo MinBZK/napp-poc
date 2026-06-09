@@ -1,0 +1,11 @@
+/target
+node_modules/
+dist/
+*.db
+*.db-shm
+*.db-wal
+.env
+.env.local
+.DS_Store
+frontend/public/wasm/pkg/
+__pycache__/

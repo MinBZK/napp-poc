@@ -1,0 +1,131 @@
+---
+$schema: https://raw.githubusercontent.com/MinBZK/regelrecht/refs/tags/schema-v0.5.0/schema/v0.5.0/schema.json
+$id: regeling_subsidiebedragen_politieke_partijen
+regulatory_layer: MINISTERIELE_REGELING
+publication_date: '2025-12-15'
+valid_from: '2026-01-01'
+bwb_id: BWBR0000001
+url: https://wetten.overheid.nl/BWBR0000001/2026-01-01
+name: Regeling subsidiebedragen politieke partijen 2026
+# Werknaam: deze bedragen worden in de praktijk jaarlijks bij ministeriele
+# regeling vastgesteld en geindexeerd. Hier los gehouden van de wet (IoC),
+# zodat indexatie of de definitieve bedragen vervangbaar zijn zonder de wet
+# te raken.
+legal_basis:
+  - law_id: wet_op_de_politieke_partijen
+    article: '8'
+
+articles:
+  # --- Landelijke partijen (Wfpp-verdeelsleutel) ---
+  - number: '1'
+    text: |-
+      Het basisbedrag voor een politieke partij bedraagt voor het
+      kalenderjaar 2026: EUR 232.831.
+    url: https://wetten.overheid.nl/BWBR0000001/2026-01-01
+    machine_readable:
+      implements:
+        - law: wet_op_de_politieke_partijen
+          article: '8'
+          open_term: basisbedrag
+          gelet_op: Gelet op artikel 8 van de Wet op de politieke partijen
+      execution:
+        output:
+          - name: basisbedrag
+            type: amount
+            type_spec:
+              unit: eurocent
+        actions:
+          - output: basisbedrag
+            value: 23283100
+
+  - number: '2'
+    text: |-
+      Het bedrag per kamerzetel bedraagt voor het kalenderjaar 2026:
+      EUR 69.938.
+    url: https://wetten.overheid.nl/BWBR0000001/2026-01-01
+    machine_readable:
+      implements:
+        - law: wet_op_de_politieke_partijen
+          article: '8'
+          open_term: bedrag_per_kamerzetel
+          gelet_op: Gelet op artikel 8 van de Wet op de politieke partijen
+      execution:
+        output:
+          - name: bedrag_per_kamerzetel
+            type: amount
+            type_spec:
+              unit: eurocent
+        actions:
+          - output: bedrag_per_kamerzetel
+            value: 6993800
+
+  - number: '3'
+    text: |-
+      Het bedrag per lid bedraagt voor het kalenderjaar 2026: EUR 25.
+    url: https://wetten.overheid.nl/BWBR0000001/2026-01-01
+    machine_readable:
+      implements:
+        - law: wet_op_de_politieke_partijen
+          article: '8'
+          open_term: bedrag_per_lid
+          gelet_op: Gelet op artikel 8 van de Wet op de politieke partijen
+      execution:
+        output:
+          - name: bedrag_per_lid
+            type: amount
+            type_spec:
+              unit: eurocent
+        actions:
+          # In de Wfpp is de ledencomponent een gedeeld macrobudget gedeeld
+          # door het totaal aantal leden. Voor de demo gebruiken we een vast
+          # bedrag per lid (EUR 25), zodat de berekening lokaal sluit zonder
+          # kennis van het landelijke ledentotaal.
+          - output: bedrag_per_lid
+            value: 2500
+
+  # --- Decentrale partijen (inwonerstaffel) ---
+  - number: '4'
+    text: |-
+      Het bedrag per raadszetel voor een decentrale politieke partij
+      bedraagt, afhankelijk van het aantal inwoners van de gemeente:
+      EUR 658 (tot en met 40.000 inwoners), EUR 900 (tot en met 100.000),
+      EUR 1.200 (tot en met 375.000) en EUR 1.613 (meer dan 375.000).
+    url: https://wetten.overheid.nl/BWBR0000001/2026-01-01
+    machine_readable:
+      implements:
+        - law: wet_op_de_politieke_partijen
+          article: '12'
+          open_term: bedrag_per_raadszetel
+          gelet_op: Gelet op artikel 12 van de Wet op de politieke partijen
+      execution:
+        parameters:
+          - name: inwoneraantal_gemeente
+            type: number
+            required: true
+            description: Aantal inwoners van de gemeente op de peildatum
+        output:
+          - name: bedrag_per_raadszetel
+            type: amount
+            type_spec:
+              unit: eurocent
+        actions:
+          - output: bedrag_per_raadszetel
+            value:
+              operation: IF
+              cases:
+                - when:
+                    operation: LESS_THAN_OR_EQUAL
+                    subject: $inwoneraantal_gemeente
+                    value: 40000
+                  then: 65800
+                - when:
+                    operation: LESS_THAN_OR_EQUAL
+                    subject: $inwoneraantal_gemeente
+                    value: 100000
+                  then: 90000
+                - when:
+                    operation: LESS_THAN_OR_EQUAL
+                    subject: $inwoneraantal_gemeente
+                    value: 375000
+                  then: 120000
+              default: 161300
