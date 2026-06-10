@@ -121,18 +121,16 @@ fn name_tokens(name: &str) -> Vec<String> {
     }
 }
 
-/// MOCK IBAN-name check. The real check (SurePay) asks the bank whether the
-/// IBAN is held under this name; this demo compares the submitted
-/// tenaamstelling with the registered party aanduiding instead: normalized
-/// word overlap, where at least half of the words of the shorter name must
-/// occur in the other. Without a registered name (organization not in the
-/// register) there is nothing to compare and only the mod-97 check applies.
-pub fn check_tenaamstelling(submitted: &str, registered_name: Option<&str>) -> Result<(), String> {
-    if submitted.trim().is_empty() {
-        return Err("Vul de tenaamstelling van de rekening in.".to_string());
-    }
+/// MOCK IBAN-name check, as a pure fact producer. The real check (SurePay)
+/// asks the bank whether the IBAN is held under this name; this demo
+/// compares the submitted tenaamstelling with the registered party
+/// aanduiding instead: normalized word overlap, where at least half of the
+/// words of the shorter name must occur in the other. Without a registered
+/// name there is nothing to compare. The verdict on this fact is not drawn
+/// here: art. 27 Wpp (engine) decides whether the rekening is acceptable.
+pub fn naam_komt_overeen(submitted: &str, registered_name: Option<&str>) -> bool {
     let Some(registered) = registered_name else {
-        return Ok(());
+        return true;
     };
     let submitted_tokens = name_tokens(submitted);
     let registered_tokens = name_tokens(registered);
@@ -141,14 +139,7 @@ pub fn check_tenaamstelling(submitted: &str, registered_name: Option<&str>) -> R
         .filter(|t| registered_tokens.contains(t))
         .count();
     let shortest = submitted_tokens.len().min(registered_tokens.len()).max(1);
-    if overlap * 2 < shortest {
-        return Err(format!(
-            "De tenaamstelling '{submitted}' komt niet overeen met de geregistreerde aanduiding \
-             '{registered}'. De rekening moet op naam van de rechtspersoon staan \
-             (IBAN-naam-controle, gesimuleerd)."
-        ));
-    }
-    Ok(())
+    overlap * 2 >= shortest
 }
 
 // ---------------------------------------------------------------------------
@@ -181,8 +172,10 @@ pub struct RekeningOpgave {
 }
 
 /// PUT /api/mijn-rekening — submit or change the account of the legal
-/// entity. Only the signing-authorized board (VOLLEDIG machtiging); a branch
-/// volmacht is refused: account changes are the fraud-sensitive moment.
+/// entity. The orchestration gathers the facts (machtiging, name check,
+/// registration); art. 27 Wpp draws the verdicts: only the
+/// signing-authorized board may change the account (the fraud-sensitive
+/// moment) and the account must be held in the name of the rechtspersoon.
 pub async fn put_mijn_rekening(
     State(state): State<AppState>,
     session: Session,
@@ -191,13 +184,6 @@ pub async fn put_mijn_rekening(
     let Some(kvk) = session_kvk(&session).await else {
         return Err(forbidden_with("Geen toegang."));
     };
-    if machtiging::session_machtiging(&session).await != Machtiging::Volledig {
-        return Err(forbidden_with(
-            "Alleen het tekenbevoegd bestuur van de rechtspersoon kan het rekeningnummer \
-             opgeven of wijzigen. Uw beperkte machtiging als afdelingsbestuurder volstaat \
-             hiervoor niet; log in namens de gehele partij.",
-        ));
-    }
     let partij = register::partij_by_kvk(&state.pool, &kvk)
         .await
         .map_err(internal_error)?;
@@ -210,10 +196,42 @@ pub async fn put_mijn_rekening(
              vastgelegd kan het bestuur hier een rekeningnummer opgeven.",
         ));
     };
+    // Technical input validation (no legal content): ISO 13616 checksum and
+    // a non-empty tenaamstelling.
     let iban = validate_iban(&body.iban).map_err(|m| bad_request(&m))?;
-    check_tenaamstelling(body.tenaamstelling.trim(), Some(&partij.naam))
-        .map_err(|m| bad_request(&m))?;
     let tenaamstelling = body.tenaamstelling.trim().to_string();
+    if tenaamstelling.is_empty() {
+        return Err(bad_request("Vul de tenaamstelling van de rekening in."));
+    }
+
+    // Facts for art. 27: the (mocked) IBAN-name check and the machtiging.
+    let op_naam = naam_komt_overeen(&tenaamstelling, Some(&partij.naam));
+    let tekenbevoegd = machtiging::session_machtiging(&session).await == Machtiging::Volledig;
+    let vandaag = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    let toets = crate::engine::evaluate_rekening(
+        state.corpus.clone(),
+        op_naam,
+        tekenbevoegd,
+        true,
+        vandaag,
+    )
+    .await
+    .map_err(internal_error)?;
+    if !toets.mag_rekening_wijzigen {
+        return Err(forbidden_with(
+            "Alleen het tekenbevoegd bestuur van de rechtspersoon kan het rekeningnummer \
+             opgeven of wijzigen (artikel 27 Wpp). Uw beperkte machtiging als \
+             afdelingsbestuurder volstaat hiervoor niet; log in namens de gehele partij.",
+        ));
+    }
+    if !toets.rekening_aanvaardbaar {
+        return Err(bad_request(&format!(
+            "De tenaamstelling '{tenaamstelling}' komt niet overeen met de geregistreerde \
+             aanduiding '{}'. De rekening moet op naam van de rechtspersoon staan \
+             (artikel 27 Wpp; IBAN-naam-controle gesimuleerd).",
+            partij.naam
+        )));
+    }
     register::update_rekening(&state.pool, &kvk, &iban, &tenaamstelling)
         .await
         .map_err(internal_error)?;
@@ -273,42 +291,33 @@ mod tests {
         assert!(message.contains("controlecijfers"), "melding: {message}");
     }
 
-    // -- mock name check ------------------------------------------------------
+    // -- mock name check (fact producer; the verdict is art. 27, engine) ------
 
     #[test]
-    fn matching_tenaamstelling_variants_pass() {
-        assert!(check_tenaamstelling("D66", Some("D66")).is_ok());
-        assert!(check_tenaamstelling("d66", Some("D66")).is_ok());
-        assert!(check_tenaamstelling("Vereniging D66", Some("D66")).is_ok());
+    fn matching_tenaamstelling_variants_match() {
+        assert!(naam_komt_overeen("D66", Some("D66")));
+        assert!(naam_komt_overeen("d66", Some("D66")));
+        assert!(naam_komt_overeen("Vereniging D66", Some("D66")));
         // Partial but clearly the same party.
-        assert!(check_tenaamstelling(
+        assert!(naam_komt_overeen(
             "Hart voor Den Haag",
             Some("Hart voor Den Haag / Groep de Mos")
-        )
-        .is_ok());
+        ));
     }
 
     #[test]
-    fn clear_mismatch_is_rejected() {
-        let err = check_tenaamstelling("Bakkerij Jansen B.V.", Some("D66")).unwrap_err();
-        assert!(err.contains("komt niet overeen"), "melding: {err}");
-        assert!(check_tenaamstelling("VVD", Some("D66")).is_err());
-        assert!(check_tenaamstelling(
+    fn clear_mismatch_does_not_match() {
+        assert!(!naam_komt_overeen("Bakkerij Jansen B.V.", Some("D66")));
+        assert!(!naam_komt_overeen("VVD", Some("D66")));
+        assert!(!naam_komt_overeen(
             "Penningmeester privé",
             Some("Hart voor Den Haag / Groep de Mos")
-        )
-        .is_err());
+        ));
     }
 
     #[test]
-    fn empty_tenaamstelling_is_rejected() {
-        assert!(check_tenaamstelling("  ", Some("D66")).is_err());
-        assert!(check_tenaamstelling("", None).is_err());
-    }
-
-    #[test]
-    fn without_registered_name_only_mod97_applies() {
+    fn without_registered_name_there_is_nothing_to_compare() {
         // Unknown organization: nothing to compare the name against.
-        assert!(check_tenaamstelling("Wat dan ook", None).is_ok());
+        assert!(naam_komt_overeen("Wat dan ook", None));
     }
 }

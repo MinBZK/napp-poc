@@ -234,6 +234,38 @@ articles:
                   value: true
 
   # ------------------------------------------------------------------
+  # Artikel 13 — Eenmalige verstrekking per subsidiejaar
+  # De orchestratie levert het feit (loopt er voor dit onderdeel al een
+  # aanvraag of toekenning in het subsidiejaar, uit de aanvragentabel);
+  # de wet velt het oordeel.
+  # ------------------------------------------------------------------
+  - number: '13'
+    text: |-
+      De subsidie wordt per kalenderjaar verstrekt. Voor ieder onderdeel
+      van de aanvraag (de landelijke subsidie dan wel een decentraal orgaan
+      en gebied) wordt per subsidiejaar ten hoogste eenmaal subsidie
+      verstrekt.
+    url: https://www.tweedekamer.nl/kamerstukken/wetsvoorstellen/detail?qry=wetsvoorstel%3A36742
+    machine_readable:
+      execution:
+        parameters:
+          - name: onderdeel_al_aangevraagd_of_toegekend
+            type: boolean
+            required: true
+            description: >-
+              Of voor dit onderdeel in het subsidiejaar al een aanvraag in
+              behandeling is of subsidie is toegekend
+        output:
+          - name: onderdeel_beschikbaar
+            type: boolean
+        actions:
+          - output: onderdeel_beschikbaar
+            value:
+              operation: EQUALS
+              subject: $onderdeel_al_aangevraagd_of_toegekend
+              value: false
+
+  # ------------------------------------------------------------------
   # Artikel 14 — Subsidiebedragen voor landelijke partijen
   # Volgt art. 14 van het wetsvoorstel: onderdeel a is de subsidie voor de
   # partij zelf (basisbedrag + bedrag per kamerzetel + een aandeel in het
@@ -788,3 +820,62 @@ articles:
               days: -1
           - output: voorschotpercentage
             value: 80
+
+  # ------------------------------------------------------------------
+  # Artikel 27 — Verstrekking aan de rechtspersoon en uitbetaling
+  # De feiten (staat de rekening op naam, handelt de sessie als
+  # tekenbevoegd bestuur, is er een rekening bekend) komen uit de
+  # orchestratie (IBAN-naam-controle als databron, eHerkenning-machtiging,
+  # partijregister); de regels staan hier.
+  # ------------------------------------------------------------------
+  - number: '27'
+    text: |-
+      De subsidie wordt verstrekt aan de politieke partij als rechtspersoon
+      en uitbetaald op een bankrekening die op naam van die rechtspersoon
+      staat. Per rechtspersoon geldt een rekening. Het rekeningnummer wordt
+      opgegeven en gewijzigd door het tekenbevoegd bestuur van de
+      rechtspersoon. Zolang geen rekening van de rechtspersoon bekend is,
+      houdt de Napp de uitbetaling aan.
+    url: https://www.tweedekamer.nl/kamerstukken/wetsvoorstellen/detail?qry=wetsvoorstel%3A36742
+    machine_readable:
+      execution:
+        parameters:
+          - name: rekening_op_naam_van_rechtspersoon
+            type: boolean
+            required: true
+            description: >-
+              Of de opgegeven tenaamstelling overeenkomt met de
+              rechtspersoon (IBAN-naam-controle, databron)
+          - name: handelt_als_tekenbevoegd_bestuur
+            type: boolean
+            required: true
+            description: >-
+              Of de sessie de rechtspersoon volledig vertegenwoordigt
+              (eHerkenning-machtiging van het tekenbevoegd bestuur)
+          - name: rekening_bekend
+            type: boolean
+            required: true
+            description: Of een rekening van de rechtspersoon bekend is
+        output:
+          - name: rekening_aanvaardbaar
+            type: boolean
+          - name: mag_rekening_wijzigen
+            type: boolean
+          - name: uitbetaling_aangehouden
+            type: boolean
+        actions:
+          - output: rekening_aanvaardbaar
+            value:
+              operation: EQUALS
+              subject: $rekening_op_naam_van_rechtspersoon
+              value: true
+          - output: mag_rekening_wijzigen
+            value:
+              operation: EQUALS
+              subject: $handelt_als_tekenbevoegd_bestuur
+              value: true
+          - output: uitbetaling_aangehouden
+            value:
+              operation: EQUALS
+              subject: $rekening_bekend
+              value: false

@@ -654,6 +654,84 @@ pub async fn evaluate_termijnen(
     .await?
 }
 
+/// Het oordeel van art. 27 over de rekening van de rechtspersoon. De
+/// feiten (naam-controle, machtiging, bekendheid) komen uit de
+/// orchestratie; de regels staan in de wet.
+#[derive(Debug, Clone, Serialize)]
+pub struct RekeningToets {
+    pub rekening_aanvaardbaar: bool,
+    pub mag_rekening_wijzigen: bool,
+    pub uitbetaling_aangehouden: bool,
+}
+
+pub async fn evaluate_rekening(
+    corpus: Arc<LawCorpus>,
+    rekening_op_naam_van_rechtspersoon: bool,
+    handelt_als_tekenbevoegd_bestuur: bool,
+    rekening_bekend: bool,
+    date: String,
+) -> anyhow::Result<RekeningToets> {
+    tokio::task::spawn_blocking(move || {
+        let service = service_with_corpus(&corpus)?;
+        let mut params: BTreeMap<String, Value> = BTreeMap::new();
+        params.insert(
+            "rekening_op_naam_van_rechtspersoon".into(),
+            Value::Bool(rekening_op_naam_van_rechtspersoon),
+        );
+        params.insert(
+            "handelt_als_tekenbevoegd_bestuur".into(),
+            Value::Bool(handelt_als_tekenbevoegd_bestuur),
+        );
+        params.insert("rekening_bekend".into(), Value::Bool(rekening_bekend));
+        let result = service
+            .evaluate_law(
+                WPP_ID,
+                &[
+                    "rekening_aanvaardbaar",
+                    "mag_rekening_wijzigen",
+                    "uitbetaling_aangehouden",
+                ],
+                params,
+                &date,
+            )
+            .map_err(|e| anyhow::anyhow!("toetsing artikel 27 mislukt: {e}"))?;
+        Ok(RekeningToets {
+            rekening_aanvaardbaar: as_bool(&result.outputs, "rekening_aanvaardbaar"),
+            mag_rekening_wijzigen: as_bool(&result.outputs, "mag_rekening_wijzigen"),
+            uitbetaling_aangehouden: as_bool(&result.outputs, "uitbetaling_aangehouden"),
+        })
+    })
+    .await?
+}
+
+/// Het oordeel van art. 13 (eenmalige verstrekking per subsidiejaar) per
+/// onderdeel. De orchestratie levert per onderdeel het feit of er al een
+/// aanvraag loopt of subsidie is toegekend; de wet beslist of het
+/// onderdeel nog beschikbaar is.
+pub async fn beschikbare_onderdelen(
+    corpus: Arc<LawCorpus>,
+    al_bezet: Vec<bool>,
+    date: String,
+) -> anyhow::Result<Vec<bool>> {
+    tokio::task::spawn_blocking(move || {
+        let service = service_with_corpus(&corpus)?;
+        let mut beschikbaar = Vec::with_capacity(al_bezet.len());
+        for bezet in al_bezet {
+            let mut params: BTreeMap<String, Value> = BTreeMap::new();
+            params.insert(
+                "onderdeel_al_aangevraagd_of_toegekend".into(),
+                Value::Bool(bezet),
+            );
+            let result = service
+                .evaluate_law(WPP_ID, &["onderdeel_beschikbaar"], params, &date)
+                .map_err(|e| anyhow::anyhow!("toetsing artikel 13 mislukt: {e}"))?;
+            beschikbaar.push(as_bool(&result.outputs, "onderdeel_beschikbaar"));
+        }
+        Ok(beschikbaar)
+    })
+    .await?
+}
+
 /// Het oordeel van Kieswet G 1 over een Handelsregister-raadpleging, per
 /// eis zoals de wet die teruggeeft. Dit is een advies aan de beoordelaar;
 /// de bevestiging van een claim blijft een menselijke beslissing.

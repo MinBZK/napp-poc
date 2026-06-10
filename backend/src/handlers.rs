@@ -487,13 +487,27 @@ pub async fn create_aanvraag(
         componenten.push(c.clone());
     }
 
-    // Dubbeldetectie: onderdelen die dit jaar al lopen of zijn toegekend.
+    // Eenmalige verstrekking per subsidiejaar (art. 13): de feiten komen
+    // uit de aanvragentabel, het oordeel per onderdeel komt uit de wet.
     let bezet = db::bezette_componenten(&state.pool, &kvk, jaar)
         .await
         .map_err(internal_error)?;
-    if let Some(c) = componenten.iter().find(|c| bezet.contains_key(&c.key)) {
+    let al_bezet: Vec<bool> = componenten
+        .iter()
+        .map(|c| bezet.contains_key(&c.key))
+        .collect();
+    let beschikbaar =
+        engine::beschikbare_onderdelen(state.corpus.clone(), al_bezet, vandaag.clone())
+            .await
+            .map_err(internal_error)?;
+    if let Some(c) = componenten
+        .iter()
+        .zip(&beschikbaar)
+        .find(|(_, ok)| !**ok)
+        .map(|(c, _)| c)
+    {
         return Err(bad_request(&format!(
-            "Onderdeel '{}' is voor {jaar} al aangevraagd of toegekend.",
+            "Onderdeel '{}' is voor {jaar} al aangevraagd of toegekend (artikel 13 Wpp).",
             c.key
         )));
     }
@@ -800,18 +814,29 @@ pub async fn stel_besluit_vast(
 
     // Side-effect uit art. 16/27: één betaalopdracht aan de rechtspersoon.
     // De rekening komt uit het partijregister (eigen opgave van het
-    // tekenbevoegd bestuur, zie rekening.rs). Zonder bekende rekening wordt
-    // de opdracht AANGEHOUDEN: het besluit staat, de uitbetaling wacht.
+    // tekenbevoegd bestuur, zie rekening.rs). Of de uitbetaling zonder
+    // bekende rekening wordt aangehouden, beslist art. 27; de orchestratie
+    // levert alleen het feit dat er (g)een rekening bekend is.
     let mut betaalopdracht_status: Option<&str> = None;
     if uitkomst.betaalopdracht_vereist {
         let rekening = crate::register::partij_by_kvk(&state.pool, &aanvraag.kvk_nummer)
             .await
             .map_err(internal_error)?
             .and_then(|p| p.iban.zip(p.iban_tenaamstelling));
-        let status = if rekening.is_some() {
-            "AANGEMAAKT"
-        } else {
+        let toets = engine::evaluate_rekening(
+            state.corpus.clone(),
+            // De opgeslagen rekening is bij opgave al op naam getoetst.
+            rekening.is_some(),
+            false,
+            rekening.is_some(),
+            vandaag.clone(),
+        )
+        .await
+        .map_err(internal_error)?;
+        let status = if toets.uitbetaling_aangehouden {
             "AANGEHOUDEN"
+        } else {
+            "AANGEMAAKT"
         };
         let opdracht_id = Uuid::new_v4().to_string();
         db::insert_betaalopdracht(
