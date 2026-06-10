@@ -716,7 +716,24 @@ pub async fn get_mijn_aanvraag(
     let besluit = db::get_besluit_by_aanvraag(&state.pool, &id)
         .await
         .map_err(internal_error)?;
-    Ok(Json(json!({"aanvraag": aanvraag, "besluit": besluit})))
+    let betaalopdracht = betaalopdracht_voor(&state, besluit.as_ref()).await?;
+    Ok(Json(
+        json!({"aanvraag": aanvraag, "besluit": besluit, "betaalopdracht": betaalopdracht}),
+    ))
+}
+
+/// De betaalopdracht die uit een besluit voortvloeit, voor het
+/// dossierbeeld (aanvrager en beoordelaar).
+async fn betaalopdracht_voor(
+    state: &AppState,
+    besluit: Option<&db::Besluit>,
+) -> Result<Option<db::Betaalopdracht>, ApiError> {
+    let Some(besluit) = besluit else {
+        return Ok(None);
+    };
+    db::get_betaalopdracht_by_besluit(&state.pool, &besluit.id)
+        .await
+        .map_err(internal_error)
 }
 
 /// Beoordelingsomgeving: de volledige werkvoorraad.
@@ -750,7 +767,10 @@ pub async fn get_aanvraag(
     let besluit = db::get_besluit_by_aanvraag(&state.pool, &id)
         .await
         .map_err(internal_error)?;
-    Ok(Json(json!({"aanvraag": aanvraag, "besluit": besluit})))
+    let betaalopdracht = betaalopdracht_voor(&state, besluit.as_ref()).await?;
+    Ok(Json(
+        json!({"aanvraag": aanvraag, "besluit": besluit, "betaalopdracht": betaalopdracht}),
+    ))
 }
 
 // ---------------------------------------------------------------------------

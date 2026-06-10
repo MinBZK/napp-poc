@@ -91,6 +91,31 @@ onMounted(async () => {
           text="Uw aanvraag is in behandeling"
           supporting-text="De Napp toetst uw aanvraag aan de Wet op de politieke partijen."
         />
+
+        <!-- Het voorschot dat uit het besluit voortvloeit (art. 16/17 Wpp). -->
+        <template v-if="item.betaalopdracht">
+          <nldd-spacer size="12"></nldd-spacer>
+          <NBanner
+            v-if="item.betaalopdracht.status === 'AANGEHOUDEN'"
+            variant="warning"
+            :text="`Uitbetaling van het voorschot (${euro(item.betaalopdracht.bedrag)}) is aangehouden`"
+            supporting-text="Er is nog geen rekeningnummer van uw rechtspersoon bekend (artikel 27 Wpp). Zodra het bestuur een rekening opgeeft bij Mijn organisatie, wordt de uitbetaling klaargezet."
+          />
+          <NBanner
+            v-else-if="item.betaalopdracht.status === 'UITBETAALD'"
+            variant="success"
+            :text="`Het voorschot van ${euro(item.betaalopdracht.bedrag)} is uitbetaald`"
+            :supporting-text="`Overgemaakt naar ${item.betaalopdracht.iban} op ${item.betaalopdracht.uitgevoerd_at}.`"
+          />
+          <NBanner
+            v-else
+            variant="accent"
+            :text="`Het voorschot van ${euro(item.betaalopdracht.bedrag)} staat klaar voor uitbetaling`"
+            :supporting-text="item.betaalopdracht.betaaltermijn_einddatum
+              ? `Uitbetaling op ${item.betaalopdracht.iban}, uiterlijk ${datum(item.betaalopdracht.betaaltermijn_einddatum)} (AWB 4:87).`
+              : `Uitbetaling op ${item.betaalopdracht.iban}.`"
+          />
+        </template>
         <nldd-spacer size="32"></nldd-spacer>
 
         <template v-if="item.besluit">

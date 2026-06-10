@@ -219,6 +219,9 @@ pub const BETAAL_UITBETAALD: &str = "UITBETAALD";
 pub struct Betaalopdracht {
     pub id: String,
     pub besluit_id: String,
+    /// Het dossier waar deze opdracht uit voortvloeit (via het besluit);
+    /// de UI springt hiermee van betaalopdracht naar aanvraag en terug.
+    pub aanvraag_id: String,
     pub partij_naam: String,
     pub bedrag: i64,
     /// Rekening van de rechtspersoon op het moment van verlening; leeg bij
@@ -531,6 +534,7 @@ fn row_to_betaalopdracht(row: &sqlx::sqlite::SqliteRow) -> Betaalopdracht {
     Betaalopdracht {
         id: row.get("id"),
         besluit_id: row.get("besluit_id"),
+        aanvraag_id: row.get("aanvraag_id"),
         partij_naam: row.get("partij_naam"),
         bedrag: row.get("bedrag"),
         iban: row.get("iban"),
@@ -542,8 +546,13 @@ fn row_to_betaalopdracht(row: &sqlx::sqlite::SqliteRow) -> Betaalopdracht {
     }
 }
 
+// De aanvraag hoort bij elke opdracht (besluit_id is verplicht); de join
+// levert het dossiernummer voor het heen-en-weer springen in de UI.
+const BETAALOPDRACHT_SELECT: &str =
+    "SELECT bo.*, b.aanvraag_id FROM betaalopdrachten bo JOIN besluiten b ON bo.besluit_id = b.id";
+
 pub async fn list_betaalopdrachten(pool: &SqlitePool) -> anyhow::Result<Vec<Betaalopdracht>> {
-    let rows = sqlx::query("SELECT * FROM betaalopdrachten ORDER BY created_at DESC")
+    let rows = sqlx::query(&format!("{BETAALOPDRACHT_SELECT} ORDER BY bo.created_at DESC"))
         .fetch_all(pool)
         .await?;
     Ok(rows.iter().map(row_to_betaalopdracht).collect())
@@ -553,8 +562,20 @@ pub async fn get_betaalopdracht(
     pool: &SqlitePool,
     id: &str,
 ) -> anyhow::Result<Option<Betaalopdracht>> {
-    let row = sqlx::query("SELECT * FROM betaalopdrachten WHERE id = ?")
+    let row = sqlx::query(&format!("{BETAALOPDRACHT_SELECT} WHERE bo.id = ?"))
         .bind(id)
+        .fetch_optional(pool)
+        .await?;
+    Ok(row.as_ref().map(row_to_betaalopdracht))
+}
+
+/// De betaalopdracht bij een besluit (hooguit één), voor het dossierbeeld.
+pub async fn get_betaalopdracht_by_besluit(
+    pool: &SqlitePool,
+    besluit_id: &str,
+) -> anyhow::Result<Option<Betaalopdracht>> {
+    let row = sqlx::query(&format!("{BETAALOPDRACHT_SELECT} WHERE bo.besluit_id = ?"))
+        .bind(besluit_id)
         .fetch_optional(pool)
         .await?;
     Ok(row.as_ref().map(row_to_betaalopdracht))

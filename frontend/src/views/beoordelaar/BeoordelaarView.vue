@@ -220,7 +220,7 @@ watch(() => session.beoordelaar, laad);
           </template>
           <nldd-table
             v-if="betaalopdrachten.length"
-            columns="minmax(170px,1fr) 120px 190px minmax(150px,1fr) 130px 130px 150px"
+            columns="minmax(170px,1fr) 120px 190px minmax(150px,1fr) 130px 130px 150px 110px"
             accessible-label="Betaalopdrachten"
           >
             <nldd-table-row slot="header">
@@ -231,6 +231,7 @@ watch(() => session.beoordelaar, laad);
               <nldd-text-cell text="Status"></nldd-text-cell>
               <nldd-text-cell text="Betalen vóór (AWB 4:87)"></nldd-text-cell>
               <nldd-text-cell text=""></nldd-text-cell>
+              <nldd-text-cell text="Dossier"></nldd-text-cell>
             </nldd-table-row>
             <nldd-table-row v-for="opdracht in betaalopdrachten" :key="opdracht.id">
               <nldd-text-cell :text="opdracht.partij_naam"></nldd-text-cell>
@@ -272,6 +273,15 @@ watch(() => session.beoordelaar, laad);
                 text="Wacht op rekening van de rechtspersoon (art. 27)"
                 color="secondary"
               ></nldd-text-cell>
+              <nldd-cell>
+                <nldd-button
+                  variant="neutral-transparent"
+                  size="sm"
+                  text="Bekijk"
+                  end-icon="chevron-right"
+                  @click="router.push(`/aanvraag/${opdracht.aanvraag_id}`)"
+                ></nldd-button>
+              </nldd-cell>
             </nldd-table-row>
           </nldd-table>
           <nldd-inline-dialog

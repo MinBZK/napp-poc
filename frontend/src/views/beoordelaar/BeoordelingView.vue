@@ -129,6 +129,34 @@ async function maakBekend() {
   }
 }
 
+// Voorschot/betaalopdracht bij dit dossier (indien het besluit er een
+// opleverde). Uitbetalen is de feitelijke handeling naar het
+// (gesimuleerde) betaalsysteem.
+const BETAAL_LABELS = {
+  AANGEMAAKT: 'Aangemaakt',
+  AANGEHOUDEN: 'Aangehouden',
+  UITBETAALD: 'Uitbetaald',
+};
+
+function betaalKleur(status) {
+  if (status === 'AANGEHOUDEN') return 'warning';
+  if (status === 'UITBETAALD') return 'success';
+  return 'accent';
+}
+
+async function betaalUit() {
+  bezig.value = true;
+  fout.value = '';
+  try {
+    await api.betaalopdrachtUitbetalen(item.value.betaalopdracht.id);
+    await laad();
+  } catch (e) {
+    fout.value = e.message;
+  } finally {
+    bezig.value = false;
+  }
+}
+
 onMounted(laad);
 </script>
 
@@ -217,6 +245,54 @@ onMounted(laad);
                   {{ datum(item.besluit.bezwaartermijn_einddatum) }}.
                 </p>
               </nldd-rich-text>
+            </template>
+
+            <template v-if="item.betaalopdracht">
+              <nldd-spacer size="24"></nldd-spacer>
+              <nldd-title size="4">
+                <h3>Voorschot (art. 16/17 Wpp)</h3>
+                <div slot="actions">
+                  <nldd-tag
+                    :color="betaalKleur(item.betaalopdracht.status)"
+                    :text="BETAAL_LABELS[item.betaalopdracht.status] ?? item.betaalopdracht.status"
+                  ></nldd-tag>
+                </div>
+              </nldd-title>
+              <nldd-spacer size="12"></nldd-spacer>
+              <nldd-list variant="box">
+                <nldd-list-item size="sm">
+                  <nldd-text-cell text="Bedrag (80% van rechtswege)" color="secondary"></nldd-text-cell>
+                  <nldd-text-cell :text="euro(item.betaalopdracht.bedrag)" horizontal-alignment="right"></nldd-text-cell>
+                </nldd-list-item>
+                <nldd-list-item size="sm">
+                  <nldd-text-cell text="Rekening" color="secondary"></nldd-text-cell>
+                  <nldd-text-cell
+                    :text="item.betaalopdracht.iban ?? 'Nog geen rekening bekend (art. 27)'"
+                    horizontal-alignment="right"
+                  ></nldd-text-cell>
+                </nldd-list-item>
+                <nldd-list-item v-if="item.betaalopdracht.betaaltermijn_einddatum" size="sm">
+                  <nldd-text-cell text="Betalen vóór · AWB 4:87" color="secondary"></nldd-text-cell>
+                  <nldd-text-cell
+                    :text="datum(item.betaalopdracht.betaaltermijn_einddatum)"
+                    horizontal-alignment="right"
+                  ></nldd-text-cell>
+                </nldd-list-item>
+                <nldd-list-item v-if="item.betaalopdracht.uitgevoerd_at" size="sm">
+                  <nldd-text-cell text="Uitbetaald op" color="secondary"></nldd-text-cell>
+                  <nldd-text-cell :text="item.betaalopdracht.uitgevoerd_at" horizontal-alignment="right"></nldd-text-cell>
+                </nldd-list-item>
+              </nldd-list>
+              <template v-if="item.betaalopdracht.status === 'AANGEMAAKT'">
+                <nldd-spacer size="12"></nldd-spacer>
+                <nldd-button
+                  variant="secondary"
+                  text="Uitbetalen (gesimuleerd betaalsysteem)"
+                  start-icon="euro-sign"
+                  :disabled="bezig || undefined"
+                  @click="betaalUit"
+                ></nldd-button>
+              </template>
             </template>
           </div>
 
