@@ -13,7 +13,7 @@ mod state;
 
 use std::sync::Arc;
 
-use axum::routing::{delete, get, post};
+use axum::routing::{get, post};
 use axum::Router;
 use regelrecht_auth::OidcAppState;
 use sqlx::sqlite::SqlitePoolOptions;
@@ -114,24 +114,14 @@ async fn main() -> anyhow::Result<()> {
         )
         .route("/api/register", get(handlers::register))
         .route("/api/register/statistieken", get(handlers::statistieken))
-        // Partijregister-beheer (beoordelaar-only, zie beheer.rs).
-        .route(
-            "/api/beheer/partijen",
-            get(beheer::list_partijen).post(beheer::create_partij),
-        )
+        // Partijregister-beheer (beoordelaar-only, zie beheer.rs). De
+        // uitslagen zijn referentiedata (Kiesraad/CBS) en kennen bewust
+        // geen mutatie-endpoints; koppelingen ontstaan via de claim-flow.
+        .route("/api/beheer/partijen", get(beheer::list_partijen))
         .route(
             "/api/beheer/partijen/{kvk}",
             get(beheer::get_partij).put(beheer::update_partij),
-        )
-        .route(
-            "/api/beheer/partijen/{kvk}/uitslagen",
-            post(beheer::add_uitslag),
-        )
-        .route(
-            "/api/beheer/partijen/{kvk}/uitslagen/{orgaan}/{gebied_code}",
-            delete(beheer::delete_uitslag),
-        )
-        .route("/api/beheer/gebieden", get(beheer::list_gebieden));
+        );
 
     // Mock-SSO-login alleen registreren wanneer echte OIDC uit staat.
     if !app_state.is_auth_enabled() {

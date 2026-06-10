@@ -1,10 +1,11 @@
 <script setup>
 /**
  * Partijregister-beheer: zoeken en bladeren door alle geregistreerde
- * partijen, met een registratieformulier voor nieuwe partijen.
- * Beoordelaar-only; de backend handhaaft dat met 403.
+ * koppelingen tussen rechtspersoon (KvK) en aanduiding. Nieuwe koppelingen
+ * ontstaan via een claim bij de eerste aanvraag, niet via handmatige
+ * invoer. Beoordelaar-only; de backend handhaaft dat met 403.
  */
-import { computed, onBeforeUnmount, onMounted, ref, watch, nextTick } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import PortalHeader from '../../components/PortalHeader.vue';
 import NBanner from '../../components/NBanner.vue';
@@ -67,52 +68,6 @@ function onPagina(event) {
   laad();
 }
 
-// --- Nieuw-registreren-sheet -----------------------------------------------
-const sheetEl = ref(null);
-const sheetOpen = ref(false);
-const nieuw = ref({ kvk_nummer: '', naam: '', organisatiemodel: 'CENTRAAL', moederpartij_kvk: '' });
-const nieuwFout = ref('');
-const bezig = ref(false);
-
-watch(sheetOpen, async (open) => {
-  if (!open) {
-    sheetEl.value?.hide();
-    return;
-  }
-  await nextTick();
-  sheetEl.value?.show();
-});
-
-function openNieuw() {
-  nieuw.value = { kvk_nummer: '', naam: '', organisatiemodel: 'CENTRAAL', moederpartij_kvk: '' };
-  nieuwFout.value = '';
-  sheetOpen.value = true;
-}
-
-function veld(event) {
-  return event.detail?.value ?? event.target?.value ?? '';
-}
-
-async function registreer() {
-  nieuwFout.value = '';
-  bezig.value = true;
-  try {
-    const detail = await api.beheerPartijRegistreren({
-      kvk_nummer: nieuw.value.kvk_nummer.trim(),
-      naam: nieuw.value.naam.trim(),
-      organisatiemodel: nieuw.value.organisatiemodel,
-      moederpartij_kvk: nieuw.value.moederpartij_kvk.trim() || null,
-    });
-    sheetOpen.value = false;
-    melding.value = `Partij '${detail.naam}' is geregistreerd onder KvK-nummer ${detail.kvk_nummer}.`;
-    await laad();
-  } catch (e) {
-    nieuwFout.value = e.message;
-  } finally {
-    bezig.value = false;
-  }
-}
-
 onMounted(laad);
 watch(() => session.beoordelaar, laad);
 </script>
@@ -149,22 +104,15 @@ watch(() => session.beoordelaar, laad);
         <nldd-title size="2">
           <span slot="overline">Registratietaak van de Napp</span>
           <h2>Partijregister</h2>
-          <div slot="actions">
-            <nldd-button
-              variant="primary"
-              text="Partij registreren"
-              start-icon="plus"
-              @click="openNieuw"
-            ></nldd-button>
-          </div>
         </nldd-title>
         <nldd-spacer size="12"></nldd-spacer>
         <nldd-rich-text>
           <p>
             De koppeling tussen rechtspersoon (KvK-nummer) en geregistreerde
-            aanduiding, met organisatiemodel en decentrale verkiezingsuitslagen.
-            Dit register bepaalt welke aanspraken een partij in het
-            aanvraagportaal ziet.
+            aanduiding, met het organisatiemodel. Nieuwe koppelingen ontstaan
+            doordat een partij haar aanduiding claimt bij haar eerste
+            aanvraag. De verkiezingsuitslagen zelf zijn referentiedata van de
+            Kiesraad en zijn hier alleen te raadplegen.
           </p>
         </nldd-rich-text>
         <nldd-spacer size="24"></nldd-spacer>
@@ -240,84 +188,9 @@ watch(() => session.beoordelaar, laad);
           v-else
           icon="magnifier"
           text="Geen partijen gevonden"
-          supporting-text="Pas de zoekopdracht aan of registreer een nieuwe partij."
+          supporting-text="Pas de zoekopdracht aan. Nieuwe partijen verschijnen hier zodra hun claim bij de eerste aanvraag is bevestigd."
         ></nldd-inline-dialog>
       </nldd-simple-section>
-
-      <!-- Registratieformulier -->
-      <nldd-sheet
-        ref="sheetEl"
-        placement="right"
-        width="480px"
-        accessible-label="Partij registreren"
-        @close="sheetOpen = false"
-      >
-        <nldd-container padding="24" gap="16">
-          <nldd-title size="3">
-            <span slot="overline">Partijregister</span>
-            <h3>Partij registreren</h3>
-          </nldd-title>
-          <nldd-form novalidate @submit.prevent="registreer">
-            <nldd-form-field label="KvK-nummer">
-              <nldd-text-field
-                :value="nieuw.kvk_nummer"
-                name="kvk_nummer"
-                placeholder="8 cijfers"
-                @input="nieuw.kvk_nummer = veld($event)"
-              ></nldd-text-field>
-              <nldd-form-field-help-text>
-                Het KvK-nummer van de rechtspersoon die de aanduiding voert.
-              </nldd-form-field-help-text>
-            </nldd-form-field>
-            <nldd-form-field label="Geregistreerde aanduiding">
-              <nldd-text-field
-                :value="nieuw.naam"
-                name="naam"
-                placeholder="Bijvoorbeeld: Partij voor de Toekomst"
-                @input="nieuw.naam = veld($event)"
-              ></nldd-text-field>
-            </nldd-form-field>
-            <nldd-form-field label="Organisatiemodel">
-              <nldd-dropdown>
-                <select
-                  :value="nieuw.organisatiemodel"
-                  @change="nieuw.organisatiemodel = veld($event)"
-                >
-                  <option value="CENTRAAL">Centraal (afdelingen onder één KvK)</option>
-                  <option value="DECENTRAAL">Decentraal (afdelingen als eigen rechtspersoon)</option>
-                </select>
-              </nldd-dropdown>
-            </nldd-form-field>
-            <nldd-form-field label="Moederpartij (optioneel)">
-              <nldd-text-field
-                :value="nieuw.moederpartij_kvk"
-                name="moederpartij_kvk"
-                placeholder="KvK-nummer van de moederpartij"
-                @input="nieuw.moederpartij_kvk = veld($event)"
-              ></nldd-text-field>
-              <nldd-form-field-help-text>
-                Alleen voor afdelingen met een eigen rechtspersoon.
-              </nldd-form-field-help-text>
-            </nldd-form-field>
-            <template v-if="nieuwFout">
-              <NBanner variant="critical" :text="nieuwFout" />
-            </template>
-            <nldd-form-actions>
-              <nldd-button
-                variant="primary"
-                type="submit"
-                text="Registreren"
-                :disabled="bezig || undefined"
-              ></nldd-button>
-              <nldd-button
-                variant="secondary"
-                text="Annuleren"
-                @click="sheetOpen = false"
-              ></nldd-button>
-            </nldd-form-actions>
-          </nldd-form>
-        </nldd-container>
-      </nldd-sheet>
     </template>
   </nldd-page>
 </template>

@@ -74,12 +74,5 @@ export const api = {
   beheerPartijen: ({ zoek = '', offset = 0, limit = 25 } = {}) =>
     apiGet(`/api/beheer/partijen?${new URLSearchParams({ zoek, offset, limit })}`),
   beheerPartij: (kvk) => apiGet(`/api/beheer/partijen/${kvk}`),
-  beheerPartijRegistreren: (payload) => apiPost('/api/beheer/partijen', payload),
   beheerPartijWijzigen: (kvk, payload) => apiPut(`/api/beheer/partijen/${kvk}`, payload),
-  beheerUitslagToevoegen: (kvk, payload) =>
-    apiPost(`/api/beheer/partijen/${kvk}/uitslagen`, payload),
-  beheerUitslagVerwijderen: (kvk, orgaan, gebiedCode) =>
-    apiDelete(`/api/beheer/partijen/${kvk}/uitslagen/${orgaan}/${gebiedCode}`),
-  beheerGebieden: (orgaan) =>
-    apiGet(`/api/beheer/gebieden?${new URLSearchParams(orgaan ? { orgaan } : {})}`),
 };

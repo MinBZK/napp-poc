@@ -1,7 +1,9 @@
 <script setup>
 /**
- * Detail van een geregistreerde partij: gegevens bewerken, decentrale
- * uitslagen per orgaan inzien en corrigeren (regel toevoegen/verwijderen).
+ * Detail van een geregistreerde koppeling: de rechtspersoon (KvK) achter een
+ * aanduiding, met organisatiemodel en moederpartij (bewerkbaar). De
+ * verkiezingsuitslagen en inwoneraantallen zijn referentiedata uit
+ * authentieke bronnen (Kiesraad, CBS) en zijn hier alleen te raadplegen.
  */
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -22,7 +24,16 @@ const navItems = [
 const ORGAAN_LABELS = {
   GEMEENTERAAD: 'Gemeenteraad',
   PROVINCIALE_STATEN: 'Provinciale Staten',
+  EILANDSRAAD: 'Eilandsraad',
   WATERSCHAP: 'Waterschap',
+};
+
+// Herkomst van de referentiedata, per orgaan de verkiezing.
+const ORGAAN_BRONNEN = {
+  GEMEENTERAAD: 'Kiesraad, gemeenteraadsverkiezingen 2026',
+  PROVINCIALE_STATEN: 'Kiesraad, provinciale statenverkiezingen 2023',
+  EILANDSRAAD: 'Kiesraad, eilandsraadsverkiezingen 2023',
+  WATERSCHAP: 'Kiesraad, waterschapsverkiezingen 2023',
 };
 
 const kvk = computed(() => route.params.kvk);
@@ -38,6 +49,7 @@ const uitslagenPerOrgaan = computed(() => {
     .map((orgaan) => ({
       orgaan,
       label: ORGAAN_LABELS[orgaan],
+      bron: ORGAAN_BRONNEN[orgaan],
       uitslagen: partij.value.uitslagen.filter((u) => u.orgaan === orgaan),
     }))
     .filter((groep) => groep.uitslagen.length);
@@ -57,7 +69,7 @@ function veld(event) {
   return event.detail?.value ?? event.target?.value ?? '';
 }
 
-// --- Gegevens bewerken -------------------------------------------------------
+// --- Koppeling bewerken ------------------------------------------------------
 const bewerkSheetEl = ref(null);
 const bewerkOpen = ref(false);
 const bewerk = ref({ naam: '', organisatiemodel: 'CENTRAAL', moederpartij_kvk: '' });
@@ -93,99 +105,12 @@ async function bewaarGegevens() {
       moederpartij_kvk: bewerk.value.moederpartij_kvk.trim() || null,
     });
     bewerkOpen.value = false;
-    melding.value = 'De partijgegevens zijn gewijzigd.';
+    melding.value = 'De koppeling is gewijzigd.';
   } catch (e) {
     bewerkFout.value = e.message;
   } finally {
     bewerkBezig.value = false;
   }
-}
-
-// --- Uitslag toevoegen -------------------------------------------------------
-const uitslagSheetEl = ref(null);
-const uitslagOpen = ref(false);
-const nieuweUitslag = ref({ orgaan: 'GEMEENTERAAD', gebied_code: '', zetels: 1 });
-const gebieden = ref([]);
-const uitslagFout = ref('');
-const uitslagBezig = ref(false);
-
-watch(uitslagOpen, async (open) => {
-  if (!open) {
-    uitslagSheetEl.value?.hide();
-    return;
-  }
-  await nextTick();
-  uitslagSheetEl.value?.show();
-});
-
-async function laadGebieden() {
-  try {
-    gebieden.value = await api.beheerGebieden(nieuweUitslag.value.orgaan);
-    if (!gebieden.value.some((g) => g.code === nieuweUitslag.value.gebied_code)) {
-      nieuweUitslag.value.gebied_code = gebieden.value[0]?.code ?? '';
-    }
-  } catch (e) {
-    uitslagFout.value = e.message;
-  }
-}
-
-async function openUitslagToevoegen() {
-  nieuweUitslag.value = { orgaan: 'GEMEENTERAAD', gebied_code: '', zetels: 1 };
-  uitslagFout.value = '';
-  uitslagOpen.value = true;
-  await laadGebieden();
-}
-
-async function wisselOrgaan(event) {
-  nieuweUitslag.value.orgaan = veld(event);
-  await laadGebieden();
-}
-
-async function voegUitslagToe() {
-  uitslagFout.value = '';
-  uitslagBezig.value = true;
-  try {
-    partij.value = await api.beheerUitslagToevoegen(kvk.value, {
-      orgaan: nieuweUitslag.value.orgaan,
-      gebied_code: nieuweUitslag.value.gebied_code,
-      zetels: Number(nieuweUitslag.value.zetels),
-    });
-    uitslagOpen.value = false;
-    melding.value = 'De uitslag is toegevoegd.';
-  } catch (e) {
-    uitslagFout.value = e.message;
-  } finally {
-    uitslagBezig.value = false;
-  }
-}
-
-// --- Uitslag verwijderen -----------------------------------------------------
-const verwijderModalEl = ref(null);
-const verwijderKandidaat = ref(null);
-
-watch(verwijderKandidaat, async (kandidaat) => {
-  if (!kandidaat) {
-    verwijderModalEl.value?.hide();
-    return;
-  }
-  await nextTick();
-  verwijderModalEl.value?.show();
-});
-
-async function verwijderUitslag() {
-  const kandidaat = verwijderKandidaat.value;
-  if (!kandidaat) return;
-  try {
-    partij.value = await api.beheerUitslagVerwijderen(
-      kvk.value,
-      kandidaat.orgaan,
-      kandidaat.gebied_code,
-    );
-    melding.value = 'De uitslag is verwijderd.';
-  } catch (e) {
-    fout.value = e.message;
-  }
-  verwijderKandidaat.value = null;
 }
 
 onMounted(laad);
@@ -237,20 +162,12 @@ watch(kvk, laad);
             <span slot="overline">KvK-nummer {{ partij.kvk_nummer }}</span>
             <h2>{{ partij.naam }}</h2>
             <div slot="actions">
-              <nldd-button-group orientation="horizontal">
-                <nldd-button
-                  variant="secondary"
-                  text="Gegevens bewerken"
-                  start-icon="pencil"
-                  @click="openBewerken"
-                ></nldd-button>
-                <nldd-button
-                  variant="primary"
-                  text="Uitslag toevoegen"
-                  start-icon="plus"
-                  @click="openUitslagToevoegen"
-                ></nldd-button>
-              </nldd-button-group>
+              <nldd-button
+                variant="secondary"
+                text="Koppeling bewerken"
+                start-icon="pencil"
+                @click="openBewerken"
+              ></nldd-button>
             </div>
           </nldd-title>
           <nldd-spacer size="12"></nldd-spacer>
@@ -263,7 +180,7 @@ watch(kvk, laad);
             <nldd-tag
               v-if="partij.kamerzetels"
               color="success"
-              :text="`${partij.kamerzetels} kamerzetels`"
+              :text="`${partij.kamerzetels} kamerzetels (Kiesraad, TK2025)`"
             ></nldd-tag>
             <nldd-tag
               v-if="partij.moederpartij_kvk"
@@ -291,12 +208,24 @@ watch(kvk, laad);
 
           <nldd-spacer size="16"></nldd-spacer>
 
+          <nldd-title size="3"><h3>Verkiezingsuitslagen</h3></nldd-title>
+          <nldd-spacer size="4"></nldd-spacer>
+          <nldd-rich-text>
+            <p>
+              Referentiedata uit de officiële uitslagen van de centrale
+              stembureaus; inwoneraantallen van het CBS (peildatum 1 januari).
+              Deze gegevens zijn niet in dit register te wijzigen — correcties
+              volgen de bron.
+            </p>
+          </nldd-rich-text>
+          <nldd-spacer size="16"></nldd-spacer>
+
           <template v-if="uitslagenPerOrgaan.length">
             <template v-for="groep in uitslagenPerOrgaan" :key="groep.orgaan">
-              <nldd-title size="4"><h3>{{ groep.label }}</h3></nldd-title>
+              <nldd-title size="4"><h4>{{ groep.label }}</h4></nldd-title>
               <nldd-spacer size="8"></nldd-spacer>
               <nldd-table
-                columns="minmax(200px,1fr) 130px 140px 100px 150px"
+                columns="minmax(200px,1fr) 130px 140px 100px"
                 :accessible-label="`Uitslagen ${groep.label}`"
               >
                 <nldd-table-row slot="header">
@@ -304,7 +233,6 @@ watch(kvk, laad);
                   <nldd-text-cell text="Code"></nldd-text-cell>
                   <nldd-text-cell text="Inwoneraantal" horizontal-alignment="right"></nldd-text-cell>
                   <nldd-text-cell text="Zetels" horizontal-alignment="right"></nldd-text-cell>
-                  <nldd-text-cell text=""></nldd-text-cell>
                 </nldd-table-row>
                 <nldd-table-row
                   v-for="uitslag in groep.uitslagen"
@@ -320,42 +248,37 @@ watch(kvk, laad);
                     :text="String(uitslag.zetels)"
                     horizontal-alignment="right"
                   ></nldd-text-cell>
-                  <nldd-cell horizontal-alignment="right">
-                    <nldd-button
-                      variant="critical-transparent"
-                      size="sm"
-                      text="Verwijderen"
-                      start-icon="trash"
-                      @click="verwijderKandidaat = uitslag"
-                    ></nldd-button>
-                  </nldd-cell>
                 </nldd-table-row>
               </nldd-table>
-              <nldd-spacer size="24"></nldd-spacer>
+              <nldd-spacer size="4"></nldd-spacer>
+              <nldd-rich-text>
+                <p>Bron: {{ groep.bron }}.</p>
+              </nldd-rich-text>
+              <nldd-spacer size="20"></nldd-spacer>
             </template>
           </template>
           <nldd-inline-dialog
             v-else
             icon="inbox"
-            text="Geen decentrale uitslagen geregistreerd"
-            supporting-text="Voeg een uitslag toe wanneer deze partij een zetel haalde in een gemeenteraad, provinciale staten of waterschap."
+            text="Geen decentrale uitslagen"
+            supporting-text="In de officiële uitslagen van de Kiesraad staat voor deze aanduiding geen zetel in een gemeenteraad, provinciale staten, eilandsraad of waterschap."
           ></nldd-inline-dialog>
         </template>
         <nldd-activity-indicator v-else-if="!fout" show-text text="Partij laden"></nldd-activity-indicator>
       </nldd-simple-section>
 
-      <!-- Gegevens bewerken -->
+      <!-- Koppeling bewerken -->
       <nldd-sheet
         ref="bewerkSheetEl"
         placement="right"
         width="480px"
-        accessible-label="Partijgegevens bewerken"
+        accessible-label="Koppeling bewerken"
         @close="bewerkOpen = false"
       >
         <nldd-container padding="24" gap="16">
           <nldd-title size="3">
             <span slot="overline">KvK-nummer {{ kvk }}</span>
-            <h3>Gegevens bewerken</h3>
+            <h3>Koppeling bewerken</h3>
           </nldd-title>
           <nldd-form novalidate @submit.prevent="bewaarGegevens">
             <nldd-form-field label="Geregistreerde aanduiding">
@@ -375,6 +298,11 @@ watch(kvk, laad);
                   <option value="DECENTRAAL">Decentraal (afdelingen als eigen rechtspersoon)</option>
                 </select>
               </nldd-dropdown>
+              <nldd-form-field-help-text>
+                Bij een centraal model ontstaan afdelingen vanzelf uit de
+                verkiezingsuitslagen; afdelingsbestuurders loggen in met het
+                KvK-nummer van de partij en een beperkte machtiging.
+              </nldd-form-field-help-text>
             </nldd-form-field>
             <nldd-form-field label="Moederpartij (optioneel)">
               <nldd-text-field
@@ -383,6 +311,10 @@ watch(kvk, laad);
                 placeholder="KvK-nummer van de moederpartij"
                 @input="bewerk.moederpartij_kvk = veld($event)"
               ></nldd-text-field>
+              <nldd-form-field-help-text>
+                Alleen voor afdelingen met een eigen rechtspersoon (decentraal
+                model).
+              </nldd-form-field-help-text>
             </nldd-form-field>
             <template v-if="bewerkFout">
               <NBanner variant="critical" :text="bewerkFout" />
@@ -403,100 +335,6 @@ watch(kvk, laad);
           </nldd-form>
         </nldd-container>
       </nldd-sheet>
-
-      <!-- Uitslag toevoegen -->
-      <nldd-sheet
-        ref="uitslagSheetEl"
-        placement="right"
-        width="480px"
-        accessible-label="Uitslag toevoegen"
-        @close="uitslagOpen = false"
-      >
-        <nldd-container padding="24" gap="16">
-          <nldd-title size="3">
-            <span slot="overline">{{ partij?.naam }}</span>
-            <h3>Uitslag toevoegen</h3>
-          </nldd-title>
-          <nldd-form novalidate @submit.prevent="voegUitslagToe">
-            <nldd-form-field label="Orgaan">
-              <nldd-dropdown>
-                <select :value="nieuweUitslag.orgaan" @change="wisselOrgaan">
-                  <option
-                    v-for="(label, orgaan) in ORGAAN_LABELS"
-                    :key="orgaan"
-                    :value="orgaan"
-                  >
-                    {{ label }}
-                  </option>
-                </select>
-              </nldd-dropdown>
-            </nldd-form-field>
-            <nldd-form-field label="Gebied">
-              <nldd-dropdown>
-                <select
-                  :value="nieuweUitslag.gebied_code"
-                  @change="nieuweUitslag.gebied_code = veld($event)"
-                >
-                  <option v-for="gebied in gebieden" :key="gebied.code" :value="gebied.code">
-                    {{ gebied.naam }} ({{ gebied.code }})
-                  </option>
-                </select>
-              </nldd-dropdown>
-            </nldd-form-field>
-            <nldd-form-field label="Zetels">
-              <nldd-number-field
-                :value="nieuweUitslag.zetels"
-                name="zetels"
-                min="1"
-                step="1"
-                @input="nieuweUitslag.zetels = veld($event)"
-                @change="nieuweUitslag.zetels = veld($event)"
-              ></nldd-number-field>
-            </nldd-form-field>
-            <template v-if="uitslagFout">
-              <NBanner variant="critical" :text="uitslagFout" />
-            </template>
-            <nldd-form-actions>
-              <nldd-button
-                variant="primary"
-                type="submit"
-                text="Toevoegen"
-                :disabled="uitslagBezig || undefined"
-              ></nldd-button>
-              <nldd-button
-                variant="secondary"
-                text="Annuleren"
-                @click="uitslagOpen = false"
-              ></nldd-button>
-            </nldd-form-actions>
-          </nldd-form>
-        </nldd-container>
-      </nldd-sheet>
-
-      <!-- Verwijderen bevestigen -->
-      <nldd-modal-dialog
-        ref="verwijderModalEl"
-        variant="alert"
-        text="Uitslag verwijderen?"
-        :supporting-text="verwijderKandidaat
-          ? `De uitslag voor ${verwijderKandidaat.gebied_naam ?? verwijderKandidaat.gebied_code} (${ORGAAN_LABELS[verwijderKandidaat.orgaan]}) wordt uit het register verwijderd.`
-          : ''"
-        accessible-label="Uitslag verwijderen"
-        @close="verwijderKandidaat = null"
-      >
-        <nldd-button
-          slot="actions"
-          variant="destructive"
-          text="Verwijderen"
-          @click="verwijderUitslag"
-        ></nldd-button>
-        <nldd-button
-          slot="actions"
-          variant="secondary"
-          text="Annuleren"
-          @click="verwijderKandidaat = null"
-        ></nldd-button>
-      </nldd-modal-dialog>
     </template>
   </nldd-page>
 </template>
