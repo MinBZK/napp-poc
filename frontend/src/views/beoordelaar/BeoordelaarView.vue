@@ -186,20 +186,39 @@ watch(() => session.beoordelaar, laad);
         <template v-else>
           <nldd-table
             v-if="betaalopdrachten.length"
-            columns="minmax(220px,1fr) 160px 140px 180px"
+            columns="minmax(180px,1fr) 130px 200px minmax(160px,1fr) 140px 170px"
             accessible-label="Betaalopdrachten"
           >
             <nldd-table-row slot="header">
               <nldd-text-cell text="Partij"></nldd-text-cell>
               <nldd-text-cell text="Bedrag" horizontal-alignment="right"></nldd-text-cell>
+              <nldd-text-cell text="IBAN"></nldd-text-cell>
+              <nldd-text-cell text="Tenaamstelling"></nldd-text-cell>
               <nldd-text-cell text="Status"></nldd-text-cell>
               <nldd-text-cell text="Aangemaakt"></nldd-text-cell>
             </nldd-table-row>
             <nldd-table-row v-for="opdracht in betaalopdrachten" :key="opdracht.id">
               <nldd-text-cell :text="opdracht.partij_naam"></nldd-text-cell>
               <nldd-text-cell :text="euro(opdracht.bedrag)" horizontal-alignment="right"></nldd-text-cell>
+              <nldd-text-cell
+                :text="opdracht.iban ?? '—'"
+                :color="opdracht.iban ? undefined : 'secondary'"
+              ></nldd-text-cell>
+              <nldd-text-cell
+                :text="opdracht.tenaamstelling ?? '—'"
+                :color="opdracht.tenaamstelling ? undefined : 'secondary'"
+              ></nldd-text-cell>
               <nldd-cell>
-                <nldd-tag color="accent" :text="opdracht.status === 'AANGEMAAKT' ? 'Aangemaakt' : opdracht.status"></nldd-tag>
+                <nldd-tag
+                  :color="opdracht.status === 'AANGEHOUDEN' ? 'warning' : 'accent'"
+                  :text="
+                    opdracht.status === 'AANGEMAAKT'
+                      ? 'Aangemaakt'
+                      : opdracht.status === 'AANGEHOUDEN'
+                        ? 'Aangehouden'
+                        : opdracht.status
+                  "
+                ></nldd-tag>
               </nldd-cell>
               <nldd-text-cell :text="opdracht.created_at" color="secondary"></nldd-text-cell>
             </nldd-table-row>

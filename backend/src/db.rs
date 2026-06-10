@@ -39,11 +39,16 @@ pub async fn init(pool: &SqlitePool) -> anyhow::Result<()> {
             beoordelaar TEXT NOT NULL,
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
+        -- Status: AANGEMAAKT (klaar voor het betaalsysteem, met rekening)
+        -- of AANGEHOUDEN (geen rekening bekend bij verlening; wordt demo-
+        -- materiaal voor de claim-flow).
         CREATE TABLE IF NOT EXISTS betaalopdrachten (
             id TEXT PRIMARY KEY,
             besluit_id TEXT NOT NULL REFERENCES besluiten(id),
             partij_naam TEXT NOT NULL,
             bedrag INTEGER NOT NULL,
+            iban TEXT NULL,
+            tenaamstelling TEXT NULL,
             status TEXT NOT NULL DEFAULT 'AANGEMAAKT',
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
@@ -54,12 +59,18 @@ pub async fn init(pool: &SqlitePool) -> anyhow::Result<()> {
         -- naar een gebied in register_gebieden (met inwoneraantal); de Kamer
         -- heeft geen gebied, dus een uitslag-rij zou een kunstmatig gebied of
         -- NULL-joins vereisen. De kolom volgt bovendien het Partij-domeinmodel.
+        -- Eén rekening per rechtspersoon (Wpp art. 27: de subsidie wordt
+        -- verstrekt aan de rechtspersoon; afdelingen van een centraal
+        -- georganiseerde partij hebben geen rechtspersoonlijkheid). Eigen
+        -- opgave door het tekenbevoegd bestuur, met IBAN-naam-controle.
         CREATE TABLE IF NOT EXISTS register_partijen (
             kvk_nummer TEXT PRIMARY KEY,
             naam TEXT NOT NULL,
             organisatiemodel TEXT NOT NULL DEFAULT 'CENTRAAL',
             kamerzetels INTEGER NOT NULL DEFAULT 0,
-            moederpartij_kvk TEXT REFERENCES register_partijen(kvk_nummer)
+            moederpartij_kvk TEXT REFERENCES register_partijen(kvk_nummer),
+            iban TEXT NULL,
+            iban_tenaamstelling TEXT NULL
         );
         CREATE TABLE IF NOT EXISTS register_uitslagen (
             kvk_nummer TEXT NOT NULL REFERENCES register_partijen(kvk_nummer),
@@ -160,6 +171,10 @@ pub struct Betaalopdracht {
     pub besluit_id: String,
     pub partij_naam: String,
     pub bedrag: i64,
+    /// Rekening van de rechtspersoon op het moment van verlening; leeg bij
+    /// status AANGEHOUDEN (nog geen rekening bekend).
+    pub iban: Option<String>,
+    pub tenaamstelling: Option<String>,
     pub status: String,
     pub created_at: String,
 }
@@ -386,20 +401,28 @@ pub async fn set_bekendmaking(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn insert_betaalopdracht(
     pool: &SqlitePool,
     id: &str,
     besluit_id: &str,
     partij_naam: &str,
     bedrag: i64,
+    iban: Option<&str>,
+    tenaamstelling: Option<&str>,
+    status: &str,
 ) -> anyhow::Result<()> {
     sqlx::query(
-        "INSERT INTO betaalopdrachten (id, besluit_id, partij_naam, bedrag) VALUES (?, ?, ?, ?)",
+        "INSERT INTO betaalopdrachten (id, besluit_id, partij_naam, bedrag, iban, tenaamstelling, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(id)
     .bind(besluit_id)
     .bind(partij_naam)
     .bind(bedrag)
+    .bind(iban)
+    .bind(tenaamstelling)
+    .bind(status)
     .execute(pool)
     .await?;
     Ok(())
@@ -416,6 +439,8 @@ pub async fn list_betaalopdrachten(pool: &SqlitePool) -> anyhow::Result<Vec<Beta
             besluit_id: row.get("besluit_id"),
             partij_naam: row.get("partij_naam"),
             bedrag: row.get("bedrag"),
+            iban: row.get("iban"),
+            tenaamstelling: row.get("tenaamstelling"),
             status: row.get("status"),
             created_at: row.get("created_at"),
         })

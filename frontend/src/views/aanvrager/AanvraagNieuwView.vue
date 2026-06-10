@@ -10,6 +10,7 @@ import { euro, datum, onderdelen } from '../../format.js';
 const router = useRouter();
 
 const registratie = ref(null);
+const rekening = ref(null);
 const geselecteerd = ref(new Set());
 const leden = ref(0);
 
@@ -144,6 +145,13 @@ async function laadRegistratie() {
   } catch {
     registratie.value = null;
   }
+  // Informational only: applying without an account is allowed; the
+  // betaalopdracht is then held until the board submits one.
+  try {
+    rekening.value = await api.mijnRekening();
+  } catch {
+    rekening.value = null;
+  }
 }
 
 async function herberekenProef() {
@@ -255,6 +263,14 @@ watch(() => session.aanvrager, laadRegistratie);
           supporting-text="Uw organisatie staat niet in het partijregister van de Napp. U kunt een aanvraag indienen, maar zonder geregistreerde zetels zal de wet haar afwijzen."
         />
         <nldd-spacer v-if="registratie && !registratie.partij" size="16"></nldd-spacer>
+
+        <NBanner
+          v-if="rekening && !rekening.iban"
+          variant="neutral"
+          text="Nog geen rekeningnummer bekend"
+          supporting-text="Voor uitbetaling van het voorschot is een rekeningnummer op naam van de rechtspersoon nodig; u kunt dit op de overzichtspagina opgeven. U kunt wel alvast aanvragen."
+        />
+        <nldd-spacer v-if="rekening && !rekening.iban" size="16"></nldd-spacer>
 
         <template v-for="groep in zichtbareGroepen" :key="groep.titel">
           <nldd-title size="4">

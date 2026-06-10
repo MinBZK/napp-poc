@@ -46,11 +46,11 @@ pub(crate) fn forbidden() -> ApiError {
     forbidden_with("Geen toegang.")
 }
 
-fn forbidden_with(msg: &str) -> ApiError {
+pub(crate) fn forbidden_with(msg: &str) -> ApiError {
     (StatusCode::FORBIDDEN, Json(json!({"fout": msg})))
 }
 
-async fn session_kvk(session: &Session) -> Option<String> {
+pub(crate) async fn session_kvk(session: &Session) -> Option<String> {
     session.get(SESSION_KEY_EH_KVK).await.ok().flatten()
 }
 
@@ -709,7 +709,20 @@ pub async fn stel_besluit_vast(
         .map_err(internal_error)?;
 
     // Side-effect uit art. 16/27: één betaalopdracht aan de rechtspersoon.
+    // De rekening komt uit het partijregister (eigen opgave van het
+    // tekenbevoegd bestuur, zie rekening.rs). Zonder bekende rekening wordt
+    // de opdracht AANGEHOUDEN: het besluit staat, de uitbetaling wacht.
+    let mut betaalopdracht_status: Option<&str> = None;
     if uitkomst.betaalopdracht_vereist {
+        let rekening = crate::register::partij_by_kvk(&state.pool, &aanvraag.kvk_nummer)
+            .await
+            .map_err(internal_error)?
+            .and_then(|p| p.iban.zip(p.iban_tenaamstelling));
+        let status = if rekening.is_some() {
+            "AANGEMAAKT"
+        } else {
+            "AANGEHOUDEN"
+        };
         let opdracht_id = Uuid::new_v4().to_string();
         db::insert_betaalopdracht(
             &state.pool,
@@ -717,12 +730,17 @@ pub async fn stel_besluit_vast(
             &besluit_id,
             &aanvraag.partij_naam,
             uitkomst.betaalopdracht_bedrag,
+            rekening.as_ref().map(|(iban, _)| iban.as_str()),
+            rekening.as_ref().map(|(_, naam)| naam.as_str()),
+            status,
         )
         .await
         .map_err(internal_error)?;
+        betaalopdracht_status = Some(status);
         tracing::info!(
             besluit = %besluit_id,
             bedrag = uitkomst.betaalopdracht_bedrag,
+            status,
             "betaalopdracht aangemaakt (mock betaalsysteem)"
         );
     }
@@ -730,6 +748,9 @@ pub async fn stel_besluit_vast(
     Ok(Json(json!({
         "besluit_id": besluit_id,
         "uitkomst": uitkomst,
+        // AANGEMAAKT, AANGEHOUDEN (geen rekening bekend) of null (geen
+        // betaalopdracht); de UI kan een aangehouden opdracht hiermee melden.
+        "betaalopdracht_status": betaalopdracht_status,
     })))
 }
 
