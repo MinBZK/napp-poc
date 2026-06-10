@@ -38,7 +38,6 @@ const stappen = [
   <nldd-page>
     <PortalHeader
       slot="header"
-      subtitle="Nederlandse autoriteit politieke partijen"
       :items="navItems"
       :utility-items="[{ text: 'Inloggen', icon: 'person', key: 'login' }]"
       @utility="naarInloggen"

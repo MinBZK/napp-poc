@@ -139,7 +139,6 @@ onMounted(run);
   <nldd-page>
     <PortalHeader
       slot="header"
-      subtitle="Beoordelingsomgeving"
       portal="beoordelaar"
       :items="[{ text: 'Werkvoorraad', to: '/' }, { text: 'Partijregister', to: '/partijregister' }, { text: 'Scenario’s', to: '/scenarios' }]"
     />
@@ -155,7 +154,7 @@ onMounted(run);
       <nldd-spacer size="16"></nldd-spacer>
 
       <nldd-title size="2">
-        <span slot="overline">Doet de wet wat hij moet doen?</span>
+        <span slot="overline">Beoordelingsomgeving</span>
         <h2>Scenario's</h2>
         <div slot="actions">
           <nldd-button

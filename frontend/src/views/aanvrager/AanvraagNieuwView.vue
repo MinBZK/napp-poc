@@ -243,7 +243,6 @@ watch(() => session.aanvrager, laadRegistratie);
   <nldd-page>
     <PortalHeader
       slot="header"
-      subtitle="Subsidieportaal politieke partijen"
       portal="aanvrager"
       :items="[{ text: 'Mijn aanvragen', to: '/' }, { text: 'Nieuwe aanvraag', to: '/nieuw' }, { text: 'Mijn organisatie', to: '/organisatie' }]"
     />

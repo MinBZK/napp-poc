@@ -122,7 +122,6 @@ watch(kvk, laad);
   <nldd-page>
     <PortalHeader
       slot="header"
-      subtitle="Beoordelingsomgeving"
       :items="session.beoordelaar ? navItems : []"
       portal="beoordelaar"
     />

@@ -151,7 +151,6 @@ watch(() => session.beoordelaar, alles);
   <nldd-page>
     <PortalHeader
       slot="header"
-      subtitle="Beoordelingsomgeving"
       :items="session.beoordelaar ? navItems : []"
       portal="beoordelaar"
     />
@@ -177,7 +176,7 @@ watch(() => session.beoordelaar, alles);
     <template v-else-if="session.beoordelaar">
       <nldd-simple-section>
         <nldd-title size="2">
-          <span slot="overline">Registratietaak van de Napp</span>
+          <span slot="overline">Beoordelingsomgeving</span>
           <h2>Partijregister</h2>
         </nldd-title>
         <nldd-spacer size="12"></nldd-spacer>

@@ -5,7 +5,7 @@ import PortalHeader from '../../components/PortalHeader.vue';
 import NBanner from '../../components/NBanner.vue';
 import LifecycleTimeline from '../../components/LifecycleTimeline.vue';
 import { api } from '../../api.js';
-import { euro, datum } from '../../format.js';
+import { euro, datum, datumTijd, BETAAL_LABELS, betaalKleur, BESLISSING_LABELS } from '../../format.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -132,18 +132,6 @@ async function maakBekend() {
 // Voorschot/betaalopdracht bij dit dossier (indien het besluit er een
 // opleverde). Uitbetalen is de feitelijke handeling naar het
 // (gesimuleerde) betaalsysteem.
-const BETAAL_LABELS = {
-  AANGEMAAKT: 'Aangemaakt',
-  AANGEHOUDEN: 'Aangehouden',
-  UITBETAALD: 'Uitbetaald',
-};
-
-function betaalKleur(status) {
-  if (status === 'AANGEHOUDEN') return 'warning';
-  if (status === 'UITBETAALD') return 'success';
-  return 'accent';
-}
-
 async function betaalUit() {
   bezig.value = true;
   fout.value = '';
@@ -157,7 +145,7 @@ async function betaalUit() {
   }
 }
 
-// Bezwaarbehandeling (AWB hoofdstuk 7): horen of geldig afzien (7:3),
+// Bezwaarbehandeling (Awb hoofdstuk 7): horen of geldig afzien (7:3),
 // daarna beslissen; bij gegrond volgt volledige heroverweging (7:11).
 const bezwaarFout = ref('');
 const afzienGrond = ref('KENNELIJK_ONGEGROND');
@@ -170,12 +158,6 @@ const AFZIEN_GRONDEN = [
   { value: 'INDIENER_ZIET_AF', label: 'Indiener ziet af van horen' },
   { value: 'VOLLEDIG_TEGEMOETGEKOMEN', label: 'Volledig tegemoetgekomen' },
 ];
-
-const BESLISSING_LABELS = {
-  NIET_ONTVANKELIJK: 'Niet-ontvankelijk',
-  ONGEGROND: 'Ongegrond',
-  GEGROND: 'Gegrond',
-};
 
 async function registreerHoren(gehoord) {
   bezwaarFout.value = '';
@@ -222,7 +204,6 @@ onMounted(laad);
   <nldd-page>
     <PortalHeader
       slot="header"
-      subtitle="Beoordelingsomgeving"
       portal="beoordelaar"
       :items="[{ text: 'Werkvoorraad', to: '/' }, { text: 'Partijregister', to: '/partijregister' }, { text: 'Scenario’s', to: '/scenarios' }]"
     />
@@ -330,7 +311,7 @@ onMounted(laad);
                   ></nldd-text-cell>
                 </nldd-list-item>
                 <nldd-list-item v-if="item.betaalopdracht.betaaltermijn_einddatum" size="sm">
-                  <nldd-text-cell text="Betalen vóór · AWB 4:87" color="secondary"></nldd-text-cell>
+                  <nldd-text-cell text="Betalen vóór · Awb 4:87" color="secondary"></nldd-text-cell>
                   <nldd-text-cell
                     :text="datum(item.betaalopdracht.betaaltermijn_einddatum)"
                     horizontal-alignment="right"
@@ -338,7 +319,7 @@ onMounted(laad);
                 </nldd-list-item>
                 <nldd-list-item v-if="item.betaalopdracht.uitgevoerd_at" size="sm">
                   <nldd-text-cell text="Uitbetaald op" color="secondary"></nldd-text-cell>
-                  <nldd-text-cell :text="item.betaalopdracht.uitgevoerd_at" horizontal-alignment="right"></nldd-text-cell>
+                  <nldd-text-cell :text="datumTijd(item.betaalopdracht.uitgevoerd_at)" horizontal-alignment="right"></nldd-text-cell>
                 </nldd-list-item>
               </nldd-list>
               <template v-if="item.betaalopdracht.status === 'AANGEMAAKT'">
@@ -356,7 +337,7 @@ onMounted(laad);
             <template v-if="item.bezwaar">
               <nldd-spacer size="24"></nldd-spacer>
               <nldd-title size="4">
-                <h3>Bezwaar (AWB hoofdstuk 6/7)</h3>
+                <h3>Bezwaar (Awb hoofdstuk 6/7)</h3>
                 <div slot="actions">
                   <nldd-tag
                     :color="item.bezwaar.beslissing ? (item.bezwaar.beslissing === 'GEGROND' ? 'success' : 'critical') : 'accent'"
@@ -375,7 +356,7 @@ onMounted(laad);
                   <nldd-text-cell :text="item.bezwaar.gronden || '— (vormgebrek)'" horizontal-alignment="right"></nldd-text-cell>
                 </nldd-list-item>
                 <nldd-list-item size="sm">
-                  <nldd-text-cell text="Tijdig (AWB 6:9) · oordeel wet" color="secondary"></nldd-text-cell>
+                  <nldd-text-cell text="Tijdig (Awb 6:9) · oordeel wet" color="secondary"></nldd-text-cell>
                   <nldd-cell width="fit-content">
                     <nldd-tag
                       :color="item.bezwaar.toets?.tijdig ? 'success' : 'critical'"
@@ -384,7 +365,7 @@ onMounted(laad);
                   </nldd-cell>
                 </nldd-list-item>
                 <nldd-list-item size="sm">
-                  <nldd-text-cell text="Vereisten (AWB 6:5) · oordeel wet" color="secondary"></nldd-text-cell>
+                  <nldd-text-cell text="Vereisten (Awb 6:5) · oordeel wet" color="secondary"></nldd-text-cell>
                   <nldd-cell width="fit-content">
                     <nldd-tag
                       :color="item.bezwaar.toets?.voldoet_aan_vereisten ? 'success' : 'warning'"
@@ -393,11 +374,11 @@ onMounted(laad);
                   </nldd-cell>
                 </nldd-list-item>
                 <nldd-list-item v-if="item.bezwaar.beslistermijn_einddatum" size="sm">
-                  <nldd-text-cell text="Beslissen vóór · AWB 7:10" color="secondary"></nldd-text-cell>
+                  <nldd-text-cell text="Beslissen vóór · Awb 7:10" color="secondary"></nldd-text-cell>
                   <nldd-text-cell :text="datum(item.bezwaar.beslistermijn_einddatum)" horizontal-alignment="right"></nldd-text-cell>
                 </nldd-list-item>
                 <nldd-list-item v-if="item.bezwaar.gehoord !== null" size="sm">
-                  <nldd-text-cell text="Horen (AWB 7:2/7:3)" color="secondary"></nldd-text-cell>
+                  <nldd-text-cell text="Horen (Awb 7:2/7:3)" color="secondary"></nldd-text-cell>
                   <nldd-text-cell
                     :text="item.bezwaar.gehoord ? 'Gehoord' : `Afgezien: ${item.bezwaar.afzien_grond}`"
                     horizontal-alignment="right"
@@ -415,7 +396,7 @@ onMounted(laad);
                     @click="registreerHoren(true)"
                   ></nldd-button>
                   <nldd-spacer size="8"></nldd-spacer>
-                  <nldd-form-field label="Of afzien van horen (AWB 7:3)">
+                  <nldd-form-field label="Of afzien van horen (Awb 7:3)">
                     <nldd-dropdown>
                       <select :value="afzienGrond" @change="afzienGrond = bezwaarVeld($event)">
                         <option v-for="g in AFZIEN_GRONDEN" :key="g.value" :value="g.value">{{ g.label }}</option>
@@ -437,7 +418,7 @@ onMounted(laad);
                       <select :value="beslisKeuze" @change="beslisKeuze = bezwaarVeld($event)">
                         <option value="NIET_ONTVANKELIJK">Niet-ontvankelijk</option>
                         <option value="ONGEGROND">Ongegrond</option>
-                        <option value="GEGROND">Gegrond (heroverweging, AWB 7:11)</option>
+                        <option value="GEGROND">Gegrond (heroverweging, Awb 7:11)</option>
                       </select>
                     </nldd-dropdown>
                   </nldd-form-field>

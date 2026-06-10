@@ -31,7 +31,6 @@ onMounted(async () => {
   <nldd-page>
     <PortalHeader
       slot="header"
-      subtitle="Nederlandse autoriteit politieke partijen"
       :items="navItems"
     />
 

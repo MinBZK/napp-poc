@@ -118,7 +118,6 @@ watch(() => session.aanvrager, laadAlles);
   <nldd-page>
     <PortalHeader
       slot="header"
-      subtitle="Subsidieportaal politieke partijen"
       :items="session.aanvrager ? navItems : []"
       portal="aanvrager"
     />

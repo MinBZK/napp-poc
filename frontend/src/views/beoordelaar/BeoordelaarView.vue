@@ -5,7 +5,7 @@ import PortalHeader from '../../components/PortalHeader.vue';
 import NBanner from '../../components/NBanner.vue';
 import { api } from '../../api.js';
 import { session, refreshSession } from '../../session.js';
-import { euro, datum, onderdelen, statusLabel, statusColor } from '../../format.js';
+import { euro, datum, datumTijd, onderdelen, statusLabel, statusColor, BETAAL_LABELS, betaalKleur } from '../../format.js';
 
 const router = useRouter();
 
@@ -75,18 +75,6 @@ async function betaalUit(opdracht) {
   }
 }
 
-const BETAAL_LABELS = {
-  AANGEMAAKT: 'Aangemaakt',
-  AANGEHOUDEN: 'Aangehouden',
-  UITBETAALD: 'Uitbetaald',
-};
-
-function betaalKleur(status) {
-  if (status === 'AANGEHOUDEN') return 'warning';
-  if (status === 'UITBETAALD') return 'success';
-  return 'accent';
-}
-
 onMounted(laad);
 watch(() => session.beoordelaar, laad);
 </script>
@@ -95,7 +83,6 @@ watch(() => session.beoordelaar, laad);
   <nldd-page>
     <PortalHeader
       slot="header"
-      subtitle="Beoordelingsomgeving"
       :items="navItems"
       portal="beoordelaar"
     />
@@ -229,7 +216,7 @@ watch(() => session.beoordelaar, laad);
               <nldd-text-cell text="IBAN"></nldd-text-cell>
               <nldd-text-cell text="Tenaamstelling"></nldd-text-cell>
               <nldd-text-cell text="Status"></nldd-text-cell>
-              <nldd-text-cell text="Betalen vóór (AWB 4:87)"></nldd-text-cell>
+              <nldd-text-cell text="Betalen vóór (Awb 4:87)"></nldd-text-cell>
               <nldd-text-cell text=""></nldd-text-cell>
               <nldd-text-cell text="Dossier"></nldd-text-cell>
             </nldd-table-row>
@@ -265,7 +252,7 @@ watch(() => session.beoordelaar, laad);
               </nldd-cell>
               <nldd-text-cell
                 v-else-if="opdracht.status === 'UITBETAALD'"
-                :text="opdracht.uitgevoerd_at ?? ''"
+                :text="datumTijd(opdracht.uitgevoerd_at)"
                 color="secondary"
               ></nldd-text-cell>
               <nldd-text-cell

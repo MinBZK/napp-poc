@@ -10,8 +10,14 @@ import { useRoute, useRouter } from 'vue-router';
 import { api } from '../api.js';
 import { session, refreshSession } from '../session.js';
 
+// Functionele sitenaam onder het woordmerk, per portaal vast; afgeleid
+// van de portal-prop zodat hij nooit per pagina kan verschillen.
+const PORTAL_SUBTITLES = {
+  aanvrager: 'Subsidieportaal',
+  beoordelaar: 'Beoordelingsomgeving',
+};
+
 const props = defineProps({
-  subtitle: { type: String, required: true },
   items: { type: Array, default: () => [] }, // { text, to? , href?, icon? }
   // 'aanvrager' | 'beoordelaar' | null (publiek): toont rechtsboven wie is
   // ingelogd, op elke pagina van het portaal.
@@ -80,9 +86,12 @@ function onSelect(event, item) {
 
 <template>
   <nldd-skip-link text="Direct naar de inhoud">
+    <!-- Rijkshuisstijl: het woordmerk naast het beeldmerk is de officiële
+         organisatienaam, op elk portaal identiek; de functionele sitenaam
+         staat als vaste tweede regel eronder. -->
     <nldd-top-navigation-bar
-      logo-title="Napp"
-      :logo-subtitle="subtitle"
+      logo-title="Nederlandse autoriteit politieke partijen"
+      :logo-subtitle="PORTAL_SUBTITLES[portal] ?? ''"
       logo-href="/"
       website-href="/"
     >

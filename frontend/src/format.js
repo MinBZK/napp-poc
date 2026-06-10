@@ -51,3 +51,30 @@ export function statusColor(status, besluit) {
 export function onderdelen(n) {
   return `${n} ${n === 1 ? 'onderdeel' : 'onderdelen'}`;
 }
+
+/// Datum mét tijdstip (voor uitvoeringsmomenten zoals een uitbetaling).
+export function datumTijd(value) {
+  if (!value) return '';
+  const [d, t] = String(value).split(' ');
+  return t ? `${datum(d)}, ${t.slice(0, 5)} uur` : datum(d);
+}
+
+// Betaalopdracht-statussen (gedeeld door beide beoordelaarsweergaven).
+export const BETAAL_LABELS = {
+  AANGEMAAKT: 'Aangemaakt',
+  AANGEHOUDEN: 'Aangehouden',
+  UITBETAALD: 'Uitbetaald',
+};
+
+export function betaalKleur(status) {
+  if (status === 'AANGEHOUDEN') return 'warning';
+  if (status === 'UITBETAALD') return 'success';
+  return 'accent';
+}
+
+// Beslissingen op bezwaar (Awb 7:11), gedeeld door tijdlijn en portalen.
+export const BESLISSING_LABELS = {
+  NIET_ONTVANKELIJK: 'Niet-ontvankelijk',
+  ONGEGROND: 'Ongegrond',
+  GEGROND: 'Gegrond',
+};

@@ -5,7 +5,7 @@ import PortalHeader from '../../components/PortalHeader.vue';
 import NBanner from '../../components/NBanner.vue';
 import LifecycleTimeline from '../../components/LifecycleTimeline.vue';
 import { api } from '../../api.js';
-import { euro, datum, onderdelen } from '../../format.js';
+import { euro, datum, datumTijd, onderdelen, BESLISSING_LABELS } from '../../format.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -47,7 +47,7 @@ async function laad() {
 }
 onMounted(laad);
 
-// Bezwaar maken (AWB 6:4 e.v.): het formulier levert de feiten voor de
+// Bezwaar maken (Awb 6:4 e.v.): het formulier levert de feiten voor de
 // vereisten van 6:5; de wet oordeelt (incl. herstelgelegenheid, 6:6).
 const bezwaarOpen = ref(false);
 const bezwaarBezig = ref(false);
@@ -95,11 +95,6 @@ async function herstelBezwaar() {
   }
 }
 
-const BESLISSING_LABELS = {
-  NIET_ONTVANKELIJK: 'Niet-ontvankelijk',
-  ONGEGROND: 'Ongegrond',
-  GEGROND: 'Gegrond',
-};
 
 // Welke 6:5-vereisten ontbreken volgens de wet (outputs van de toets);
 // de herstelbanner benoemt ze, zodat duidelijk is wat aangevuld moet.
@@ -132,7 +127,6 @@ watch(item, (i) => {
   <nldd-page>
     <PortalHeader
       slot="header"
-      subtitle="Subsidieportaal politieke partijen"
       portal="aanvrager"
       :items="[{ text: 'Mijn aanvragen', to: '/' }, { text: 'Nieuwe aanvraag', to: '/nieuw' }, { text: 'Mijn organisatie', to: '/organisatie' }]"
     />
@@ -186,14 +180,14 @@ watch(item, (i) => {
             v-else-if="item.betaalopdracht.status === 'UITBETAALD'"
             variant="success"
             :text="`Het voorschot van ${euro(item.betaalopdracht.bedrag)} is uitbetaald`"
-            :supporting-text="`Overgemaakt naar ${item.betaalopdracht.iban} op ${item.betaalopdracht.uitgevoerd_at}.`"
+            :supporting-text="`Overgemaakt naar ${item.betaalopdracht.iban} op ${datumTijd(item.betaalopdracht.uitgevoerd_at)}.`"
           />
           <NBanner
             v-else
             variant="accent"
             :text="`Het voorschot van ${euro(item.betaalopdracht.bedrag)} staat klaar voor uitbetaling`"
             :supporting-text="item.betaalopdracht.betaaltermijn_einddatum
-              ? `Uitbetaling op ${item.betaalopdracht.iban}, uiterlijk ${datum(item.betaalopdracht.betaaltermijn_einddatum)} (AWB 4:87).`
+              ? `Uitbetaling op ${item.betaalopdracht.iban}, uiterlijk ${datum(item.betaalopdracht.betaaltermijn_einddatum)} (Awb 4:87).`
               : `Uitbetaling op ${item.betaalopdracht.iban}.`"
           />
         </template>
