@@ -1,12 +1,24 @@
 #!/usr/bin/env bash
 # Vult een draaiende backend met demo-dossiers: drie partijen dienen hun
 # jaaraanvraag in; twee worden besloten en bekendgemaakt, één blijft in
-# behandeling. Draaien: ./scripts/seed_demo.sh [backend-url]
+# behandeling. D66 en Hart voor Den Haag geven eerst hun rekening op
+# (betaalopdracht met IBAN); de CDA-afdeling bewust niet, zodat een
+# toekenning daar een AANGEHOUDEN betaalopdracht oplevert.
+# Draaien: ./scripts/seed_demo.sh [backend-url]
 set -euo pipefail
 
 B="${1:-http://localhost:8400}"
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
+
+zet_rekening() { # kvk iban tenaamstelling
+  local jar="$TMP/$1-rekening.jar"
+  curl -sf -c "$jar" -X POST "$B/api/eherkenning/login" \
+    -H 'Content-Type: application/json' -d "{\"kvk_nummer\":\"$1\"}" > /dev/null
+  curl -sf -b "$jar" -X PUT "$B/api/mijn-rekening" \
+    -H 'Content-Type: application/json' \
+    -d "{\"iban\":\"$2\",\"tenaamstelling\":\"$3\"}" > /dev/null
+}
 
 aanvraag() { # kvk leden -> aanvraag-id
   local kvk="$1" leden="$2" jar="$TMP/$1.jar"
@@ -41,14 +53,18 @@ besluit_en_bekendmaking() { # aanvraag-id
 }
 
 echo "D66 (landelijk + 240 gemeenten + 12 provincies)..."
+zet_rekening 92525446 NL91ABNA0417164300 "D66"
 ID_D66=$(aanvraag 92525446 24000)
 besluit_en_bekendmaking "$ID_D66"
 
 echo "Hart voor Den Haag / Groep de Mos (lokale partij)..."
+zet_rekening 98626816 NL69INGB0123456789 "Hart voor Den Haag / Groep de Mos"
 ID_HVDH=$(aanvraag 98626816 0)
 besluit_en_bekendmaking "$ID_HVDH"
 
 echo "CDA, afdeling 's-Gravenhage (afdeling met eigen rechtspersoon)..."
+# Bewust géén rekening: een toekenning levert hier een AANGEHOUDEN
+# betaalopdracht op (demomateriaal voor de rekening-flow).
 aanvraag 99399789 0 > /dev/null   # blijft in behandeling: werkvoorraad-demo
 
-echo "klaar: 2 bekendgemaakte besluiten, 1 aanvraag in behandeling"
+echo "klaar: 2 bekendgemaakte besluiten (betaalopdrachten met IBAN), 1 aanvraag in behandeling (zonder rekening)"

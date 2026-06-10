@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import PortalHeader from '../../components/PortalHeader.vue';
 import NBanner from '../../components/NBanner.vue';
@@ -137,15 +137,89 @@ async function laadAanvragen() {
   }
 }
 
+// --- Rekening voor uitbetaling (één rekening per rechtspersoon, art. 27) ---
+const rekening = ref(null);
+const rekeningSheetEl = ref(null);
+const rekeningOpen = ref(false);
+const rekeningForm = ref({ iban: '', tenaamstelling: '' });
+const rekeningFout = ref('');
+const rekeningBezig = ref(false);
+const rekeningMelding = ref('');
+
+// Only the signing-authorized board (VOLLEDIG) manages the account; a
+// branch volmacht sees it read-only.
+const beperkteMachtiging = computed(
+  () => session.aanvrager?.machtiging?.type === 'BEPERKT',
+);
+
+function veld(event) {
+  return event.detail?.value ?? event.target?.value ?? '';
+}
+
+watch(rekeningOpen, async (open) => {
+  if (!open) {
+    rekeningSheetEl.value?.hide();
+    return;
+  }
+  await nextTick();
+  rekeningSheetEl.value?.show();
+});
+
+function openRekening() {
+  rekeningForm.value = {
+    iban: rekening.value?.iban ?? '',
+    tenaamstelling: rekening.value?.tenaamstelling ?? '',
+  };
+  rekeningFout.value = '';
+  rekeningMelding.value = '';
+  rekeningOpen.value = true;
+}
+
+async function bewaarRekening() {
+  rekeningFout.value = '';
+  rekeningBezig.value = true;
+  try {
+    rekening.value = await api.mijnRekeningWijzigen({
+      iban: rekeningForm.value.iban.trim(),
+      tenaamstelling: rekeningForm.value.tenaamstelling.trim(),
+    });
+    rekeningOpen.value = false;
+    rekeningMelding.value = 'Het rekeningnummer voor uitbetaling is vastgelegd.';
+  } catch (e) {
+    rekeningFout.value = e.message;
+  } finally {
+    rekeningBezig.value = false;
+  }
+}
+
+async function laadRekening() {
+  if (!session.aanvrager) {
+    rekening.value = null;
+    return;
+  }
+  try {
+    rekening.value = await api.mijnRekening();
+  } catch {
+    rekening.value = null;
+  }
+}
+
 onMounted(async () => {
   laadAanvragen();
+  laadRekening();
   try {
     demoVoorbeelden.value = await api.registerDemo();
   } catch {
     demoVoorbeelden.value = [];
   }
 });
-watch(() => session.aanvrager, laadAanvragen);
+watch(
+  () => session.aanvrager,
+  () => {
+    laadAanvragen();
+    laadRekening();
+  },
+);
 </script>
 
 <template>
@@ -389,7 +463,139 @@ watch(() => session.aanvrager, laadAanvragen);
             @click="router.push('/nieuw')"
           ></nldd-button>
         </nldd-inline-dialog>
+
+        <!-- Rekening voor uitbetaling: één per rechtspersoon (art. 27 Wpp) -->
+        <nldd-spacer size="40"></nldd-spacer>
+        <nldd-title size="3">
+          <h3>Rekening voor uitbetaling</h3>
+          <div
+            v-if="rekening?.in_register && !beperkteMachtiging"
+            slot="actions"
+          >
+            <nldd-button
+              variant="secondary"
+              :text="rekening?.iban ? 'Rekening wijzigen' : 'Rekening opgeven'"
+              start-icon="pencil"
+              @click="openRekening"
+            ></nldd-button>
+          </div>
+        </nldd-title>
+        <nldd-spacer size="8"></nldd-spacer>
+        <nldd-rich-text>
+          <p>
+            De subsidie wordt verstrekt aan de rechtspersoon (artikel 27 Wpp):
+            er geldt één rekeningnummer per partij, op naam van de
+            rechtspersoon.
+          </p>
+        </nldd-rich-text>
+        <nldd-spacer size="12"></nldd-spacer>
+
+        <template v-if="rekeningMelding">
+          <NBanner variant="success" :text="rekeningMelding" />
+          <nldd-spacer size="12"></nldd-spacer>
+        </template>
+
+        <nldd-list variant="box">
+          <nldd-list-item size="md">
+            <nldd-title-cell
+              :text="rekening?.iban ?? 'Nog niet opgegeven'"
+              :supporting-text="
+                rekening?.iban
+                  ? `Tenaamstelling: ${rekening.tenaamstelling}`
+                  : 'Voor uitbetaling van het voorschot is een rekeningnummer op naam van de rechtspersoon nodig.'
+              "
+            ></nldd-title-cell>
+            <template v-if="rekening && !rekening.iban">
+              <nldd-spacer-cell size="12"></nldd-spacer-cell>
+              <nldd-cell width="fit-content">
+                <nldd-tag color="warning" text="Ontbreekt"></nldd-tag>
+              </nldd-cell>
+            </template>
+          </nldd-list-item>
+        </nldd-list>
+
+        <template v-if="beperkteMachtiging">
+          <nldd-spacer size="8"></nldd-spacer>
+          <nldd-rich-text>
+            <p>
+              Alleen het tekenbevoegd bestuur van de partij kan het
+              rekeningnummer opgeven of wijzigen. Met uw beperkte machtiging
+              als afdelingsbestuurder kunt u het hier alleen inzien.
+            </p>
+          </nldd-rich-text>
+        </template>
+        <template v-else-if="rekening && !rekening.in_register">
+          <nldd-spacer size="8"></nldd-spacer>
+          <nldd-rich-text>
+            <p>
+              Uw organisatie staat nog niet in het partijregister van de Napp.
+              Zodra de registratie is vastgelegd kan het bestuur hier een
+              rekeningnummer opgeven.
+            </p>
+          </nldd-rich-text>
+        </template>
       </nldd-simple-section>
+
+      <!-- Rekening opgeven of wijzigen -->
+      <nldd-sheet
+        ref="rekeningSheetEl"
+        placement="right"
+        width="480px"
+        accessible-label="Rekening voor uitbetaling"
+        @close="rekeningOpen = false"
+      >
+        <nldd-container padding="24" gap="16">
+          <nldd-title size="3">
+            <span slot="overline">{{ session.aanvrager?.partij_naam }}</span>
+            <h3>Rekening voor uitbetaling</h3>
+          </nldd-title>
+          <nldd-rich-text>
+            <p>
+              Het IBAN wordt gevalideerd en de tenaamstelling wordt vergeleken
+              met de geregistreerde aanduiding van uw partij
+              (IBAN-naam-controle, in deze demo gesimuleerd).
+            </p>
+          </nldd-rich-text>
+          <nldd-form novalidate @submit.prevent="bewaarRekening">
+            <nldd-form-field label="IBAN">
+              <nldd-text-field
+                :value="rekeningForm.iban"
+                name="iban"
+                placeholder="NL00BANK0123456789"
+                @input="rekeningForm.iban = veld($event)"
+              ></nldd-text-field>
+            </nldd-form-field>
+            <nldd-form-field label="Tenaamstelling">
+              <nldd-text-field
+                :value="rekeningForm.tenaamstelling"
+                name="tenaamstelling"
+                :placeholder="session.aanvrager?.partij_naam"
+                @input="rekeningForm.tenaamstelling = veld($event)"
+              ></nldd-text-field>
+              <nldd-form-field-help-text>
+                De rekening moet op naam van de rechtspersoon staan, niet van
+                een bestuurslid of afdeling.
+              </nldd-form-field-help-text>
+            </nldd-form-field>
+            <template v-if="rekeningFout">
+              <NBanner variant="critical" :text="rekeningFout" />
+            </template>
+            <nldd-form-actions>
+              <nldd-button
+                variant="primary"
+                type="submit"
+                text="Opslaan"
+                :disabled="rekeningBezig || undefined"
+              ></nldd-button>
+              <nldd-button
+                variant="secondary"
+                text="Annuleren"
+                @click="rekeningOpen = false"
+              ></nldd-button>
+            </nldd-form-actions>
+          </nldd-form>
+        </nldd-container>
+      </nldd-sheet>
     </template>
   </nldd-page>
 </template>

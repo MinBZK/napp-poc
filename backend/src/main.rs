@@ -9,6 +9,7 @@ mod engine;
 mod handlers;
 mod machtiging;
 mod register;
+mod rekening;
 mod state;
 
 use std::sync::Arc;
@@ -89,6 +90,10 @@ async fn main() -> anyhow::Result<()> {
             get(machtiging::machtigingen),
         )
         .route("/api/mijn-registratie", get(handlers::mijn_registratie))
+        .route(
+            "/api/mijn-rekening",
+            get(rekening::get_mijn_rekening).put(rekening::put_mijn_rekening),
+        )
         .route("/api/register/demo", get(handlers::register_demo))
         .route("/api/aanvragen", post(handlers::create_aanvraag))
         .route("/api/aanvragen/proef", post(handlers::proef_aanspraken))

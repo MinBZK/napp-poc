@@ -39,6 +39,12 @@ pub struct Partij {
     pub kamerzetels: i64,
     #[serde(default)]
     pub moederpartij_kvk: Option<String>,
+    /// Rekening van de rechtspersoon voor uitbetaling (eigen opgave door het
+    /// tekenbevoegd bestuur, zie `rekening.rs`). Niet in de seed-snapshot.
+    #[serde(default)]
+    pub iban: Option<String>,
+    #[serde(default)]
+    pub iban_tenaamstelling: Option<String>,
     pub decentrale_uitslagen: Vec<Uitslag>,
 }
 
@@ -179,6 +185,8 @@ pub async fn partij_by_kvk(pool: &SqlitePool, kvk: &str) -> anyhow::Result<Optio
         organisatiemodel: row.get("organisatiemodel"),
         kamerzetels: row.get("kamerzetels"),
         moederpartij_kvk: row.get("moederpartij_kvk"),
+        iban: row.get("iban"),
+        iban_tenaamstelling: row.get("iban_tenaamstelling"),
         decentrale_uitslagen: uitslagen
             .iter()
             .map(|r| Uitslag {
@@ -369,6 +377,26 @@ pub async fn update_partij(
     .bind(naam)
     .bind(organisatiemodel)
     .bind(moederpartij_kvk)
+    .bind(kvk)
+    .execute(pool)
+    .await?;
+    Ok(result.rows_affected() > 0)
+}
+
+/// Store the bank account of a registered legal entity. Returns false when
+/// the party is not in the register (the claim flow, on a parallel branch,
+/// is the route that creates the registration first).
+pub async fn update_rekening(
+    pool: &SqlitePool,
+    kvk: &str,
+    iban: &str,
+    tenaamstelling: &str,
+) -> anyhow::Result<bool> {
+    let result = sqlx::query(
+        "UPDATE register_partijen SET iban = ?, iban_tenaamstelling = ? WHERE kvk_nummer = ?",
+    )
+    .bind(iban)
+    .bind(tenaamstelling)
     .bind(kvk)
     .execute(pool)
     .await?;
