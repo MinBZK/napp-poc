@@ -10,13 +10,17 @@ name: Regeling subsidiebedragen politieke partijen 2026
 # Werknaam: deze bedragen worden in de praktijk jaarlijks bij ministeriele
 # regeling vastgesteld en geindexeerd. Hier los gehouden van de wet (IoC),
 # zodat indexatie of de definitieve bedragen vervangbaar zijn zonder de wet
-# te raken.
+# te raken. Het basisbedrag, het bedrag per kamerzetel en het ledenbudget
+# komen uit de indicatieve cijfers bij het wetsvoorstel (mei 2025); de
+# bedragen voor de neveninstellingen zijn eigen aannames in de orde van
+# grootte van de huidige Wfpp. De decentrale bedragen staan in het (fictieve)
+# Besluit subsidiëring decentrale politieke partijen (AMvB, art. 26 Wpp).
 legal_basis:
   - law_id: wet_op_de_politieke_partijen
-    article: '8'
+    article: '14'
 
 articles:
-  # --- Landelijke partijen (Wfpp-verdeelsleutel) ---
+  # --- Onderdeel a: de politieke partij zelf ---
   - number: '1'
     text: |-
       Het basisbedrag voor een politieke partij bedraagt voor het
@@ -25,9 +29,9 @@ articles:
     machine_readable:
       implements:
         - law: wet_op_de_politieke_partijen
-          article: '8'
+          article: '14'
           open_term: basisbedrag
-          gelet_op: Gelet op artikel 8 van de Wet op de politieke partijen
+          gelet_op: Gelet op artikel 14 van de Wet op de politieke partijen
       execution:
         output:
           - name: basisbedrag
@@ -46,9 +50,9 @@ articles:
     machine_readable:
       implements:
         - law: wet_op_de_politieke_partijen
-          article: '8'
+          article: '14'
           open_term: bedrag_per_kamerzetel
-          gelet_op: Gelet op artikel 8 van de Wet op de politieke partijen
+          gelet_op: Gelet op artikel 14 van de Wet op de politieke partijen
       execution:
         output:
           - name: bedrag_per_kamerzetel
@@ -61,115 +65,130 @@ articles:
 
   - number: '3'
     text: |-
-      Het bedrag per lid bedraagt voor het kalenderjaar 2026: EUR 25.
+      Het totaalbedrag voor de betalende leden (het ledenbudget) bedraagt
+      voor het kalenderjaar 2026: EUR 2.594.017. Dit bedrag wordt naar rato
+      van de opgegeven ledentallen verdeeld over de politieke partijen
+      waaraan subsidie wordt verstrekt.
     url: https://wetten.overheid.nl/BWBR0000001/2026-01-01
     machine_readable:
       implements:
         - law: wet_op_de_politieke_partijen
-          article: '8'
-          open_term: bedrag_per_lid
-          gelet_op: Gelet op artikel 8 van de Wet op de politieke partijen
+          article: '14'
+          open_term: ledenbudget
+          gelet_op: Gelet op artikel 14 van de Wet op de politieke partijen
       execution:
         output:
-          - name: bedrag_per_lid
+          - name: ledenbudget
             type: amount
             type_spec:
               unit: eurocent
         actions:
-          # In de Wfpp is de ledencomponent een gedeeld macrobudget gedeeld
-          # door het totaal aantal leden. Voor de demo gebruiken we een vast
-          # bedrag per lid (EUR 25), zodat de berekening lokaal sluit zonder
-          # kennis van het landelijke ledentotaal.
-          - output: bedrag_per_lid
-            value: 2500
+          - output: ledenbudget
+            value: 259401700
 
-  # --- Decentrale partijen (inwonerstaffel) ---
+  # --- Onderdeel b: politiek-wetenschappelijk instituut ---
   - number: '4'
     text: |-
-      Het bedrag per raadszetel voor een decentrale politieke partij
-      bedraagt, afhankelijk van het aantal inwoners van de gemeente:
-      EUR 658 (tot en met 40.000 inwoners), EUR 900 (tot en met 100.000),
-      EUR 1.200 (tot en met 375.000) en EUR 1.613 (meer dan 375.000).
+      Het basisbedrag ten behoeve van het politiek-wetenschappelijk
+      instituut bedraagt EUR 128.323; het bedrag per kamerzetel EUR 12.971.
     url: https://wetten.overheid.nl/BWBR0000001/2026-01-01
     machine_readable:
       implements:
         - law: wet_op_de_politieke_partijen
-          article: '12'
-          open_term: bedrag_per_raadszetel
-          gelet_op: Gelet op artikel 12 van de Wet op de politieke partijen
+          article: '14'
+          open_term: basisbedrag_wetenschappelijk_instituut
+          gelet_op: Gelet op artikel 14 van de Wet op de politieke partijen
+        - law: wet_op_de_politieke_partijen
+          article: '14'
+          open_term: bedrag_per_kamerzetel_wetenschappelijk_instituut
+          gelet_op: Gelet op artikel 14 van de Wet op de politieke partijen
       execution:
-        parameters:
-          - name: inwoneraantal_gemeente
-            type: number
-            required: true
-            description: Aantal inwoners van de gemeente op de peildatum
         output:
-          - name: bedrag_per_raadszetel
+          - name: basisbedrag_wetenschappelijk_instituut
+            type: amount
+            type_spec:
+              unit: eurocent
+          - name: bedrag_per_kamerzetel_wetenschappelijk_instituut
             type: amount
             type_spec:
               unit: eurocent
         actions:
-          - output: bedrag_per_raadszetel
-            value:
-              operation: IF
-              cases:
-                - when:
-                    operation: LESS_THAN_OR_EQUAL
-                    subject: $inwoneraantal_gemeente
-                    value: 40000
-                  then: 65800
-                - when:
-                    operation: LESS_THAN_OR_EQUAL
-                    subject: $inwoneraantal_gemeente
-                    value: 100000
-                  then: 90000
-                - when:
-                    operation: LESS_THAN_OR_EQUAL
-                    subject: $inwoneraantal_gemeente
-                    value: 375000
-                  then: 120000
-              default: 161300
+          - output: basisbedrag_wetenschappelijk_instituut
+            value: 12832300
+          - output: bedrag_per_kamerzetel_wetenschappelijk_instituut
+            value: 1297100
 
+  # --- Onderdeel c: politieke jongerenorganisatie ---
   - number: '5'
     text: |-
-      Het bedrag per zetel in provinciale staten bedraagt EUR 1.613.
+      Het basisbedrag ten behoeve van de politieke jongerenorganisatie
+      bedraagt EUR 12.971; het bedrag per kamerzetel EUR 2.594; het vaste
+      bedrag per lid van de jongerenorganisatie EUR 2,50.
     url: https://wetten.overheid.nl/BWBR0000001/2026-01-01
     machine_readable:
       implements:
         - law: wet_op_de_politieke_partijen
-          article: '12'
-          open_term: bedrag_per_statenzetel
-          gelet_op: Gelet op artikel 12 van de Wet op de politieke partijen
+          article: '14'
+          open_term: basisbedrag_jongerenorganisatie
+          gelet_op: Gelet op artikel 14 van de Wet op de politieke partijen
+        - law: wet_op_de_politieke_partijen
+          article: '14'
+          open_term: bedrag_per_kamerzetel_jongerenorganisatie
+          gelet_op: Gelet op artikel 14 van de Wet op de politieke partijen
+        - law: wet_op_de_politieke_partijen
+          article: '14'
+          open_term: bedrag_per_lid_jongerenorganisatie
+          gelet_op: Gelet op artikel 14 van de Wet op de politieke partijen
       execution:
         output:
-          - name: bedrag_per_statenzetel
+          - name: basisbedrag_jongerenorganisatie
+            type: amount
+            type_spec:
+              unit: eurocent
+          - name: bedrag_per_kamerzetel_jongerenorganisatie
+            type: amount
+            type_spec:
+              unit: eurocent
+          - name: bedrag_per_lid_jongerenorganisatie
             type: amount
             type_spec:
               unit: eurocent
         actions:
-          # Aanname: de AMvB met decentrale bedragen bestaat nog niet;
-          # gelijkgesteld aan de hoogste gemeentestaffel.
-          - output: bedrag_per_statenzetel
-            value: 161300
+          - output: basisbedrag_jongerenorganisatie
+            value: 1297100
+          - output: bedrag_per_kamerzetel_jongerenorganisatie
+            value: 259400
+          - output: bedrag_per_lid_jongerenorganisatie
+            value: 250
 
+  # --- Onderdeel d: instelling voor buitenlandse activiteiten ---
   - number: '6'
     text: |-
-      Het bedrag per zetel in het algemeen bestuur van een waterschap
-      bedraagt EUR 1.613.
+      Het basisbedrag ten behoeve van de instelling voor buitenlandse
+      activiteiten bedraagt EUR 25.000; het bedrag per kamerzetel EUR 1.297.
     url: https://wetten.overheid.nl/BWBR0000001/2026-01-01
     machine_readable:
       implements:
         - law: wet_op_de_politieke_partijen
-          article: '12'
-          open_term: bedrag_per_waterschapszetel
-          gelet_op: Gelet op artikel 12 van de Wet op de politieke partijen
+          article: '14'
+          open_term: basisbedrag_buitenland
+          gelet_op: Gelet op artikel 14 van de Wet op de politieke partijen
+        - law: wet_op_de_politieke_partijen
+          article: '14'
+          open_term: bedrag_per_kamerzetel_buitenland
+          gelet_op: Gelet op artikel 14 van de Wet op de politieke partijen
       execution:
         output:
-          - name: bedrag_per_waterschapszetel
+          - name: basisbedrag_buitenland
+            type: amount
+            type_spec:
+              unit: eurocent
+          - name: bedrag_per_kamerzetel_buitenland
             type: amount
             type_spec:
               unit: eurocent
         actions:
-          # Aanname: zie artikel 5.
-          - output: bedrag_per_waterschapszetel
-            value: 161300
+          - output: basisbedrag_buitenland
+            value: 2500000
+          - output: bedrag_per_kamerzetel_buitenland
+            value: 129700

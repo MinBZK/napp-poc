@@ -145,9 +145,9 @@ articles:
     text: |-
       Een decentrale politieke partij of afdeling heeft aanspraak op
       subsidie indien aan haar bij de laatstgehouden verkiezing van de leden
-      van de gemeenteraad, provinciale staten of het algemeen bestuur van
-      een waterschap ten minste een zetel is toegewezen, en zij voldoet aan
-      de voorwaarden van artikel 5.
+      van de gemeenteraad, provinciale staten, de eilandsraad of het
+      algemeen bestuur van een waterschap ten minste een zetel is
+      toegewezen, en zij voldoet aan de voorwaarden van artikel 5.
     url: https://www.tweedekamer.nl/kamerstukken/wetsvoorstellen/detail?qry=wetsvoorstel%3A36742
     machine_readable:
       execution:
@@ -177,14 +177,30 @@ articles:
                   value: true
 
   # ------------------------------------------------------------------
-  # Artikel 8 — Hoogte van de subsidie voor landelijke partijen
-  # (open terms: bedragen bij ministeriele regeling)
+  # Artikel 14 — Subsidiebedragen voor landelijke partijen
+  # Volgt art. 14 van het wetsvoorstel: onderdeel a is de subsidie voor de
+  # partij zelf (basisbedrag + bedrag per kamerzetel + een aandeel in het
+  # ledenbudget naar rato van het aantal betalende leden van alle
+  # subsidie-ontvangende partijen); onderdelen b, c en d zijn geoormerkte
+  # bedragen voor de aangewezen neveninstellingen (politiek-wetenschappelijk
+  # instituut, politieke jongerenorganisatie, instelling voor buitenlandse
+  # activiteiten). Bedragen via open terms (ministeriele regeling).
   # ------------------------------------------------------------------
-  - number: '8'
+  - number: '14'
     text: |-
-      De subsidie voor een landelijke politieke partij bestaat uit een
-      basisbedrag, een bedrag per kamerzetel en een bedrag per lid. De
-      bedragen worden bij ministeriele regeling vastgesteld.
+      De subsidie voor een landelijke politieke partij bestaat uit: (a) een
+      basisbedrag, een bedrag per kamerzetel en een aandeel in het
+      totaalbedrag voor de betalende leden, naar rato van het aantal
+      betalende leden van de partijen waaraan subsidie wordt verstrekt;
+      (b) indien de partij een politiek-wetenschappelijk instituut heeft
+      aangewezen: een basisbedrag en een bedrag per kamerzetel ten behoeve
+      van dat instituut; (c) indien de partij een politieke
+      jongerenorganisatie heeft aangewezen: een basisbedrag, een bedrag per
+      kamerzetel en een vast bedrag per lid van die organisatie; (d) indien
+      de partij een instelling voor buitenlandse activiteiten heeft
+      aangewezen: een basisbedrag en een bedrag per kamerzetel. De bedragen
+      onder b, c en d betaalt de partij als geoormerkt bedrag door aan de
+      neveninstelling.
     url: https://www.tweedekamer.nl/kamerstukken/wetsvoorstellen/detail?qry=wetsvoorstel%3A36742
     machine_readable:
       open_terms:
@@ -198,7 +214,42 @@ articles:
           required: true
           delegated_to: minister
           delegation_type: MINISTERIELE_REGELING
-        - id: bedrag_per_lid
+        - id: ledenbudget
+          type: amount
+          required: true
+          delegated_to: minister
+          delegation_type: MINISTERIELE_REGELING
+        - id: basisbedrag_wetenschappelijk_instituut
+          type: amount
+          required: true
+          delegated_to: minister
+          delegation_type: MINISTERIELE_REGELING
+        - id: bedrag_per_kamerzetel_wetenschappelijk_instituut
+          type: amount
+          required: true
+          delegated_to: minister
+          delegation_type: MINISTERIELE_REGELING
+        - id: basisbedrag_jongerenorganisatie
+          type: amount
+          required: true
+          delegated_to: minister
+          delegation_type: MINISTERIELE_REGELING
+        - id: bedrag_per_kamerzetel_jongerenorganisatie
+          type: amount
+          required: true
+          delegated_to: minister
+          delegation_type: MINISTERIELE_REGELING
+        - id: bedrag_per_lid_jongerenorganisatie
+          type: amount
+          required: true
+          delegated_to: minister
+          delegation_type: MINISTERIELE_REGELING
+        - id: basisbedrag_buitenland
+          type: amount
+          required: true
+          delegated_to: minister
+          delegation_type: MINISTERIELE_REGELING
+        - id: bedrag_per_kamerzetel_buitenland
           type: amount
           required: true
           delegated_to: minister
@@ -211,13 +262,55 @@ articles:
           - name: aantal_betalende_leden
             type: number
             required: true
+          - name: totaal_aantal_betalende_leden
+            type: number
+            required: true
+            description: >-
+              Som van de betalende leden van alle partijen waaraan voor het
+              subsidiejaar subsidie wordt verstrekt (op basis van de opgaven
+              bij de aanvragen; de orchestratielaag levert dit aan).
+          - name: heeft_wetenschappelijk_instituut
+            type: boolean
+            required: true
+            description: Of de partij een politiek-wetenschappelijk instituut heeft aangewezen (art. 3)
+          - name: heeft_jongerenorganisatie
+            type: boolean
+            required: true
+            description: Of de partij een politieke jongerenorganisatie heeft aangewezen (art. 4)
+          - name: aantal_leden_jongerenorganisatie
+            type: number
+            required: true
+          - name: heeft_instelling_buitenland
+            type: boolean
+            required: true
+            description: Of de partij een instelling voor buitenlandse activiteiten heeft aangewezen
         output:
+          - name: subsidie_partij
+            type: amount
+            type_spec:
+              unit: eurocent
+          - name: subsidie_wetenschappelijk_instituut
+            type: amount
+            type_spec:
+              unit: eurocent
+          - name: subsidie_jongerenorganisatie
+            type: amount
+            type_spec:
+              unit: eurocent
+          - name: subsidie_buitenland
+            type: amount
+            type_spec:
+              unit: eurocent
           - name: subsidie_landelijk
             type: amount
             type_spec:
               unit: eurocent
         actions:
-          - output: subsidie_landelijk
+          # Onderdeel a: basisbedrag + zetels + ledencomponent. De
+          # ledencomponent is een vast macrobudget dat naar rato van de
+          # opgegeven ledentallen over de ontvangende partijen wordt verdeeld
+          # (Wfpp-systematiek); zonder bekend totaal is het aandeel nul.
+          - output: subsidie_partij
             value:
               operation: ADD
               values:
@@ -226,41 +319,126 @@ articles:
                   values:
                     - $bedrag_per_kamerzetel
                     - $aantal_kamerzetels
-                - operation: MULTIPLY
-                  values:
-                    - $bedrag_per_lid
-                    - $aantal_betalende_leden
+                - operation: IF
+                  cases:
+                    - when:
+                        operation: LESS_THAN_OR_EQUAL
+                        subject: $totaal_aantal_betalende_leden
+                        value: 0
+                      then: 0
+                  default:
+                    operation: DIVIDE
+                    values:
+                      - operation: MULTIPLY
+                        values:
+                          - $ledenbudget
+                          - $aantal_betalende_leden
+                      - $totaal_aantal_betalende_leden
+          # Onderdeel b: politiek-wetenschappelijk instituut (indien aangewezen).
+          - output: subsidie_wetenschappelijk_instituut
+            value:
+              operation: IF
+              cases:
+                - when:
+                    operation: EQUALS
+                    subject: $heeft_wetenschappelijk_instituut
+                    value: true
+                  then:
+                    operation: ADD
+                    values:
+                      - $basisbedrag_wetenschappelijk_instituut
+                      - operation: MULTIPLY
+                        values:
+                          - $bedrag_per_kamerzetel_wetenschappelijk_instituut
+                          - $aantal_kamerzetels
+              default: 0
+          # Onderdeel c: politieke jongerenorganisatie (indien aangewezen).
+          - output: subsidie_jongerenorganisatie
+            value:
+              operation: IF
+              cases:
+                - when:
+                    operation: EQUALS
+                    subject: $heeft_jongerenorganisatie
+                    value: true
+                  then:
+                    operation: ADD
+                    values:
+                      - $basisbedrag_jongerenorganisatie
+                      - operation: MULTIPLY
+                        values:
+                          - $bedrag_per_kamerzetel_jongerenorganisatie
+                          - $aantal_kamerzetels
+                      - operation: MULTIPLY
+                        values:
+                          - $bedrag_per_lid_jongerenorganisatie
+                          - $aantal_leden_jongerenorganisatie
+              default: 0
+          # Onderdeel d: instelling voor buitenlandse activiteiten (indien aangewezen).
+          - output: subsidie_buitenland
+            value:
+              operation: IF
+              cases:
+                - when:
+                    operation: EQUALS
+                    subject: $heeft_instelling_buitenland
+                    value: true
+                  then:
+                    operation: ADD
+                    values:
+                      - $basisbedrag_buitenland
+                      - operation: MULTIPLY
+                        values:
+                          - $bedrag_per_kamerzetel_buitenland
+                          - $aantal_kamerzetels
+              default: 0
+          - output: subsidie_landelijk
+            value:
+              operation: ADD
+              values:
+                - $subsidie_partij
+                - $subsidie_wetenschappelijk_instituut
+                - $subsidie_jongerenorganisatie
+                - $subsidie_buitenland
 
   # ------------------------------------------------------------------
   # Artikel 12 — Hoogte van de subsidie voor decentrale partijen
-  # (open term: bedrag per raadszetel via inwonerstaffel)
+  # De verdeelregels voor decentrale partijen worden krachtens artikel 26
+  # van het wetsvoorstel bij algemene maatregel van bestuur vastgesteld;
+  # de open terms delegeren daarom aan een AMvB.
   # ------------------------------------------------------------------
   - number: '12'
     text: |-
       De subsidie voor een decentrale politieke partij of afdeling bedraagt
       het aantal behaalde zetels vermenigvuldigd met een bedrag per zetel.
       Voor gemeenteraadszetels hangt het bedrag af van het aantal inwoners
-      van de gemeente; voor zetels in provinciale staten en het algemeen
-      bestuur van een waterschap geldt een vast bedrag. De bedragen worden
-      bij ministeriele regeling vastgesteld.
+      van de gemeente; voor zetels in provinciale staten, de eilandsraad en
+      het algemeen bestuur van een waterschap geldt een vast bedrag. De
+      bedragen en de wijze van verdeling worden bij algemene maatregel van
+      bestuur vastgesteld (artikel 26).
     url: https://www.tweedekamer.nl/kamerstukken/wetsvoorstellen/detail?qry=wetsvoorstel%3A36742
     machine_readable:
       open_terms:
         - id: bedrag_per_raadszetel
           type: amount
           required: true
-          delegated_to: minister
-          delegation_type: MINISTERIELE_REGELING
+          delegated_to: regering
+          delegation_type: AMVB
         - id: bedrag_per_statenzetel
           type: amount
           required: true
-          delegated_to: minister
-          delegation_type: MINISTERIELE_REGELING
+          delegated_to: regering
+          delegation_type: AMVB
+        - id: bedrag_per_eilandsraadszetel
+          type: amount
+          required: true
+          delegated_to: regering
+          delegation_type: AMVB
         - id: bedrag_per_waterschapszetel
           type: amount
           required: true
-          delegated_to: minister
-          delegation_type: MINISTERIELE_REGELING
+          delegated_to: regering
+          delegation_type: AMVB
       execution:
         parameters:
           - name: aantal_raadszetels
@@ -270,7 +448,7 @@ articles:
           - name: orgaan
             type: string
             required: true
-            description: GEMEENTERAAD, PROVINCIALE_STATEN of WATERSCHAP
+            description: GEMEENTERAAD, PROVINCIALE_STATEN, EILANDSRAAD of WATERSCHAP
         output:
           - name: subsidie_decentraal
             type: amount
@@ -288,6 +466,11 @@ articles:
                         subject: $orgaan
                         value: PROVINCIALE_STATEN
                       then: $bedrag_per_statenzetel
+                    - when:
+                        operation: EQUALS
+                        subject: $orgaan
+                        value: EILANDSRAAD
+                      then: $bedrag_per_eilandsraadszetel
                     - when:
                         operation: EQUALS
                         subject: $orgaan
@@ -330,7 +513,22 @@ articles:
           - name: orgaan
             type: string
             required: true
-            description: Decentraal orgaan (GEMEENTERAAD, PROVINCIALE_STATEN, WATERSCHAP)
+            description: Decentraal orgaan (GEMEENTERAAD, PROVINCIALE_STATEN, EILANDSRAAD, WATERSCHAP)
+          - name: totaal_aantal_betalende_leden
+            type: number
+            required: true
+          - name: heeft_wetenschappelijk_instituut
+            type: boolean
+            required: true
+          - name: heeft_jongerenorganisatie
+            type: boolean
+            required: true
+          - name: aantal_leden_jongerenorganisatie
+            type: number
+            required: true
+          - name: heeft_instelling_buitenland
+            type: boolean
+            required: true
           - name: ontvangt_anonieme_giften
             type: boolean
             required: true
@@ -378,6 +576,11 @@ articles:
               parameters:
                 aantal_kamerzetels: $aantal_kamerzetels
                 aantal_betalende_leden: $aantal_betalende_leden
+                totaal_aantal_betalende_leden: $totaal_aantal_betalende_leden
+                heeft_wetenschappelijk_instituut: $heeft_wetenschappelijk_instituut
+                heeft_jongerenorganisatie: $heeft_jongerenorganisatie
+                aantal_leden_jongerenorganisatie: $aantal_leden_jongerenorganisatie
+                heeft_instelling_buitenland: $heeft_instelling_buitenland
             type_spec:
               unit: eurocent
           - name: subsidie_decentraal
@@ -426,13 +629,18 @@ articles:
               default: $subsidie_decentraal
 
   # ------------------------------------------------------------------
-  # Artikel 16 — Betaalopdracht (side-effect via post_actions hook)
+  # Artikel 16 — Betaalopdracht voorschot (side-effect via post_actions hook)
+  # Het besluit op de aanvraag is een verleningsbeschikking; bij verlening
+  # ontstaat van rechtswege een voorschot van 80% van het verleende bedrag
+  # (artikel 17, derde lid). De betaalopdracht betreft dat voorschot; de
+  # resterende 20% volgt bij de vaststelling (artikel 18, buiten scope).
   # ------------------------------------------------------------------
   - number: '16'
     text: |-
-      Bij een toekennend besluit geeft de Napp opdracht aan het
-      betaalsysteem om het vastgestelde subsidiebedrag uit te betalen aan
-      de politieke partij.
+      Bij een besluit tot verlening van de subsidie verleent de Napp van
+      rechtswege een voorschot van tachtig procent van het verleende
+      subsidiebedrag en geeft zij opdracht aan het betaalsysteem om dat
+      voorschot uit te betalen aan de politieke partij.
     url: https://www.tweedekamer.nl/kamerstukken/wetsvoorstellen/detail?qry=wetsvoorstel%3A36742
     machine_readable:
       hooks:
@@ -471,5 +679,55 @@ articles:
                     operation: EQUALS
                     subject: $subsidie_toegekend
                     value: true
-                  then: $subsidiebedrag
+                  then:
+                    operation: DIVIDE
+                    values:
+                      - operation: MULTIPLY
+                        values:
+                          - $subsidiebedrag
+                          - 80
+                      - 100
               default: 0
+
+  # ------------------------------------------------------------------
+  # Artikel 17 — Aanvraag- en beslistermijn (lex specialis t.o.v. AWB 4:13)
+  # ------------------------------------------------------------------
+  - number: '17'
+    text: |-
+      Een politieke partij vraagt de subsidie uiterlijk 1 november
+      voorafgaand aan het subsidiejaar aan bij de Napp, onder opgave van
+      het aantal leden. De Napp besluit voor 1 januari van het
+      subsidiejaar op de aanvraag. Bij verlening verleent de Napp van
+      rechtswege een voorschot van tachtig procent van het verleende
+      subsidiebedrag. Peildatum voor de gegevens is 1 januari van het
+      subsidiejaar.
+    url: https://www.tweedekamer.nl/kamerstukken/wetsvoorstellen/detail?qry=wetsvoorstel%3A36742
+    machine_readable:
+      execution:
+        parameters:
+          - name: subsidiejaar_startdatum
+            type: date
+            required: true
+            description: 1 januari van het subsidiejaar (tevens peildatum)
+        output:
+          - name: aanvraagtermijn_einddatum
+            type: date
+          - name: beslistermijn_einddatum
+            type: date
+          - name: voorschotpercentage
+            type: number
+        actions:
+          # Uiterlijk 1 november voorafgaand aan het subsidiejaar.
+          - output: aanvraagtermijn_einddatum
+            value:
+              operation: DATE_ADD
+              date: $subsidiejaar_startdatum
+              months: -2
+          # Besluit voor 1 januari van het subsidiejaar.
+          - output: beslistermijn_einddatum
+            value:
+              operation: DATE_ADD
+              date: $subsidiejaar_startdatum
+              days: -1
+          - output: voorschotpercentage
+            value: 80

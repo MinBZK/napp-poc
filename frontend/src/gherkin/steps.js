@@ -20,6 +20,22 @@ export function parseValue(str) {
 
 const WPP_ID = 'wet_op_de_politieke_partijen';
 
+/**
+ * Artikel 15 vraagt alle parameters; scenario's die de ledencomponent of de
+ * neveninstellingen niet testen mogen die tabelrijen weglaten (gespiegeld
+ * aan apply_besluit_defaults in de Rust-runner).
+ */
+function withBesluitDefaults(parameters) {
+  return {
+    totaal_aantal_betalende_leden: 0,
+    heeft_wetenschappelijk_instituut: false,
+    heeft_jongerenorganisatie: false,
+    aantal_leden_jongerenorganisatie: 0,
+    heeft_instelling_buitenland: false,
+    ...parameters,
+  };
+}
+
 function getOutput(ctx, name) {
   if (!ctx.result || !ctx.result.outputs) {
     throw new Error(
@@ -66,6 +82,48 @@ export const stepDefinitions = [
         ctx.result = engine.executeMultiple(
           WPP_ID,
           ['subsidie_toegekend', 'subsidiebedrag'],
+          withBesluitDefaults(ctx.parameters),
+          ctx.calculationDate ?? '2026-06-01',
+        );
+        ctx.error = null;
+      } catch (e) {
+        ctx.error = e;
+        ctx.result = null;
+      }
+      ctx.executed = true;
+    },
+  },
+  {
+    pattern: /^the subsidiebedragen of artikel 14 are calculated$/,
+    execute: (ctx, engine) => {
+      try {
+        ctx.result = engine.executeMultiple(
+          WPP_ID,
+          [
+            'subsidie_partij',
+            'subsidie_wetenschappelijk_instituut',
+            'subsidie_jongerenorganisatie',
+            'subsidie_buitenland',
+            'subsidie_landelijk',
+          ],
+          withBesluitDefaults(ctx.parameters),
+          ctx.calculationDate ?? '2026-06-01',
+        );
+        ctx.error = null;
+      } catch (e) {
+        ctx.error = e;
+        ctx.result = null;
+      }
+      ctx.executed = true;
+    },
+  },
+  {
+    pattern: /^the verleningstermijnen are calculated$/,
+    execute: (ctx, engine) => {
+      try {
+        ctx.result = engine.executeMultiple(
+          WPP_ID,
+          ['aanvraagtermijn_einddatum', 'beslistermijn_einddatum', 'voorschotpercentage'],
           ctx.parameters,
           ctx.calculationDate ?? '2026-06-01',
         );
@@ -180,5 +238,25 @@ export const stepDefinitions = [
   {
     pattern: /^motivering is vereist$/,
     execute: (ctx) => assertOutput(ctx, 'motivering_vereist', true),
+  },
+  {
+    pattern: /^the output "([^"]+)" is "(-?\d+)" eurocent$/,
+    execute: (ctx, _engine, match) =>
+      assertOutput(ctx, match[1], parseInt(match[2], 10)),
+  },
+  {
+    pattern: /^the aanvraagtermijn ends on "([^"]+)"$/,
+    execute: (ctx, _engine, match) =>
+      assertOutput(ctx, 'aanvraagtermijn_einddatum', match[1]),
+  },
+  {
+    pattern: /^the beslistermijn ends on "([^"]+)"$/,
+    execute: (ctx, _engine, match) =>
+      assertOutput(ctx, 'beslistermijn_einddatum', match[1]),
+  },
+  {
+    pattern: /^the voorschotpercentage is "(\d+)"$/,
+    execute: (ctx, _engine, match) =>
+      assertOutput(ctx, 'voorschotpercentage', parseInt(match[1], 10)),
   },
 ];

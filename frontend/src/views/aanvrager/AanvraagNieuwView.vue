@@ -5,13 +5,18 @@ import PortalHeader from '../../components/PortalHeader.vue';
 import NBanner from '../../components/NBanner.vue';
 import { api } from '../../api.js';
 import { session } from '../../session.js';
-import { euro, onderdelen } from '../../format.js';
+import { euro, datum, onderdelen } from '../../format.js';
 
 const router = useRouter();
 
 const registratie = ref(null);
 const geselecteerd = ref(new Set());
 const leden = ref(0);
+
+const heeftWetenschappelijkInstituut = ref(false);
+const heeftJongerenorganisatie = ref(false);
+const pjoLeden = ref(0);
+const heeftInstellingBuitenland = ref(false);
 
 const geenAnoniemeGiften = ref(false);
 const geenGiftenNietIngezetenen = ref(false);
@@ -27,6 +32,7 @@ const GROEPEN = [
   { soort: 'LANDELIJK', titel: 'Landelijk', kolom: 'Kamerzetels (EK + TK)' },
   { orgaan: 'GEMEENTERAAD', titel: 'Gemeenteraden', kolom: 'Raadszetels' },
   { orgaan: 'PROVINCIALE_STATEN', titel: 'Provinciale staten', kolom: 'Statenzetels' },
+  { orgaan: 'EILANDSRAAD', titel: 'Eilandsraden (Caribisch Nederland)', kolom: 'Eilandsraadszetels' },
   { orgaan: 'WATERSCHAP', titel: 'Waterschappen', kolom: 'Zetels algemeen bestuur' },
 ];
 
@@ -85,19 +91,27 @@ function num(event) {
   return Number.isFinite(v) ? v : 0;
 }
 
+function aanvraagParameters() {
+  return {
+    aantal_betalende_leden: leden.value,
+    heeft_wetenschappelijk_instituut: heeftWetenschappelijkInstituut.value,
+    heeft_jongerenorganisatie: heeftJongerenorganisatie.value,
+    aantal_leden_jongerenorganisatie: pjoLeden.value,
+    heeft_instelling_buitenland: heeftInstellingBuitenland.value,
+    ontvangt_anonieme_giften: !geenAnoniemeGiften.value,
+    ontvangt_giften_niet_ingezetenen: !geenGiftenNietIngezetenen.value,
+    voldoet_aan_meldplicht_giften: meldplichtNageleefd.value,
+    financien_openbaar_op_website: financienOpenbaar.value,
+  };
+}
+
 async function verstuur() {
   fout.value = '';
   bezig.value = true;
   try {
     const result = await api.nieuweAanvraag({
       componenten: [...geselecteerd.value],
-      parameters: {
-        aantal_betalende_leden: leden.value,
-        ontvangt_anonieme_giften: !geenAnoniemeGiften.value,
-        ontvangt_giften_niet_ingezetenen: !geenGiftenNietIngezetenen.value,
-        voldoet_aan_meldplicht_giften: meldplichtNageleefd.value,
-        financien_openbaar_op_website: financienOpenbaar.value,
-      },
+      parameters: aanvraagParameters(),
     });
     router.push(`/aanvraag/${result.id}`);
   } catch (e) {
@@ -130,13 +144,7 @@ async function herberekenProef() {
   try {
     proef.value = await api.proefAanspraken({
       componenten: [...geselecteerd.value],
-      parameters: {
-        aantal_betalende_leden: leden.value,
-        ontvangt_anonieme_giften: !geenAnoniemeGiften.value,
-        ontvangt_giften_niet_ingezetenen: !geenGiftenNietIngezetenen.value,
-        voldoet_aan_meldplicht_giften: meldplichtNageleefd.value,
-        financien_openbaar_op_website: financienOpenbaar.value,
-      },
+      parameters: aanvraagParameters(),
     });
   } catch {
     proef.value = null;
@@ -144,7 +152,18 @@ async function herberekenProef() {
 }
 
 watch(
-  [geselecteerd, leden, geenAnoniemeGiften, geenGiftenNietIngezetenen, meldplichtNageleefd, financienOpenbaar],
+  [
+    geselecteerd,
+    leden,
+    heeftWetenschappelijkInstituut,
+    heeftJongerenorganisatie,
+    pjoLeden,
+    heeftInstellingBuitenland,
+    geenAnoniemeGiften,
+    geenGiftenNietIngezetenen,
+    meldplichtNageleefd,
+    financienOpenbaar,
+  ],
   () => {
     clearTimeout(proefTimer);
     proefTimer = setTimeout(herberekenProef, 400);
@@ -194,6 +213,13 @@ watch(() => session.aanvrager, laadRegistratie);
             verkiezingsuitslagen van de Kiesraad. U vraagt alles in één keer aan;
             onderdelen uitvinken kan. De Napp beslist in één beschikking met een
             specificatie per onderdeel.
+          </p>
+          <p v-if="registratie?.aanvraagtermijn_einddatum">
+            De subsidie geldt per kalenderjaar. Aanvragen voor
+            {{ registratie.subsidiejaar }} kan tot en met
+            {{ datum(registratie.aanvraagtermijn_einddatum) }}; de Napp besluit
+            vóór 1 januari {{ registratie.subsidiejaar }} (artikel 17 Wpp). Bij
+            verlening ontvangt u van rechtswege een voorschot van 80%.
           </p>
         </nldd-rich-text>
         <nldd-spacer size="24"></nldd-spacer>
@@ -272,9 +298,56 @@ watch(() => session.aanvrager, laadRegistratie);
               Eigen opgave, alleen vereist voor de landelijke subsidie: leden
               met vergader- en stemrecht die jaarlijks ten minste € 12
               contributie betalen (minimaal 1.000). Voor decentrale
-              onderdelen geldt geen ledeneis.
+              onderdelen geldt geen ledeneis. Het ledenbudget wordt naar rato
+              van de opgegeven ledentallen verdeeld over alle ontvangende
+              partijen (artikel 14).
             </nldd-form-field-help-text>
           </nldd-form-field>
+          <nldd-spacer size="24"></nldd-spacer>
+
+          <nldd-title size="4"><h3>Neveninstellingen</h3></nldd-title>
+          <nldd-spacer size="4"></nldd-spacer>
+          <nldd-rich-text>
+            <p>
+              Voor aangewezen neveninstellingen ontvangt de partij een
+              geoormerkt bedrag dat zij doorbetaalt (artikel 14, onderdelen
+              b tot en met d).
+            </p>
+          </nldd-rich-text>
+          <nldd-spacer size="12"></nldd-spacer>
+          <nldd-container gap="12">
+            <nldd-checkbox-field
+              label="Onze partij heeft een politiek-wetenschappelijk instituut aangewezen (artikel 3)"
+              :checked="heeftWetenschappelijkInstituut || undefined"
+              @change="heeftWetenschappelijkInstituut = $event.detail?.checked ?? false"
+            ></nldd-checkbox-field>
+            <nldd-checkbox-field
+              label="Onze partij heeft een politieke jongerenorganisatie aangewezen (artikel 4)"
+              :checked="heeftJongerenorganisatie || undefined"
+              @change="heeftJongerenorganisatie = $event.detail?.checked ?? false"
+            ></nldd-checkbox-field>
+            <template v-if="heeftJongerenorganisatie">
+              <nldd-form-field label="Leden van de jongerenorganisatie">
+                <nldd-number-field
+                  :value="pjoLeden"
+                  name="pjo_leden"
+                  min="0"
+                  step="100"
+                  @input="pjoLeden = num($event)"
+                  @change="pjoLeden = num($event)"
+                ></nldd-number-field>
+                <nldd-form-field-help-text>
+                  Eigen opgave; voor de jongerenorganisatie geldt een vast
+                  bedrag per lid.
+                </nldd-form-field-help-text>
+              </nldd-form-field>
+            </template>
+            <nldd-checkbox-field
+              label="Onze partij heeft een instelling voor buitenlandse activiteiten aangewezen"
+              :checked="heeftInstellingBuitenland || undefined"
+              @change="heeftInstellingBuitenland = $event.detail?.checked ?? false"
+            ></nldd-checkbox-field>
+          </nldd-container>
           <nldd-spacer size="24"></nldd-spacer>
         </template>
 
@@ -331,7 +404,11 @@ watch(() => session.aanvrager, laadRegistratie);
               <nldd-text-cell
                 overline="Indicatieve uitkomst volgens de wet"
                 :text="proef.subsidie_toegekend ? euro(proef.subsidiebedrag) : 'Afwijzing'"
-                :supporting-text="`${proef.onderdelen_toegekend} van ${onderdelen(proef.onderdelen_totaal)} toegekend · dit is geen besluit`"
+                :supporting-text="
+                  proef.subsidie_toegekend
+                    ? `${proef.onderdelen_toegekend} van ${onderdelen(proef.onderdelen_totaal)} toegekend · voorschot 80%: ${euro(proef.voorschot_bedrag)} · dit is geen besluit`
+                    : `${proef.onderdelen_toegekend} van ${onderdelen(proef.onderdelen_totaal)} toegekend · dit is geen besluit`
+                "
                 size="md"
               ></nldd-text-cell>
             </nldd-container>

@@ -43,6 +43,7 @@ impl OidcAppState for AppState {
 pub struct LawCorpus {
     pub wpp: String,
     pub regeling: String,
+    pub besluit_decentraal: String,
     pub awb: String,
     pub termijnenwet: String,
 }
@@ -59,6 +60,9 @@ impl LawCorpus {
         Ok(Self {
             wpp: read("wet_op_de_politieke_partijen/2026-01-01.yaml")?,
             regeling: read("regeling_subsidiebedragen/2026-01-01.yaml")?,
+            besluit_decentraal: read(
+                "besluit_subsidiering_decentrale_politieke_partijen/2026-01-01.yaml",
+            )?,
             awb: read("algemene_wet_bestuursrecht/1994-01-01.yaml")?,
             termijnenwet: read("algemene_termijnenwet/1964-04-01.yaml")?,
         })

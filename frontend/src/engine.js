@@ -8,6 +8,7 @@
 
 import wppYaml from '../../law/wet_op_de_politieke_partijen/2026-01-01.yaml?raw';
 import regelingYaml from '../../law/regeling_subsidiebedragen/2026-01-01.yaml?raw';
+import besluitDecentraalYaml from '../../law/besluit_subsidiering_decentrale_politieke_partijen/2026-01-01.yaml?raw';
 import awbYaml from '../../law/algemene_wet_bestuursrecht/1994-01-01.yaml?raw';
 import termijnenwetYaml from '../../law/algemene_termijnenwet/1964-04-01.yaml?raw';
 
@@ -31,6 +32,7 @@ export function getEngine() {
     const engine = new wasm.WasmEngine();
     engine.loadLaw(wppYaml);
     engine.loadLaw(regelingYaml);
+    engine.loadLaw(besluitDecentraalYaml);
     engine.loadLaw(awbYaml);
     engine.loadLaw(termijnenwetYaml);
     return engine;

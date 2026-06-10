@@ -85,3 +85,32 @@ fn check_verlengde_einddatum(world: &mut NappWorld, expected: String) {
         "Expected verlengde_einddatum {expected}, got {actual:?}"
     );
 }
+
+#[then(regex = r#"^the output "([^"]+)" is "(-?\d+)" eurocent$"#)]
+fn check_amount_output(world: &mut NappWorld, name: String, expected: String) {
+    assert_amount_output(world, &name, expected.parse().unwrap());
+}
+
+fn assert_date_output(world: &NappWorld, name: &str, expected: &str) {
+    assert_success(world);
+    let actual = world.get_output(name);
+    assert!(
+        matches!(actual, Some(Value::String(s)) if s == expected),
+        "Expected output '{name}' to be {expected}, got {actual:?}"
+    );
+}
+
+#[then(regex = r#"^the aanvraagtermijn ends on "([^"]+)"$"#)]
+fn check_aanvraagtermijn(world: &mut NappWorld, expected: String) {
+    assert_date_output(world, "aanvraagtermijn_einddatum", &expected);
+}
+
+#[then(regex = r#"^the beslistermijn ends on "([^"]+)"$"#)]
+fn check_beslistermijn_einddatum(world: &mut NappWorld, expected: String) {
+    assert_date_output(world, "beslistermijn_einddatum", &expected);
+}
+
+#[then(regex = r#"^the voorschotpercentage is "(\d+)"$"#)]
+fn check_voorschotpercentage(world: &mut NappWorld, expected: String) {
+    assert_amount_output(world, "voorschotpercentage", expected.parse().unwrap());
+}

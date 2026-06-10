@@ -126,14 +126,6 @@ watch(() => session.beoordelaar, laad);
         <nldd-title size="2">
           <span slot="overline">Beoordelingsomgeving</span>
           <h2>Subsidieaanvragen</h2>
-          <div slot="actions">
-            <nldd-button
-              variant="secondary"
-              text="Scenario's: werkt de wet?"
-              start-icon="check-list"
-              @click="router.push('/scenarios')"
-            ></nldd-button>
-          </div>
         </nldd-title>
         <nldd-spacer size="16"></nldd-spacer>
 
@@ -163,7 +155,7 @@ watch(() => session.beoordelaar, laad);
               <nldd-title-cell
                 :text="item.aanvraag.partij_naam"
                 :overline="`Jaaraanvraag ${item.aanvraag.subsidiejaar}`"
-                :supporting-text="`${onderdelen(item.aanvraag.componenten.length)} · ingediend ${datum(item.aanvraag.aanvraag_datum)}${item.aanvraag.beslistermijn_einddatum && !item.besluit ? ` · beslissen vóór ${datum(item.aanvraag.beslistermijn_einddatum)} (AWB 4:13)` : ''}`"
+                :supporting-text="`${onderdelen(item.aanvraag.componenten.length)} · ingediend ${datum(item.aanvraag.aanvraag_datum)}${item.aanvraag.beslistermijn_einddatum && !item.besluit ? ` · beslissen vóór ${datum(item.aanvraag.beslistermijn_einddatum)} (Wpp art. 17)` : ''}`"
               ></nldd-title-cell>
               <nldd-text-cell
                 v-if="item.besluit"

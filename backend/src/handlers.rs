@@ -52,6 +52,25 @@ async fn session_kvk(session: &Session) -> Option<String> {
     session.get(SESSION_KEY_EH_KVK).await.ok().flatten()
 }
 
+/// Het subsidiejaar waarop een aanvraag van vandaag betrekking heeft.
+/// De subsidie wordt per kalenderjaar verstrekt en moet uiterlijk
+/// 1 november voorafgaand aan het subsidiejaar worden aangevraagd
+/// (Wpp art. 17). De orchestratie routeert een aanvraag daarom naar het
+/// eerstvolgende subsidiejaar waarvoor de termijn nog niet is verstreken:
+/// tot en met 1 november is dat het komende jaar, daarna het jaar erop.
+fn subsidiejaar_voor(datum: &str) -> i64 {
+    let parsed = chrono::NaiveDate::parse_from_str(datum, "%Y-%m-%d")
+        .unwrap_or_else(|_| Utc::now().date_naive());
+    let jaar = chrono::Datelike::year(&parsed) as i64;
+    let deadline = chrono::NaiveDate::from_ymd_opt(chrono::Datelike::year(&parsed), 11, 1)
+        .expect("1 november bestaat");
+    if parsed <= deadline {
+        jaar + 1
+    } else {
+        jaar + 2
+    }
+}
+
 async fn session_beoordelaar(session: &Session) -> Option<String> {
     let authenticated: bool = session
         .get(SESSION_KEY_AUTHENTICATED)
@@ -119,9 +138,13 @@ pub async fn mijn_registratie(
     let Some(kvk) = session_kvk(&session).await else {
         return Err(forbidden());
     };
-    let jaar = chrono::Utc::now().format("%Y").to_string().parse::<i64>().unwrap_or(2026);
+    let vandaag = Utc::now().format("%Y-%m-%d").to_string();
+    let jaar = subsidiejaar_voor(&vandaag);
     let partij = crate::register::partij_by_kvk(&kvk);
     let bezet = db::bezette_componenten(&state.pool, &kvk, jaar)
+        .await
+        .map_err(internal_error)?;
+    let termijnen = engine::evaluate_termijnen(state.corpus.clone(), jaar, vandaag)
         .await
         .map_err(internal_error)?;
 
@@ -146,6 +169,8 @@ pub async fn mijn_registratie(
             "organisatiemodel": p.organisatiemodel,
         })),
         "subsidiejaar": jaar,
+        "aanvraagtermijn_einddatum": termijnen.aanvraagtermijn_einddatum,
+        "beslistermijn_einddatum": termijnen.beslistermijn_einddatum,
         "aanspraken": aanspraken,
     })))
 }
@@ -192,6 +217,54 @@ fn aanspraken_voor(kvk: &str) -> Vec<db::Component> {
         });
     }
     componenten
+}
+
+/// Eigen opgaven voor de landelijke component: ledental en de aangewezen
+/// neveninstellingen (Wpp art. 3, 4 en 14, onderdelen b-d).
+fn neem_landelijke_opgaven_over(
+    bron: &serde_json::Map<String, serde_json::Value>,
+    eigen: &mut serde_json::Map<String, serde_json::Value>,
+) {
+    let leden = bron
+        .get("aantal_betalende_leden")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
+    eigen.insert("aantal_betalende_leden".to_string(), json!(leden));
+    for key in [
+        "heeft_wetenschappelijk_instituut",
+        "heeft_jongerenorganisatie",
+        "heeft_instelling_buitenland",
+    ] {
+        let waarde = bron.get(key).and_then(|v| v.as_bool()).unwrap_or(false);
+        eigen.insert(key.to_string(), json!(waarde));
+    }
+    let pjo_leden = bron
+        .get("aantal_leden_jongerenorganisatie")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
+    eigen.insert(
+        "aantal_leden_jongerenorganisatie".to_string(),
+        json!(pjo_leden),
+    );
+}
+
+/// De noemer van de ledencomponent voor een (proef)berekening: de opgaven
+/// die al in de aanvragentabel staan, plus — als de eigen aanvraag daar nog
+/// niet bij zit — de eigen opgave voor zover die aan de ledeneis voldoet.
+async fn ledentotaal_voor(
+    state: &AppState,
+    jaar: i64,
+    eigen_leden: Option<i64>,
+) -> Result<i64, ApiError> {
+    let mut totaal = db::totaal_opgegeven_leden(&state.pool, jaar)
+        .await
+        .map_err(internal_error)?;
+    if let Some(leden) = eigen_leden {
+        if leden >= 1000 {
+            totaal += leden;
+        }
+    }
+    Ok(totaal)
 }
 
 /// Demo-voorbeelden voor de gemockte eHerkenning-login (alleen metadata).
@@ -283,7 +356,8 @@ pub async fn create_aanvraag(
         .ok()
         .flatten()
         .unwrap_or_else(|| "Onbekende organisatie".to_string());
-    let jaar = chrono::Utc::now().format("%Y").to_string().parse::<i64>().unwrap_or(2026);
+    let vandaag = Utc::now().format("%Y-%m-%d").to_string();
+    let jaar = subsidiejaar_voor(&vandaag);
 
     if body.componenten.is_empty() {
         return Err(bad_request("Kies ten minste één onderdeel om aan te vragen."));
@@ -314,8 +388,8 @@ pub async fn create_aanvraag(
         )));
     }
 
-    // Eigen opgaven: verklaringen verplicht, ledental optioneel (alleen
-    // relevant voor de landelijke component).
+    // Eigen opgaven: verklaringen verplicht; ledental en neveninstellingen
+    // optioneel (alleen relevant voor de landelijke component).
     let mut eigen = serde_json::Map::new();
     for key in [
         "ontvangt_anonieme_giften",
@@ -328,20 +402,15 @@ pub async fn create_aanvraag(
         };
         eigen.insert(key.to_string(), json!(waarde));
     }
-    let leden = body
-        .parameters
-        .get("aantal_betalende_leden")
-        .and_then(|v| v.as_i64())
-        .unwrap_or(0);
-    eigen.insert("aantal_betalende_leden".to_string(), json!(leden));
+    neem_landelijke_opgaven_over(&body.parameters, &mut eigen);
 
     let id = Uuid::new_v4().to_string();
-    let vandaag = Utc::now().format("%Y-%m-%d").to_string();
-    // AWB 4:13: de Napp moet binnen acht weken na ontvangst beslissen;
-    // de Algemene termijnenwet verlengt een einde in het weekend.
-    let beslistermijn = engine::evaluate_beslistermijn(state.corpus.clone(), vandaag.clone())
+    // Wpp art. 17 (lex specialis t.o.v. AWB 4:13): de Napp besluit voor
+    // 1 januari van het subsidiejaar.
+    let termijnen = engine::evaluate_termijnen(state.corpus.clone(), jaar, vandaag.clone())
         .await
         .map_err(internal_error)?;
+    let beslistermijn = termijnen.beslistermijn_einddatum;
     db::insert_aanvraag(
         &state.pool,
         &id,
@@ -393,20 +462,32 @@ pub async fn proef_aanspraken(
         let waarde = body.parameters.get(key).and_then(|v| v.as_bool()).unwrap_or(false);
         eigen.insert(key.to_string(), json!(waarde));
     }
-    let leden = body
-        .parameters
-        .get("aantal_betalende_leden")
-        .and_then(|v| v.as_i64())
-        .unwrap_or(0);
-    eigen.insert("aantal_betalende_leden".to_string(), json!(leden));
+    neem_landelijke_opgaven_over(&body.parameters, &mut eigen);
 
     let vandaag = Utc::now().format("%Y-%m-%d").to_string();
-    let uitkomst = engine::evaluate_jaaraanvraag(state.corpus.clone(), componenten, eigen, vandaag)
-        .await
-        .map_err(internal_error)?;
+    let jaar = subsidiejaar_voor(&vandaag);
+    // De eigen opgave telt mee in de noemer van de ledencomponent als de
+    // landelijke component onderdeel is van deze (proef)aanvraag.
+    let eigen_leden = componenten
+        .iter()
+        .any(|c| c.soort == "LANDELIJK")
+        .then(|| eigen.get("aantal_betalende_leden").and_then(|v| v.as_i64()).unwrap_or(0));
+    let totaal_leden = ledentotaal_voor(&state, jaar, eigen_leden).await?;
+    let uitkomst = engine::evaluate_jaaraanvraag(
+        state.corpus.clone(),
+        componenten,
+        eigen,
+        vandaag,
+        jaar,
+        totaal_leden,
+    )
+    .await
+    .map_err(internal_error)?;
     Ok(Json(json!({
         "subsidie_toegekend": uitkomst.subsidie_toegekend,
         "subsidiebedrag": uitkomst.subsidiebedrag,
+        "voorschot_bedrag": uitkomst.betaalopdracht_bedrag,
+        "subsidiejaar": jaar,
         "onderdelen_toegekend": uitkomst.componenten.iter().filter(|c| c.toegekend).count(),
         "onderdelen_totaal": uitkomst.componenten.len(),
     })))
@@ -586,11 +667,16 @@ async fn run_engine(
         return Err(internal_error("aanvraagparameters zijn geen object"));
     };
     let vandaag = Utc::now().format("%Y-%m-%d").to_string();
+    // De eigen aanvraag staat al in de aanvragentabel en telt dus al mee in
+    // het ledentotaal van het subsidiejaar.
+    let totaal_leden = ledentotaal_voor(state, aanvraag.subsidiejaar, None).await?;
     engine::evaluate_jaaraanvraag(
         state.corpus.clone(),
         aanvraag.componenten.clone(),
         eigen,
         vandaag,
+        aanvraag.subsidiejaar,
+        totaal_leden,
     )
     .await
     .map_err(internal_error)

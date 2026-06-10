@@ -37,14 +37,22 @@ Feature: Termijnverlenging volgens de Algemene termijnenwet
     When the bezwaartermijn is calculated including the termijnenwet
     Then the verlengde einddatum is "2026-07-21"
 
-  Scenario: Beslistermijn is acht weken na ontvangst van de aanvraag
+  Scenario: AWB-beslistermijn is acht weken na ontvangst van de aanvraag
     Given an application with the following data:
       | aanvraag_datum | 2026-06-09 |
     When the beslistermijn is calculated including the termijnenwet
     Then the verlengde einddatum is "2026-08-04"
 
-  Scenario: Beslistermijn die in het weekend eindigt schuift naar maandag
+  Scenario: AWB-beslistermijn die in het weekend eindigt schuift naar maandag
     Given an application with the following data:
       | aanvraag_datum | 2026-06-13 |
     When the beslistermijn is calculated including the termijnenwet
     Then the verlengde einddatum is "2026-08-10"
+
+  Scenario: Wpp-termijnen voor subsidiejaar 2027 (lex specialis t.o.v. AWB 4:13)
+    Given an application with the following data:
+      | subsidiejaar_startdatum | 2027-01-01 |
+    When the verleningstermijnen are calculated
+    Then the aanvraagtermijn ends on "2026-11-01"
+    And the beslistermijn ends on "2026-12-31"
+    And the voorschotpercentage is "80"

@@ -13,6 +13,7 @@ law-validate:
         --features validate --bin validate --release -- \
         law/wet_op_de_politieke_partijen/2026-01-01.yaml \
         law/regeling_subsidiebedragen/2026-01-01.yaml \
+        law/besluit_subsidiering_decentrale_politieke_partijen/2026-01-01.yaml \
         law/algemene_wet_bestuursrecht/1994-01-01.yaml \
         law/algemene_termijnenwet/1964-04-01.yaml
 

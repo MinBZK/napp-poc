@@ -74,6 +74,17 @@ pub struct Component {
     pub inwoneraantal: i64,
 }
 
+/// Uitsplitsing van de landelijke component in de vier delen van art. 14
+/// Wpp: de partij zelf (a) en de geoormerkte bedragen voor de aangewezen
+/// neveninstellingen (b, c, d).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LandelijkeDelen {
+    pub partij: i64,
+    pub wetenschappelijk_instituut: i64,
+    pub jongerenorganisatie: i64,
+    pub buitenland: i64,
+}
+
 /// Uitkomst per component, vastgelegd in het besluit.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComponentUitkomst {
@@ -81,6 +92,9 @@ pub struct ComponentUitkomst {
     pub component: Component,
     pub toegekend: bool,
     pub bedrag: i64,
+    /// Alleen voor de landelijke component: de delen van art. 14.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delen: Option<LandelijkeDelen>,
 }
 
 #[derive(Debug, Serialize)]
@@ -263,6 +277,26 @@ pub async fn bezette_componenten(
         }
     }
     Ok(bezet)
+}
+
+/// Som van de opgegeven ledentallen van alle aanvragen met een landelijke
+/// component voor het subsidiejaar, voor zover de partij aan de ledeneis
+/// voldoet (art. 6: minimaal duizend betalende leden). Dit is de noemer van
+/// de ledencomponent (art. 14, onderdeel a): bij verlening werkt de Napp
+/// met de opgaven die op dat moment binnen zijn; de definitieve verdeling
+/// volgt bij de vaststelling (art. 18, buiten scope).
+pub async fn totaal_opgegeven_leden(pool: &SqlitePool, subsidiejaar: i64) -> anyhow::Result<i64> {
+    let totaal: i64 = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(json_extract(parameters, '$.aantal_betalende_leden')), 0)
+         FROM aanvragen
+         WHERE subsidiejaar = ?
+           AND componenten LIKE '%\"key\":\"LANDELIJK\"%'
+           AND json_extract(parameters, '$.aantal_betalende_leden') >= 1000",
+    )
+    .bind(subsidiejaar)
+    .fetch_one(pool)
+    .await?;
+    Ok(totaal)
 }
 
 #[allow(clippy::too_many_arguments)]

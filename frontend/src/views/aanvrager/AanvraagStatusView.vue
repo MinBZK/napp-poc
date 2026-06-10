@@ -20,10 +20,23 @@ function componentLabel(c) {
   const orgaan = {
     GEMEENTERAAD: 'Gemeenteraad',
     PROVINCIALE_STATEN: 'Provinciale staten',
+    EILANDSRAAD: 'Eilandsraad',
     WATERSCHAP: 'Waterschap',
   }[c.orgaan] ?? c.orgaan;
   return `${orgaan} ${c.gebied ?? ''}`;
 }
+
+// De vier delen van art. 14 voor de landelijke component (indien toegekend).
+const landelijkeDelen = computed(() => {
+  const c = componenten.value.find((x) => x.soort === 'LANDELIJK' && x.delen);
+  if (!c) return null;
+  return [
+    { label: 'Politieke partij (onderdeel a)', bedrag: c.delen.partij },
+    { label: 'Politiek-wetenschappelijk instituut (b)', bedrag: c.delen.wetenschappelijk_instituut },
+    { label: 'Politieke jongerenorganisatie (c)', bedrag: c.delen.jongerenorganisatie },
+    { label: 'Instelling buitenlandse activiteiten (d)', bedrag: c.delen.buitenland },
+  ].filter((d) => d.bedrag > 0);
+});
 
 onMounted(async () => {
   try {
@@ -108,6 +121,18 @@ onMounted(async () => {
               ></nldd-text-cell>
             </nldd-table-row>
           </nldd-table>
+
+          <template v-if="landelijkeDelen">
+            <nldd-spacer size="16"></nldd-spacer>
+            <nldd-title size="5"><h4>Landelijke subsidie in delen (art. 14)</h4></nldd-title>
+            <nldd-spacer size="8"></nldd-spacer>
+            <nldd-list variant="box">
+              <nldd-list-item v-for="d in landelijkeDelen" :key="d.label" size="sm">
+                <nldd-text-cell :text="d.label" color="secondary"></nldd-text-cell>
+                <nldd-text-cell :text="euro(d.bedrag)" horizontal-alignment="right"></nldd-text-cell>
+              </nldd-list-item>
+            </nldd-list>
+          </template>
           <nldd-spacer size="32"></nldd-spacer>
         </template>
 

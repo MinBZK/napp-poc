@@ -10,6 +10,37 @@ fn execute_subsidiebesluit(world: &mut NappWorld) {
     world.execute_besluit();
 }
 
+/// Wpp art. 14 rechtstreeks: de specificatie van de landelijke subsidie in
+/// de vier delen (partij + neveninstellingen).
+#[when("the subsidiebedragen of artikel 14 are calculated")]
+fn execute_artikel_14(world: &mut NappWorld) {
+    world.apply_besluit_defaults();
+    world.execute(
+        "wet_op_de_politieke_partijen",
+        &[
+            "subsidie_partij",
+            "subsidie_wetenschappelijk_instituut",
+            "subsidie_jongerenorganisatie",
+            "subsidie_buitenland",
+            "subsidie_landelijk",
+        ],
+    );
+}
+
+/// Wpp art. 17 (lex specialis t.o.v. AWB 4:13): aanvraag uiterlijk
+/// 1 november voorafgaand aan het subsidiejaar, besluit voor 1 januari.
+#[when("the verleningstermijnen are calculated")]
+fn execute_verleningstermijnen(world: &mut NappWorld) {
+    world.execute(
+        "wet_op_de_politieke_partijen",
+        &[
+            "aanvraagtermijn_einddatum",
+            "beslistermijn_einddatum",
+            "voorschotpercentage",
+        ],
+    );
+}
+
 #[when("the termijnverlenging is calculated")]
 fn execute_termijnverlenging(world: &mut NappWorld) {
     world.execute("algemene_termijnenwet", &["verlengde_einddatum"]);

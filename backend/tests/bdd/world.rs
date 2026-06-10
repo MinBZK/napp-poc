@@ -12,6 +12,7 @@ use std::path::Path;
 const LAW_FILES: &[&str] = &[
     "law/wet_op_de_politieke_partijen/2026-01-01.yaml",
     "law/regeling_subsidiebedragen/2026-01-01.yaml",
+    "law/besluit_subsidiering_decentrale_politieke_partijen/2026-01-01.yaml",
     "law/algemene_wet_bestuursrecht/1994-01-01.yaml",
     "law/algemene_termijnenwet/1964-04-01.yaml",
 ];
@@ -64,7 +65,23 @@ impl NappWorld {
     /// bezwaartermijn, motivering) arrive reactively in the result — never
     /// request them as primary outputs.
     pub fn execute_besluit(&mut self) {
+        self.apply_besluit_defaults();
         self.execute("wet_op_de_politieke_partijen", &["subsidie_toegekend", "subsidiebedrag"]);
+    }
+
+    /// Article 15 requires every parameter; scenarios that don't exercise
+    /// the ledencomponent or the neveninstellingen may omit those rows.
+    pub fn apply_besluit_defaults(&mut self) {
+        let defaults: [(&str, Value); 5] = [
+            ("totaal_aantal_betalende_leden", Value::Int(0)),
+            ("heeft_wetenschappelijk_instituut", Value::Bool(false)),
+            ("heeft_jongerenorganisatie", Value::Bool(false)),
+            ("aantal_leden_jongerenorganisatie", Value::Int(0)),
+            ("heeft_instelling_buitenland", Value::Bool(false)),
+        ];
+        for (key, value) in defaults {
+            self.parameters.entry(key.to_string()).or_insert(value);
+        }
     }
 
     /// Execute an arbitrary law for the given outputs.
