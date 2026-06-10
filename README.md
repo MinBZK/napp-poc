@@ -1,5 +1,9 @@
 # Napp — Nederlandse autoriteit politieke partijen
 
+> **Proof of concept.** Deze repository is een demonstratie met fictieve
+> gegevens; de Napp bestaat niet en de Wet op de politieke partijen is nog
+> een wetsvoorstel. Aan deze omgeving kunnen geen rechten worden ontleend.
+
 End-to-end demonstratie van wetsuitvoering als code: het subsidieproces van de
 Nederlandse autoriteit politieke partijen (Napp) uit het wetsvoorstel
 [Wet op de politieke partijen](https://www.tweedekamer.nl/kamerstukken/wetsvoorstellen/detail?qry=wetsvoorstel%3A36742)
