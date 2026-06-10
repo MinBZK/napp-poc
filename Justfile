@@ -15,7 +15,8 @@ law-validate:
         law/regeling_subsidiebedragen/2026-01-01.yaml \
         law/besluit_subsidiering_decentrale_politieke_partijen/2026-01-01.yaml \
         law/algemene_wet_bestuursrecht/1994-01-01.yaml \
-        law/algemene_termijnenwet/1964-04-01.yaml
+        law/algemene_termijnenwet/1964-04-01.yaml \
+        law/kieswet/1989-09-28.yaml
 
 # Run the BDD scenario suite against the engine
 bdd *ARGS:
