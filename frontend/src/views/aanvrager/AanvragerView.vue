@@ -416,10 +416,16 @@ watch(() => session.aanvrager, laadAanvragen);
 
 <style scoped>
 /* Gesimuleerde eHerkenning-omgeving: bewust een vreemde eend in het portaal
-   (eigen merk-kop in eHerkenning-paars), zodat zichtbaar is dat de gebruiker
-   het portaal tijdelijk verlaat. Vaste kleuren: dit bootst een extern merk
-   na en hoort niet mee te kleuren met het portaalthema. */
+   (eigen merk-kop in eHerkenning-magenta, #DE0367 uit hun huisstijl), zodat
+   zichtbaar is dat de gebruiker het portaal tijdelijk verlaat. Vaste
+   merkkleuren: dit bootst een extern merk na en hoort niet mee te kleuren
+   met het portaalthema. Tekst-styling volgt de design-system-tokens zodat
+   de kale elementen niet terugvallen op het browser-serif.
+   eHerkenning gebruikt zelf een eigen sans-serif (Gilroy); die benaderen we
+   met de systeem-sans in plaats van een font te embedden. */
 .eh-omgeving {
+  font: var(--primitives-font-body-md-regular-snug);
+  font-family: helvetica, roboto, arial, sans-serif;
   border: 1px solid light-dark(var(--primitives-color-neutral-300), var(--primitives-color-neutral-700));
   border-radius: 8px;
   overflow: hidden;
@@ -431,20 +437,21 @@ watch(() => session.aanvrager, laadAanvragen);
   align-items: baseline;
   gap: var(--primitives-space-8);
   padding: var(--primitives-space-12) var(--primitives-space-16);
-  background: #4a2683;
+  background: #de0367;
   color: #ffffff;
 }
 .eh-logo {
   font-weight: 700;
   font-size: 1.05rem;
+  letter-spacing: 0.01em;
 }
 .eh-tag {
   font-size: 0.8rem;
-  opacity: 0.85;
+  opacity: 0.9;
 }
 .eh-dienst {
   padding: var(--primitives-space-12) var(--primitives-space-16);
-  font-size: 0.9rem;
+  font-size: 0.875rem;
   line-height: 1.5;
   background: light-dark(var(--primitives-color-neutral-100), var(--primitives-color-neutral-800));
   border-bottom: 1px solid light-dark(var(--primitives-color-neutral-300), var(--primitives-color-neutral-700));
@@ -454,7 +461,7 @@ watch(() => session.aanvrager, laadAanvragen);
 }
 .eh-voet {
   padding: var(--primitives-space-12) var(--primitives-space-16);
-  font-size: 0.85rem;
+  font-size: 0.8125rem;
   color: light-dark(var(--primitives-color-neutral-600), var(--primitives-color-neutral-400));
   border-top: 1px solid light-dark(var(--primitives-color-neutral-300), var(--primitives-color-neutral-700));
 }
