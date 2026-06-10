@@ -54,22 +54,28 @@ pub(crate) async fn session_kvk(session: &Session) -> Option<String> {
     session.get(SESSION_KEY_EH_KVK).await.ok().flatten()
 }
 
-/// Het subsidiejaar waarop een aanvraag van vandaag betrekking heeft.
-/// De subsidie wordt per kalenderjaar verstrekt en moet uiterlijk
-/// 1 november voorafgaand aan het subsidiejaar worden aangevraagd
-/// (Wpp art. 17). De orchestratie routeert een aanvraag daarom naar het
-/// eerstvolgende subsidiejaar waarvoor de termijn nog niet is verstreken:
-/// tot en met 1 november is dat het komende jaar, daarna het jaar erop.
-fn subsidiejaar_voor(datum: &str) -> i64 {
+/// Het subsidiejaar waarop een aanvraag van vandaag betrekking heeft: het
+/// eerstvolgende jaar waarvoor de aanvraagtermijn van de wet nog niet is
+/// verstreken. De norm (uiterlijk 1 november voorafgaand aan het
+/// subsidiejaar, Wpp art. 17) komt volledig uit de wet; hier wordt alleen
+/// een kandidaatjaar gekozen en worden twee door de wet geleverde
+/// ISO-datums vergeleken. Die ene vergelijking is gedocumenteerde
+/// orchestratie: de engine kent geen datumvergelijking (numeriek only).
+async fn subsidiejaar_voor(state: &AppState, datum: &str) -> Result<i64, ApiError> {
     let parsed = chrono::NaiveDate::parse_from_str(datum, "%Y-%m-%d")
         .unwrap_or_else(|_| Utc::now().date_naive());
-    let jaar = chrono::Datelike::year(&parsed) as i64;
-    let deadline = chrono::NaiveDate::from_ymd_opt(chrono::Datelike::year(&parsed), 11, 1)
-        .expect("1 november bestaat");
-    if parsed <= deadline {
-        jaar + 1
+    let kandidaat = chrono::Datelike::year(&parsed) as i64 + 1;
+    let termijnen = engine::evaluate_termijnen(state.corpus.clone(), kandidaat, datum.to_string())
+        .await
+        .map_err(internal_error)?;
+    // ISO-datums (YYYY-MM-DD) vergelijken lexicografisch correct. Na de
+    // termijn schuift de aanvraag één jaar op; de termijn van dat jaar kan
+    // vandaag nooit ook al verstreken zijn (hij ligt in november van het
+    // lopende jaar of later).
+    if datum <= termijnen.aanvraagtermijn_einddatum.as_str() {
+        Ok(kandidaat)
     } else {
-        jaar + 2
+        Ok(kandidaat + 1)
     }
 }
 
@@ -165,7 +171,7 @@ pub async fn mijn_registratie(
         return Err(forbidden());
     };
     let vandaag = Utc::now().format("%Y-%m-%d").to_string();
-    let jaar = subsidiejaar_voor(&vandaag);
+    let jaar = subsidiejaar_voor(&state, &vandaag).await?;
     // ONGEKOPPELD telt als niet geregistreerd: de rechtspersoon achter de
     // aanduiding is onbekend, dus dit placeholder-nummer heeft geen
     // registratie (en de frontend biedt de claim-flow aan).
@@ -450,7 +456,7 @@ pub async fn create_aanvraag(
     };
     let partij = partijnaam_voor(&state, &kvk).await?;
     let vandaag = Utc::now().format("%Y-%m-%d").to_string();
-    let jaar = subsidiejaar_voor(&vandaag);
+    let jaar = subsidiejaar_voor(&state, &vandaag).await?;
 
     if body.componenten.is_empty() {
         return Err(bad_request(
@@ -584,7 +590,7 @@ pub async fn proef_aanspraken(
     neem_landelijke_opgaven_over(&body.parameters, &mut eigen)?;
 
     let vandaag = Utc::now().format("%Y-%m-%d").to_string();
-    let jaar = subsidiejaar_voor(&vandaag);
+    let jaar = subsidiejaar_voor(&state, &vandaag).await?;
     // De eigen opgave telt mee in de noemer van de ledencomponent als de
     // landelijke component onderdeel is van deze (proef)aanvraag; of zij
     // werkelijk meetelt beslist de wet in ledentotaal_voor.
