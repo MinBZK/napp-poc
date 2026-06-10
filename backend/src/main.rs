@@ -33,8 +33,12 @@ use state::{AppState, LawCorpus};
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "napp_backend=info,tower_http=info".into()),
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                // regelrecht_auth logt de werkelijke oorzaak van OIDC-fouten
+                // (token exchange, ID-token-verificatie); zonder die target
+                // is een 500 op /auth/callback niet te herleiden.
+                "napp_backend=info,tower_http=info,regelrecht_auth=debug".into()
+            }),
         )
         .init();
 
@@ -85,7 +89,12 @@ async fn main() -> anyhow::Result<()> {
         oidc_config,
         end_session_url,
         base_url: std::env::var("BASE_URL").ok(),
-        http_client: reqwest::Client::new(),
+        // Redirects volgen opent de token-exchange voor SSRF; de oauth2-crate
+        // schrijft Policy::none voor (zelfde opzet als regelrecht editor-api).
+        http_client: reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .timeout(std::time::Duration::from_secs(10))
+            .build()?,
     };
 
     let auth_routes = regelrecht_auth::auth_routes::<AppState>();
@@ -170,16 +179,30 @@ async fn main() -> anyhow::Result<()> {
             post(claim::wijs_claim_af),
         );
 
-    // Mock-SSO-login alleen registreren wanneer echte OIDC uit staat.
-    if !app_state.is_auth_enabled() {
+    // Demo-login blijft ook naast echte OIDC beschikbaar: dit is een PoC met
+    // fictieve data, en bezoekers zonder Rijksaccount moeten de
+    // beoordelaarsflow kunnen demonstreren. Uitzetten kan met
+    // NAPP_MOCK_SSO=0 (bijvoorbeeld zodra de omgeving niet meer publiek
+    // gedemonstreerd wordt).
+    let mock_sso = std::env::var("NAPP_MOCK_SSO")
+        .map(|v| v != "0")
+        .unwrap_or(true);
+    if mock_sso {
+        if app_state.is_auth_enabled() {
+            tracing::warn!(
+                "mock-SSO-login actief naast echte OIDC (demo); zet NAPP_MOCK_SSO=0 om dit uit te schakelen"
+            );
+        }
         api = api.route("/api/sso/mock-login", post(handlers::sso_mock_login));
     }
 
+    // Secure cookies wanneer OIDC actief is (de omgeving draait dan achter
+    // TLS); lokaal zonder OIDC werkt de dev-opstelling over http.
     let session_layer = SessionManagerLayer::new(MemoryStore::default())
         .with_expiry(Expiry::OnInactivity(time::Duration::hours(8)))
         .with_same_site(tower_sessions::cookie::SameSite::Lax)
         .with_http_only(true)
-        .with_secure(false);
+        .with_secure(app_state.is_auth_enabled());
 
     let static_dir = std::env::var("NAPP_STATIC_DIR").unwrap_or_else(|_| "frontend/dist".into());
     let index_file = format!("{static_dir}/index.html");
