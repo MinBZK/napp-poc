@@ -227,6 +227,7 @@ mod tests {
                 besluit_decentraal: String::new(),
                 awb: String::new(),
                 termijnenwet: String::new(),
+                kieswet: String::new(),
             }),
             oidc_client: None,
             oidc_config: None,

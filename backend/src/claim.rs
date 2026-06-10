@@ -255,9 +255,18 @@ pub async fn create_claim(
         ));
     }
 
-    // Handelsregister-toets (mock): wordt bij de claim opgeslagen zodat de
-    // beoordelaar ziet waarop de toets is gebaseerd.
+    // Handelsregister-raadpleging (mock, databron) plus het oordeel van
+    // Kieswet G 1 daarover (wet, engine). Beide worden bij de claim
+    // opgeslagen: de beoordelaar ziet de feiten en het wettelijk advies,
+    // en beslist zelf.
     let toets = handelsregister::raadpleeg(&kvk, &doel.naam);
+    let vandaag = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    let oordeel =
+        crate::engine::evaluate_registratie_eisen(state.corpus.clone(), toets.clone(), vandaag)
+            .await
+            .map_err(internal_error)?;
+    let mut toets_json = serde_json::to_value(&toets).map_err(internal_error)?;
+    toets_json["wettelijke_toets"] = serde_json::to_value(&oordeel).map_err(internal_error)?;
     let id = Uuid::new_v4().to_string();
     sqlx::query(
         "INSERT INTO register_claims (id, kvk_nummer, doel_kvk, aanduiding, hr_toets)
@@ -267,7 +276,7 @@ pub async fn create_claim(
     .bind(&kvk)
     .bind(&doel_kvk)
     .bind(&doel.naam)
-    .bind(serde_json::to_string(&toets).map_err(internal_error)?)
+    .bind(serde_json::to_string(&toets_json).map_err(internal_error)?)
     .execute(&state.pool)
     .await
     .map_err(internal_error)?;
@@ -506,6 +515,9 @@ mod tests {
                 besluit_decentraal: String::new(),
                 awb: String::new(),
                 termijnenwet: String::new(),
+                // De claim-flow toetst aan Kieswet G 1 via de engine; de
+                // tests gebruiken daarvoor de echte wettekst.
+                kieswet: include_str!("../../law/kieswet/1989-09-28.yaml").to_string(),
             }),
             oidc_client: None,
             oidc_config: None,
@@ -718,6 +730,12 @@ mod tests {
             claim.hr_toets["rechtsvorm"],
             "Vereniging met volledige rechtsbevoegdheid"
         );
+        // Het oordeel van Kieswet G 1 (engine) wordt bij de claim bewaard.
+        assert_eq!(
+            claim.hr_toets["wettelijke_toets"]["voldoet_aan_registratie_eisen"],
+            true
+        );
+        assert_eq!(claim.hr_toets["wettelijke_toets"]["voldoet_eis_rechtsvorm"], true);
 
         let result = mijn_claim(State(state), aanvrager_session(NIEUW).await)
             .await

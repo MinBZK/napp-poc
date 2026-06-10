@@ -46,6 +46,9 @@ pub struct LawCorpus {
     pub besluit_decentraal: String,
     pub awb: String,
     pub termijnenwet: String,
+    /// Subset van de Kieswet (artikel G 1): de registratie-eisen voor een
+    /// aanduiding, gebruikt bij de claim-toets in het partijregister.
+    pub kieswet: String,
 }
 
 impl LawCorpus {
@@ -65,6 +68,7 @@ impl LawCorpus {
             )?,
             awb: read("algemene_wet_bestuursrecht/1994-01-01.yaml")?,
             termijnenwet: read("algemene_termijnenwet/1964-04-01.yaml")?,
+            kieswet: read("kieswet/1989-09-28.yaml")?,
         })
     }
 }

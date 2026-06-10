@@ -17,6 +17,7 @@ use crate::state::LawCorpus;
 pub const WPP_ID: &str = "wet_op_de_politieke_partijen";
 pub const AWB_ID: &str = "algemene_wet_bestuursrecht";
 pub const ATW_ID: &str = "algemene_termijnenwet";
+pub const KIESWET_ID: &str = "kieswet";
 
 /// Uitkomst van een samengestelde jaaraanvraag.
 #[derive(Debug, Clone, Serialize)]
@@ -565,6 +566,66 @@ pub async fn evaluate_termijnen(
             aanvraagtermijn_einddatum: as_date("aanvraagtermijn_einddatum"),
             beslistermijn_einddatum: as_date("beslistermijn_einddatum"),
             voorschotpercentage: as_int(&result.outputs, "voorschotpercentage"),
+        })
+    })
+    .await?
+}
+
+/// Het oordeel van Kieswet G 1 over een Handelsregister-raadpleging, per
+/// eis zoals de wet die teruggeeft. Dit is een advies aan de beoordelaar;
+/// de bevestiging van een claim blijft een menselijke beslissing.
+#[derive(Debug, Clone, Serialize)]
+pub struct RegistratieToets {
+    pub voldoet_aan_registratie_eisen: bool,
+    pub voldoet_eis_inschrijving: bool,
+    pub voldoet_eis_rechtsvorm: bool,
+    pub voldoet_eis_naam: bool,
+}
+
+/// Toets een Handelsregister-raadpleging aan de registratie-eisen van
+/// Kieswet G 1. De raadpleging zelf is een databron (orchestratie); welke
+/// eisen gelden staat uitsluitend in de wet.
+pub async fn evaluate_registratie_eisen(
+    corpus: Arc<LawCorpus>,
+    toets: crate::handelsregister::HrToets,
+    date: String,
+) -> anyhow::Result<RegistratieToets> {
+    tokio::task::spawn_blocking(move || {
+        let mut service = LawExecutionService::new();
+        service
+            .load_law(&corpus.kieswet)
+            .map_err(|e| anyhow::anyhow!("laden Kieswet mislukt: {e}"))?;
+        let mut params: BTreeMap<String, Value> = BTreeMap::new();
+        params.insert(
+            "ingeschreven_in_handelsregister".into(),
+            Value::Bool(toets.gevonden),
+        );
+        params.insert(
+            "rechtsvorm".into(),
+            Value::String(toets.rechtsvorm.clone().unwrap_or_default()),
+        );
+        params.insert("naam_komt_overeen".into(), Value::Bool(toets.naam_match));
+        let result = service
+            .evaluate_law(
+                KIESWET_ID,
+                &[
+                    "voldoet_aan_registratie_eisen",
+                    "voldoet_eis_inschrijving",
+                    "voldoet_eis_rechtsvorm",
+                    "voldoet_eis_naam",
+                ],
+                params,
+                &date,
+            )
+            .map_err(|e| anyhow::anyhow!("toetsing Kieswet G 1 mislukt: {e}"))?;
+        Ok(RegistratieToets {
+            voldoet_aan_registratie_eisen: as_bool(
+                &result.outputs,
+                "voldoet_aan_registratie_eisen",
+            ),
+            voldoet_eis_inschrijving: as_bool(&result.outputs, "voldoet_eis_inschrijving"),
+            voldoet_eis_rechtsvorm: as_bool(&result.outputs, "voldoet_eis_rechtsvorm"),
+            voldoet_eis_naam: as_bool(&result.outputs, "voldoet_eis_naam"),
         })
     })
     .await?
