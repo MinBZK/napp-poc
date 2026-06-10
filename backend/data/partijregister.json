@@ -32828,16 +32828,44 @@
  ],
  "demo_voorbeelden": [
   {
-   "kvk_nummer": "92525446",
-   "naam": "D66"
+   "kvk_nummer": "99727328",
+   "naam": "PVV (Partij voor de Vrijheid)",
+   "profiel": "grootste landelijke partij (26 kamerzetels)"
   },
   {
-   "kvk_nummer": "98626816",
-   "naam": "Hart voor Den Haag / Groep de Mos"
+   "kvk_nummer": "92230197",
+   "naam": "VVD",
+   "profiel": "breedste decentrale dekking (347 gebieden)"
+  },
+  {
+   "kvk_nummer": "96544090",
+   "naam": "Volt",
+   "profiel": "kleinste landelijke partij (1 kamerzetel, op de ledendrempel)"
+  },
+  {
+   "kvk_nummer": "98786584",
+   "naam": "BBB",
+   "profiel": "sterk in provinciale staten"
   },
   {
    "kvk_nummer": "99399789",
-   "naam": "CDA, afdeling 's-Gravenhage"
+   "naam": "CDA, afdeling 's-Gravenhage",
+   "profiel": "afdeling met eigen rechtspersoon (decentraal organisatiemodel)"
+  },
+  {
+   "kvk_nummer": "98626816",
+   "naam": "Hart voor Den Haag / Groep de Mos",
+   "profiel": "grootste lokale partij"
+  },
+  {
+   "kvk_nummer": "96477294",
+   "naam": "1Nijmegen",
+   "profiel": "lokale partij met een raadszetel"
+  },
+  {
+   "kvk_nummer": "93178212",
+   "naam": "Water Natuurlijk",
+   "profiel": "waterschapspartij"
   }
  ]
 }

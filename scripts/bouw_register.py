@@ -280,25 +280,54 @@ def main() -> None:
         for code, naam in sorted(gebied_namen.items(), key=lambda x: x[1])
     ]
 
-    # --- Demo-voorbeelden voor de mock-login ---
-    grootste = max(landelijk, key=landelijk.get)
-    lokaal = max(
-        (p for p in partijen.values()
-         if p["kamerzetels"] == 0 and p["moederpartij_kvk"] is None
-         and any(u["orgaan"] == "GEMEENTERAAD" for u in p["decentrale_uitslagen"])),
-        key=lambda p: max(u["zetels"] for u in p["decentrale_uitslagen"]),
-    )
-    afdeling = next(
-        (p for p in sorted(partijen.values(), key=lambda x: x["naam"])
-         if p["moederpartij_kvk"] is not None),
-        None,
-    )
-    demo = [
-        {"kvk_nummer": kvk_voor(f"landelijk|{grootste}"), "naam": grootste},
-        {"kvk_nummer": lokaal["kvk_nummer"], "naam": lokaal["naam"]},
+    # --- Demo-voorbeelden voor de mock-login: een gevarieerd palet ---
+    def voorbeeld(p, profiel):
+        return {"kvk_nummer": p["kvk_nummer"], "naam": p["naam"], "profiel": profiel}
+
+    alle = list(partijen.values())
+    landelijke = [p for p in alle if p["kamerzetels"] > 0]
+    lokale_gr = [
+        p for p in alle
+        if p["kamerzetels"] == 0 and p["moederpartij_kvk"] is None
+        and p["decentrale_uitslagen"]
+        and all(u["orgaan"] == "GEMEENTERAAD" for u in p["decentrale_uitslagen"])
     ]
-    if afdeling:
-        demo.append({"kvk_nummer": afdeling["kvk_nummer"], "naam": afdeling["naam"]})
+    waterschaps = [
+        p for p in alle
+        if p["kamerzetels"] == 0 and p["moederpartij_kvk"] is None
+        and p["decentrale_uitslagen"]
+        and all(u["orgaan"] == "WATERSCHAP" for u in p["decentrale_uitslagen"])
+    ]
+
+    grootste = max(landelijke, key=lambda p: (p["kamerzetels"], p["naam"]))
+    breedste = max(landelijke, key=lambda p: len(p["decentrale_uitslagen"]))
+    kleinste = min(landelijke, key=lambda p: (p["kamerzetels"], p["naam"]))
+    meeste_ps = max(
+        landelijke,
+        key=lambda p: sum(u["zetels"] for u in p["decentrale_uitslagen"]
+                          if u["orgaan"] == "PROVINCIALE_STATEN"),
+    )
+    afdeling = min(
+        (p for p in alle if p["moederpartij_kvk"] is not None),
+        key=lambda p: p["naam"],
+    )
+    grootste_lokaal = max(lokale_gr, key=lambda p: max(u["zetels"] for u in p["decentrale_uitslagen"]))
+    kleinste_lokaal = min(lokale_gr, key=lambda p: (max(u["zetels"] for u in p["decentrale_uitslagen"]), p["naam"]))
+    waterschap = max(waterschaps, key=lambda p: max(u["zetels"] for u in p["decentrale_uitslagen"]))
+
+    demo = [
+        voorbeeld(grootste, f"grootste landelijke partij ({grootste['kamerzetels']} kamerzetels)"),
+        voorbeeld(breedste, f"breedste decentrale dekking ({len(breedste['decentrale_uitslagen'])} gebieden)"),
+        voorbeeld(kleinste, f"kleinste landelijke partij ({kleinste['kamerzetels']} kamerzetel{'s' if kleinste['kamerzetels'] != 1 else ''}, op de ledendrempel)"),
+        voorbeeld(meeste_ps, "sterk in provinciale staten"),
+        voorbeeld(afdeling, "afdeling met eigen rechtspersoon (decentraal organisatiemodel)"),
+        voorbeeld(grootste_lokaal, "grootste lokale partij"),
+        voorbeeld(kleinste_lokaal, "lokale partij met een raadszetel"),
+        voorbeeld(waterschap, "waterschapspartij"),
+    ]
+    # dedupliceer (criteria kunnen samenvallen) met behoud van volgorde
+    gezien = set()
+    demo = [d for d in demo if not (d["kvk_nummer"] in gezien or gezien.add(d["kvk_nummer"]))]
 
     register = {
         "bronnen": {
@@ -320,7 +349,7 @@ def main() -> None:
     print(f"geschreven: {UIT} ({UIT.stat().st_size // 1024} kB, "
           f"{len(partijen)} partijen, {len(gebieden)} gebieden)")
     for d in demo:
-        print("  demo-login:", d["kvk_nummer"], "→", d["naam"])
+        print(f"  demo-login: {d['kvk_nummer']} → {d['naam']} ({d['profiel']})")
 
 
 if __name__ == "__main__":

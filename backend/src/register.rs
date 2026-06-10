@@ -54,6 +54,8 @@ pub struct Gebied {
 pub struct DemoVoorbeeld {
     pub kvk_nummer: String,
     pub naam: String,
+    #[serde(default)]
+    pub profiel: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

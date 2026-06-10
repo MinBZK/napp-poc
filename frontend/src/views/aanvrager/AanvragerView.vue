@@ -17,15 +17,15 @@ const aanvragen = ref([]);
 const laden = ref(false);
 const demoVoorbeelden = ref([]);
 
-const demoTekst = computed(() => {
-  if (!demoVoorbeelden.value.length) {
-    return 'eHerkenning is gesimuleerd: alleen het KVK-nummer telt.';
-  }
-  const voorbeelden = demoVoorbeelden.value
-    .map((d) => `${d.kvk_nummer} (${d.naam})`)
-    .join(', ');
-  return `eHerkenning is gesimuleerd: alleen het KVK-nummer telt. Probeer bijvoorbeeld ${voorbeelden}. Elk ander nummer logt in als ongeregistreerde organisatie.`;
-});
+const demoTekst =
+  'eHerkenning is gesimuleerd: alleen het KVK-nummer telt. Kies hieronder een ' +
+  'voorbeeldpartij, of voer elk ander nummer in om als ongeregistreerde ' +
+  'organisatie in te loggen.';
+
+function kiesDemo(d) {
+  kvk.value = d.kvk_nummer;
+  login();
+}
 
 const navItems = computed(() =>
   session.aanvrager
@@ -135,6 +135,33 @@ watch(() => session.aanvrager, laadAanvragen);
             </template>
           </nldd-container>
         </nldd-card>
+
+        <template v-if="demoVoorbeelden.length">
+          <nldd-spacer size="32"></nldd-spacer>
+          <nldd-title size="4"><h3>Voorbeeldpartijen (demo)</h3></nldd-title>
+          <nldd-spacer size="8"></nldd-spacer>
+          <nldd-list variant="box">
+            <nldd-list-item
+              v-for="d in demoVoorbeelden"
+              :key="d.kvk_nummer"
+              size="sm"
+              type="button"
+              @click="kiesDemo(d)"
+            >
+              <nldd-text-cell
+                :text="d.naam"
+                :supporting-text="d.profiel"
+              ></nldd-text-cell>
+              <nldd-text-cell
+                :text="d.kvk_nummer"
+                color="secondary"
+                horizontal-alignment="right"
+              ></nldd-text-cell>
+              <nldd-spacer-cell size="8"></nldd-spacer-cell>
+              <nldd-icon-cell icon="chevron-right" size="16"></nldd-icon-cell>
+            </nldd-list-item>
+          </nldd-list>
+        </template>
       </nldd-simple-section>
     </template>
 
