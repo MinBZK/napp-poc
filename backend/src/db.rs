@@ -47,6 +47,34 @@ pub async fn init(pool: &SqlitePool) -> anyhow::Result<()> {
             status TEXT NOT NULL DEFAULT 'AANGEMAAKT',
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
+        -- Partijregister (registratietaak van de Napp), beheerd in de
+        -- beoordelaarsomgeving en geseed uit data/partijregister.json.
+        -- Schemakeuze: kamerzetels staan als kolom op register_partijen, niet
+        -- als uitslag-rij met orgaan TWEEDE_KAMER. Uitslag-rijen verwijzen
+        -- naar een gebied in register_gebieden (met inwoneraantal); de Kamer
+        -- heeft geen gebied, dus een uitslag-rij zou een kunstmatig gebied of
+        -- NULL-joins vereisen. De kolom volgt bovendien het Partij-domeinmodel.
+        CREATE TABLE IF NOT EXISTS register_partijen (
+            kvk_nummer TEXT PRIMARY KEY,
+            naam TEXT NOT NULL,
+            organisatiemodel TEXT NOT NULL DEFAULT 'CENTRAAL',
+            kamerzetels INTEGER NOT NULL DEFAULT 0,
+            moederpartij_kvk TEXT REFERENCES register_partijen(kvk_nummer)
+        );
+        CREATE TABLE IF NOT EXISTS register_uitslagen (
+            kvk_nummer TEXT NOT NULL REFERENCES register_partijen(kvk_nummer),
+            orgaan TEXT NOT NULL,
+            gebied_code TEXT NOT NULL,
+            zetels INTEGER NOT NULL,
+            PRIMARY KEY (kvk_nummer, orgaan, gebied_code)
+        );
+        CREATE TABLE IF NOT EXISTS register_gebieden (
+            orgaan TEXT NOT NULL,
+            code TEXT NOT NULL,
+            naam TEXT NOT NULL,
+            inwoneraantal INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (orgaan, code)
+        );
         "#,
     )
     .execute(pool)

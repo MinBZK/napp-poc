@@ -20,9 +20,9 @@ use crate::state::AppState;
 const SESSION_KEY_EH_KVK: &str = "eh_kvk";
 const SESSION_KEY_EH_PARTIJ: &str = "eh_partij";
 
-type ApiError = (StatusCode, Json<serde_json::Value>);
+pub(crate) type ApiError = (StatusCode, Json<serde_json::Value>);
 
-fn internal_error(e: impl std::fmt::Display) -> ApiError {
+pub(crate) fn internal_error(e: impl std::fmt::Display) -> ApiError {
     tracing::error!(error = %e, "interne fout");
     (
         StatusCode::INTERNAL_SERVER_ERROR,
@@ -30,18 +30,18 @@ fn internal_error(e: impl std::fmt::Display) -> ApiError {
     )
 }
 
-fn bad_request(msg: &str) -> ApiError {
+pub(crate) fn bad_request(msg: &str) -> ApiError {
     (StatusCode::BAD_REQUEST, Json(json!({"fout": msg})))
 }
 
-fn not_found() -> ApiError {
+pub(crate) fn not_found() -> ApiError {
     (
         StatusCode::NOT_FOUND,
         Json(json!({"fout": "Niet gevonden."})),
     )
 }
 
-fn forbidden() -> ApiError {
+pub(crate) fn forbidden() -> ApiError {
     (
         StatusCode::FORBIDDEN,
         Json(json!({"fout": "Geen toegang."})),
@@ -52,7 +52,7 @@ async fn session_kvk(session: &Session) -> Option<String> {
     session.get(SESSION_KEY_EH_KVK).await.ok().flatten()
 }
 
-async fn session_beoordelaar(session: &Session) -> Option<String> {
+pub(crate) async fn session_beoordelaar(session: &Session) -> Option<String> {
     let authenticated: bool = session
         .get(SESSION_KEY_AUTHENTICATED)
         .await
@@ -80,6 +80,7 @@ pub struct EherkenningLogin {
 /// partijregister van de Napp. Een onbekend KvK-nummer kan gewoon inloggen
 /// en aanvragen — de wet wijst dan af (AWB 4:1: iedereen mag aanvragen).
 pub async fn eherkenning_login(
+    State(state): State<AppState>,
     session: Session,
     Json(body): Json<EherkenningLogin>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -87,8 +88,11 @@ pub async fn eherkenning_login(
     if !kvk.chars().all(|c| c.is_ascii_digit()) || kvk.len() != 8 {
         return Err(bad_request("Vul een geldig KVK-nummer in (8 cijfers)."));
     }
-    let naam = match crate::register::partij_by_kvk(&kvk) {
-        Some(partij) => partij.naam.to_string(),
+    let naam = match crate::register::partij_by_kvk(&state.pool, &kvk)
+        .await
+        .map_err(internal_error)?
+    {
+        Some(partij) => partij.naam,
         None => format!("Organisatie {kvk}"),
     };
     session
@@ -120,12 +124,16 @@ pub async fn mijn_registratie(
         return Err(forbidden());
     };
     let jaar = chrono::Utc::now().format("%Y").to_string().parse::<i64>().unwrap_or(2026);
-    let partij = crate::register::partij_by_kvk(&kvk);
+    let partij = crate::register::partij_by_kvk(&state.pool, &kvk)
+        .await
+        .map_err(internal_error)?;
     let bezet = db::bezette_componenten(&state.pool, &kvk, jaar)
         .await
         .map_err(internal_error)?;
 
-    let componenten = aanspraken_voor(&kvk);
+    let componenten = aanspraken_voor(&state.pool, &kvk)
+        .await
+        .map_err(internal_error)?;
     let aanspraken: Vec<serde_json::Value> = componenten
         .iter()
         .map(|c| {
@@ -153,9 +161,12 @@ pub async fn mijn_registratie(
 /// Bouw de componenten (aanspraken) van een rechtspersoon uit het register.
 /// Een onbekende organisatie krijgt één landelijke component met nul zetels:
 /// de aanvraagroute blijft open (AWB 4:1), de wet wijst af.
-fn aanspraken_voor(kvk: &str) -> Vec<db::Component> {
-    let Some(partij) = crate::register::partij_by_kvk(kvk) else {
-        return vec![db::Component {
+async fn aanspraken_voor(
+    pool: &sqlx::SqlitePool,
+    kvk: &str,
+) -> anyhow::Result<Vec<db::Component>> {
+    let Some(partij) = crate::register::partij_by_kvk(pool, kvk).await? else {
+        return Ok(vec![db::Component {
             key: "LANDELIJK".into(),
             soort: "LANDELIJK".into(),
             orgaan: None,
@@ -163,12 +174,13 @@ fn aanspraken_voor(kvk: &str) -> Vec<db::Component> {
             gebied: None,
             zetels: 0,
             inwoneraantal: 0,
-        }];
+        }]);
     };
+    let uitslagen = crate::register::uitslagen_met_gebied(pool, kvk).await?;
     let mut componenten = Vec::new();
     // Landelijke component alleen voor partijen met kamerzetels; een
     // afdeling of lokale partij heeft die aanspraak niet.
-    if partij.kamerzetels > 0 || partij.decentrale_uitslagen.is_empty() {
+    if partij.kamerzetels > 0 || uitslagen.is_empty() {
         componenten.push(db::Component {
             key: "LANDELIJK".into(),
             soort: "LANDELIJK".into(),
@@ -179,24 +191,23 @@ fn aanspraken_voor(kvk: &str) -> Vec<db::Component> {
             inwoneraantal: 0,
         });
     }
-    for u in &partij.decentrale_uitslagen {
-        let gebied = crate::register::gebied_by_code(&u.gebied_code);
+    for u in uitslagen {
         componenten.push(db::Component {
             key: format!("{}:{}", u.orgaan, u.gebied_code),
             soort: "DECENTRAAL".into(),
-            orgaan: Some(u.orgaan.clone()),
-            gebied_code: Some(u.gebied_code.clone()),
-            gebied: gebied.map(|g| g.naam.clone()),
+            orgaan: Some(u.orgaan),
+            gebied_code: Some(u.gebied_code),
+            gebied: u.gebied_naam,
             zetels: u.zetels,
-            inwoneraantal: gebied.map(|g| g.inwoneraantal).unwrap_or(0),
+            inwoneraantal: u.inwoneraantal,
         });
     }
-    componenten
+    Ok(componenten)
 }
 
 /// Demo-voorbeelden voor de gemockte eHerkenning-login (alleen metadata).
 pub async fn register_demo() -> Json<serde_json::Value> {
-    Json(json!(crate::register::register().demo_voorbeelden))
+    Json(json!(crate::register::demo_voorbeelden()))
 }
 
 pub async fn eherkenning_logout(session: Session) -> Result<Json<serde_json::Value>, ApiError> {
@@ -292,7 +303,9 @@ pub async fn create_aanvraag(
     // De componenten komen uit het register, nooit uit de client: de client
     // stuurt alleen sleutels; gegevens (zetels, inwoneraantallen) worden hier
     // bevroren op registerwaarden.
-    let beschikbaar = aanspraken_voor(&kvk);
+    let beschikbaar = aanspraken_voor(&state.pool, &kvk)
+        .await
+        .map_err(internal_error)?;
     let mut componenten: Vec<db::Component> = Vec::new();
     for key in &body.componenten {
         let Some(c) = beschikbaar.iter().find(|c| &c.key == key) else {
@@ -375,7 +388,9 @@ pub async fn proef_aanspraken(
     let Some(kvk) = session_kvk(&session).await else {
         return Err(forbidden());
     };
-    let beschikbaar = aanspraken_voor(&kvk);
+    let beschikbaar = aanspraken_voor(&state.pool, &kvk)
+        .await
+        .map_err(internal_error)?;
     let componenten: Vec<db::Component> = beschikbaar
         .into_iter()
         .filter(|c| body.componenten.contains(&c.key))
