@@ -30,6 +30,30 @@ const bezig = ref(false);
 const proef = ref(null);
 let proefTimer = null;
 
+// Inline rekening opgeven (alleen tekenbevoegd bestuur, zie rekening.rs).
+const rekeningIban = ref('');
+const rekeningTenaamstelling = ref('');
+const rekeningFout = ref('');
+const rekeningBezig = ref(false);
+const rekeningMelding = ref('');
+
+async function bewaarRekening() {
+  rekeningFout.value = '';
+  rekeningBezig.value = true;
+  try {
+    await api.mijnRekeningWijzigen({
+      iban: rekeningIban.value.trim(),
+      tenaamstelling: rekeningTenaamstelling.value.trim(),
+    });
+    rekening.value = await api.mijnRekening();
+    rekeningMelding.value = `Rekening ${rekening.value?.iban ?? ''} opgeslagen.`;
+  } catch (e) {
+    rekeningFout.value = e.message;
+  } finally {
+    rekeningBezig.value = false;
+  }
+}
+
 const GROEPEN = [
   { soort: 'LANDELIJK', titel: 'Landelijk', kolom: 'Kamerzetels (EK + TK)' },
   { orgaan: 'GEMEENTERAAD', titel: 'Gemeenteraden', kolom: 'Raadszetels' },
@@ -153,6 +177,9 @@ async function laadRegistratie() {
   } catch {
     rekening.value = null;
   }
+  if (!rekeningTenaamstelling.value) {
+    rekeningTenaamstelling.value = session.aanvrager?.partij_naam ?? '';
+  }
 }
 
 async function herberekenProef() {
@@ -265,13 +292,73 @@ watch(() => session.aanvrager, laadRegistratie);
           <nldd-spacer size="24"></nldd-spacer>
         </template>
 
-        <NBanner
-          v-if="rekening && !rekening.iban"
-          variant="neutral"
-          text="Nog geen rekeningnummer bekend"
-          supporting-text="Voor uitbetaling van het voorschot is een rekeningnummer op naam van de rechtspersoon nodig; u kunt dit op de overzichtspagina opgeven. U kunt wel alvast aanvragen."
-        />
-        <nldd-spacer v-if="rekening && !rekening.iban" size="16"></nldd-spacer>
+        <!-- Rekening inline opgeven: alleen voor het tekenbevoegd bestuur
+             van een geregistreerde rechtspersoon; anders een informatieve
+             banner. Aanvragen kan ook zonder rekening (de betaalopdracht
+             wordt dan aangehouden). -->
+        <template v-if="rekeningMelding">
+          <NBanner variant="success" :text="rekeningMelding" />
+          <nldd-spacer size="16"></nldd-spacer>
+        </template>
+        <template v-if="rekening && !rekening.iban">
+          <nldd-card
+            v-if="!beperkt && rekening.in_register !== false"
+            accessible-label="Rekening voor uitbetaling opgeven"
+          >
+            <nldd-container padding="20" gap="8">
+              <nldd-title size="5"><h4>Nog geen rekeningnummer bekend</h4></nldd-title>
+              <nldd-rich-text>
+                <p>
+                  Voor uitbetaling van het voorschot is een rekeningnummer op
+                  naam van de rechtspersoon nodig. U kunt het hier direct
+                  opgeven; aanvragen kan ook alvast zonder.
+                </p>
+              </nldd-rich-text>
+              <nldd-form novalidate @submit.prevent="bewaarRekening">
+                <nldd-form-field label="IBAN">
+                  <nldd-text-field
+                    :value="rekeningIban"
+                    name="iban"
+                    placeholder="NL00BANK0123456789"
+                    @input="rekeningIban = $event.detail?.value ?? $event.target?.value ?? ''"
+                  ></nldd-text-field>
+                </nldd-form-field>
+                <nldd-form-field label="Tenaamstelling">
+                  <nldd-text-field
+                    :value="rekeningTenaamstelling"
+                    name="tenaamstelling"
+                    @input="rekeningTenaamstelling = $event.detail?.value ?? $event.target?.value ?? ''"
+                  ></nldd-text-field>
+                  <nldd-form-field-help-text>
+                    De rekening moet op naam van de rechtspersoon staan; de
+                    Napp voert een IBAN-naam-controle uit.
+                  </nldd-form-field-help-text>
+                </nldd-form-field>
+                <template v-if="rekeningFout">
+                  <NBanner variant="critical" :text="rekeningFout" />
+                  <nldd-spacer size="8"></nldd-spacer>
+                </template>
+                <nldd-form-actions>
+                  <nldd-button
+                    variant="secondary"
+                    type="submit"
+                    text="Rekening opslaan"
+                    :disabled="rekeningBezig || undefined"
+                  ></nldd-button>
+                </nldd-form-actions>
+              </nldd-form>
+            </nldd-container>
+          </nldd-card>
+          <NBanner
+            v-else
+            variant="neutral"
+            text="Nog geen rekeningnummer bekend"
+            :supporting-text="beperkt
+              ? 'Voor uitbetaling van het voorschot is een rekeningnummer op naam van de rechtspersoon nodig; alleen het tekenbevoegd bestuur kan dat opgeven. U kunt wel alvast aanvragen.'
+              : 'Voor uitbetaling van het voorschot is een rekeningnummer op naam van de rechtspersoon nodig; dat kan zodra uw organisatie aan een aanduiding is gekoppeld. U kunt wel alvast aanvragen.'"
+          />
+          <nldd-spacer size="16"></nldd-spacer>
+        </template>
 
         <template v-for="groep in zichtbareGroepen" :key="groep.titel">
           <nldd-title size="4">

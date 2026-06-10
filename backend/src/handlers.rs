@@ -370,13 +370,31 @@ pub async fn sso_mock_login(
     Ok(Json(json!({"rol": "beoordelaar", "naam": naam, "mock": true})))
 }
 
+/// De weergavenaam van een ingelogde rechtspersoon. De sessie draagt alleen
+/// de identiteit (KvK); de naam komt live uit het register, zodat hij ook
+/// klopt direct nadat een claim is bevestigd (zonder opnieuw inloggen).
+pub(crate) async fn partijnaam_voor(state: &AppState, kvk: &str) -> Result<String, ApiError> {
+    Ok(
+        match crate::register::partij_by_kvk(&state.pool, kvk)
+            .await
+            .map_err(internal_error)?
+        {
+            Some(partij) if !partij.is_ongekoppeld() => partij.naam,
+            _ => format!("Organisatie {kvk}"),
+        },
+    )
+}
+
 /// Gecombineerde sessie-status voor de frontend: welke rol(len) zijn actief.
 pub async fn me(
     State(state): State<AppState>,
     session: Session,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let kvk = session_kvk(&session).await;
-    let partij: Option<String> = session.get(SESSION_KEY_EH_PARTIJ).await.ok().flatten();
+    let partij = match &kvk {
+        Some(k) => Some(partijnaam_voor(&state, k).await?),
+        None => None,
+    };
     let m = machtiging::session_machtiging(&session).await;
     let machtiging_json = m.to_json(&state.pool).await.map_err(internal_error)?;
     let beoordelaar = session_beoordelaar(&session).await;
@@ -410,12 +428,7 @@ pub async fn create_aanvraag(
     let Some(kvk) = session_kvk(&session).await else {
         return Err(forbidden());
     };
-    let partij: String = session
-        .get(SESSION_KEY_EH_PARTIJ)
-        .await
-        .ok()
-        .flatten()
-        .unwrap_or_else(|| "Onbekende organisatie".to_string());
+    let partij = partijnaam_voor(&state, &kvk).await?;
     let vandaag = Utc::now().format("%Y-%m-%d").to_string();
     let jaar = subsidiejaar_voor(&vandaag);
 
