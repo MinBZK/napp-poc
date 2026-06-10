@@ -254,11 +254,11 @@ const BESLISSING_LABELS = {
                     @input="bezwaarForm.adres = veld($event)"
                   ></nldd-text-field>
                 </nldd-form-field>
-                <nldd-checkbox
+                <nldd-checkbox-field
                   :checked="bezwaarForm.ondertekend || undefined"
-                  text="Ik onderteken dit bezwaarschrift"
-                  @change="bezwaarForm.ondertekend = !bezwaarForm.ondertekend"
-                ></nldd-checkbox>
+                  label="Ik onderteken dit bezwaarschrift"
+                  @change="bezwaarForm.ondertekend = $event.detail?.checked ?? !bezwaarForm.ondertekend"
+                ></nldd-checkbox-field>
                 <template v-if="bezwaarFout">
                   <nldd-spacer size="8"></nldd-spacer>
                   <NBanner variant="critical" :text="bezwaarFout" />
@@ -330,27 +330,29 @@ const BESLISSING_LABELS = {
                       herstel (artikel 6:6).
                     </nldd-form-field-help-text>
                   </nldd-form-field>
-                  <nldd-checkbox
+                  <nldd-checkbox-field
                     :checked="bezwaarForm.ondertekend || undefined"
-                    text="Ik onderteken dit bezwaarschrift"
-                    @change="bezwaarForm.ondertekend = !bezwaarForm.ondertekend"
-                  ></nldd-checkbox>
+                    label="Ik onderteken dit bezwaarschrift"
+                    @change="bezwaarForm.ondertekend = $event.detail?.checked ?? !bezwaarForm.ondertekend"
+                  ></nldd-checkbox-field>
                   <template v-if="bezwaarFout">
                     <nldd-spacer size="8"></nldd-spacer>
                     <NBanner variant="critical" :text="bezwaarFout" />
                   </template>
                   <nldd-form-actions>
-                    <nldd-button
-                      variant="primary"
-                      type="submit"
-                      text="Bezwaarschrift indienen"
-                      :disabled="bezwaarBezig || undefined"
-                    ></nldd-button>
-                    <nldd-button
-                      variant="secondary"
-                      text="Annuleren"
-                      @click="bezwaarOpen = false"
-                    ></nldd-button>
+                    <nldd-button-group orientation="horizontal">
+                      <nldd-button
+                        variant="primary"
+                        type="submit"
+                        text="Bezwaarschrift indienen"
+                        :disabled="bezwaarBezig || undefined"
+                      ></nldd-button>
+                      <nldd-button
+                        variant="secondary"
+                        text="Annuleren"
+                        @click="bezwaarOpen = false"
+                      ></nldd-button>
+                    </nldd-button-group>
                   </nldd-form-actions>
                 </nldd-form>
               </nldd-container>

@@ -353,17 +353,19 @@ watch(() => session.beoordelaar, alles);
               <NBanner variant="critical" :text="afwijsFout" />
             </template>
             <nldd-form-actions>
-              <nldd-button
-                variant="primary"
-                type="submit"
-                text="Afwijzen"
-                :disabled="claimBezig || !afwijsReden.trim() || undefined"
-              ></nldd-button>
-              <nldd-button
-                variant="secondary"
-                text="Annuleren"
-                @click="afwijsOpen = false"
-              ></nldd-button>
+              <nldd-button-group orientation="horizontal">
+                <nldd-button
+                  variant="primary"
+                  type="submit"
+                  text="Afwijzen"
+                  :disabled="claimBezig || !afwijsReden.trim() || undefined"
+                ></nldd-button>
+                <nldd-button
+                  variant="secondary"
+                  text="Annuleren"
+                  @click="afwijsOpen = false"
+                ></nldd-button>
+              </nldd-button-group>
             </nldd-form-actions>
           </nldd-form>
         </nldd-container>

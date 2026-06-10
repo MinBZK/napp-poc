@@ -326,17 +326,19 @@ watch(kvk, laad);
               <NBanner variant="critical" :text="bewerkFout" />
             </template>
             <nldd-form-actions>
-              <nldd-button
-                variant="primary"
-                type="submit"
-                text="Opslaan"
-                :disabled="bewerkBezig || undefined"
-              ></nldd-button>
-              <nldd-button
-                variant="secondary"
-                text="Annuleren"
-                @click="bewerkOpen = false"
-              ></nldd-button>
+              <nldd-button-group orientation="horizontal">
+                <nldd-button
+                  variant="primary"
+                  type="submit"
+                  text="Opslaan"
+                  :disabled="bewerkBezig || undefined"
+                ></nldd-button>
+                <nldd-button
+                  variant="secondary"
+                  text="Annuleren"
+                  @click="bewerkOpen = false"
+                ></nldd-button>
+              </nldd-button-group>
             </nldd-form-actions>
           </nldd-form>
         </nldd-container>

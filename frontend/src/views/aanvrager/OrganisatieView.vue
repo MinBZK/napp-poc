@@ -311,17 +311,19 @@ watch(() => session.aanvrager, laadAlles);
               <NBanner variant="critical" :text="rekeningFout" />
             </template>
             <nldd-form-actions>
-              <nldd-button
-                variant="primary"
-                type="submit"
-                text="Opslaan"
-                :disabled="rekeningBezig || undefined"
-              ></nldd-button>
-              <nldd-button
-                variant="secondary"
-                text="Annuleren"
-                @click="rekeningOpen = false"
-              ></nldd-button>
+              <nldd-button-group orientation="horizontal">
+                <nldd-button
+                  variant="primary"
+                  type="submit"
+                  text="Opslaan"
+                  :disabled="rekeningBezig || undefined"
+                ></nldd-button>
+                <nldd-button
+                  variant="secondary"
+                  text="Annuleren"
+                  @click="rekeningOpen = false"
+                ></nldd-button>
+              </nldd-button-group>
             </nldd-form-actions>
           </nldd-form>
         </nldd-container>
