@@ -319,7 +319,7 @@ watch(item, (i) => {
           </template>
 
           <!-- Nog geen bezwaar: informatie + formulier -->
-          <template v-else>
+          <template v-else-if="!item.bezwaar">
             <nldd-box>
               <nldd-container padding="16" gap="8">
                 <nldd-rich-text>
