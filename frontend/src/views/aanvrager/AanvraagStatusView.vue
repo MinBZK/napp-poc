@@ -244,7 +244,7 @@ watch(item, (i) => {
 
         <nldd-title size="4"><h3>Verloop van uw aanvraag</h3></nldd-title>
         <nldd-spacer size="12"></nldd-spacer>
-        <LifecycleTimeline :aanvraag="item.aanvraag" :besluit="item.besluit" />
+        <LifecycleTimeline :aanvraag="item.aanvraag" :besluit="item.besluit" :bezwaar="item.bezwaar" />
 
         <template v-if="item.besluit?.bezwaartermijn_einddatum">
           <nldd-spacer size="24"></nldd-spacer>

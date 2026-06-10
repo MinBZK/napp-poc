@@ -5,9 +5,19 @@ import { datum } from '../format.js';
 const props = defineProps({
   aanvraag: { type: Object, required: true },
   besluit: { type: Object, default: null },
+  bezwaar: { type: Object, default: null },
 });
 
-// AWB-procedure (RFC-008): AANVRAAG → BEHANDELING → BESLUIT → BEKENDMAKING → BEZWAAR
+const BESLISSING_LABELS = {
+  NIET_ONTVANKELIJK: 'niet-ontvankelijk',
+  ONGEGROND: 'ongegrond',
+  GEGROND: 'gegrond',
+};
+
+// AWB-procedure (RFC-008): AANVRAAG → BEHANDELING → BESLUIT → BEKENDMAKING
+// → BEZWAAR; is er een bezwaarschrift, dan loopt de bezwaarprocedure
+// (BEZWAARSCHRIFT → HERSTEL → BEHANDELING → BESLISSING) als vervolg in
+// dezelfde tijdlijn door.
 const stappen = computed(() => {
   const status = props.aanvraag.status;
   const b = props.besluit;
@@ -18,7 +28,7 @@ const stappen = computed(() => {
     BEKENDMAKING: status === 'BEZWAAR',
     BEZWAAR: status === 'BEZWAAR',
   };
-  return [
+  const basis = [
     {
       key: 'AANVRAAG',
       titel: 'Aanvraag ingediend',
@@ -58,11 +68,64 @@ const stappen = computed(() => {
       bereikt: bereikt.BEZWAAR,
     },
   ];
+
+  const bz = props.bezwaar;
+  if (!bz) return basis;
+
+  const beslist = !!bz.beslissing;
+  const inBehandeling = bz.status === 'BEHANDELING' || beslist;
+  const vervolg = [
+    {
+      key: 'BEZWAARSCHRIFT',
+      titel: 'Bezwaar ingediend',
+      detail: `${datum(bz.ontvangen_op)} (AWB 6:4)`,
+      bereikt: true,
+    },
+  ];
+  // Herstel alleen tonen als die fase loopt of werkelijk is doorlopen.
+  const herstelDoorlopen = bz.toets?.outputs?.herstelgelegenheid_geboden === true;
+  if (bz.status === 'HERSTEL' || herstelDoorlopen) {
+    vervolg.push({
+      key: 'HERSTEL',
+      titel: 'Herstel van het bezwaarschrift',
+      detail:
+        bz.status === 'HERSTEL'
+          ? 'Vul de ontbrekende onderdelen aan (AWB 6:6)'
+          : 'Het verzuim is hersteld (AWB 6:6)',
+      bereikt: true,
+    });
+  }
+  vervolg.push(
+    {
+      key: 'BEZWAAR_BEHANDELING',
+      titel: 'Behandeling van het bezwaar',
+      detail:
+        bz.gehoord === true
+          ? 'U bent gehoord (AWB 7:2)'
+          : bz.gehoord === false
+            ? 'Van het horen is afgezien (AWB 7:3)'
+            : 'U wordt gehoord, tenzij daarvan mag worden afgezien (AWB 7:2/7:3)',
+      bereikt: inBehandeling,
+    },
+    {
+      key: 'BESLISSING',
+      titel: beslist
+        ? `Beslissing op bezwaar: ${BESLISSING_LABELS[bz.beslissing] ?? bz.beslissing}`
+        : 'Beslissing op bezwaar',
+      detail: beslist
+        ? `${datum(bz.beslissing_datum)} (AWB 7:11)`
+        : bz.beslistermijn_einddatum
+          ? `Uiterlijk ${datum(bz.beslistermijn_einddatum)} (AWB 7:10)`
+          : 'Na de behandeling (AWB 7:10)',
+      bereikt: beslist,
+    },
+  );
+  return [...basis, ...vervolg];
 });
 </script>
 
 <template>
-  <nldd-list variant="simple">
+  <nldd-list variant="simple" no-dividers>
     <nldd-list-item v-for="(stap, i) in stappen" :key="stap.key" size="md">
       <nldd-timeline-track-cell
         :step="stap.bereikt ? 'past' : 'future'"

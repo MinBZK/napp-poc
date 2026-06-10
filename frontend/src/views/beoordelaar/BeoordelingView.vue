@@ -286,7 +286,7 @@ onMounted(laad);
               <nldd-spacer size="24"></nldd-spacer>
               <nldd-title size="4"><h3>Verloop</h3></nldd-title>
               <nldd-spacer size="12"></nldd-spacer>
-              <LifecycleTimeline :aanvraag="item.aanvraag" :besluit="item.besluit" />
+              <LifecycleTimeline :aanvraag="item.aanvraag" :besluit="item.besluit" :bezwaar="item.bezwaar" />
               <nldd-spacer size="16"></nldd-spacer>
               <nldd-button
                 v-if="item.aanvraag.status === 'BESLUIT'"
