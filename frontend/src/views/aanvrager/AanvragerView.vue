@@ -171,7 +171,7 @@ watch(() => session.aanvrager, laadAanvragen);
         <nldd-title size="2">
           <span slot="overline">{{ session.aanvrager.partij_naam }} · KVK {{ session.aanvrager.kvk_nummer }}</span>
           <h2>Uw subsidieaanvragen</h2>
-          <div slot="actions">
+          <div v-if="aanvragen.length" slot="actions">
             <nldd-button
               variant="primary"
               text="Nieuwe aanvraag"
