@@ -59,8 +59,27 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!(database = %database_url, "database gereed");
 
     // OIDC (SSO Rijk) — alleen actief wanneer de OIDC_* variabelen gezet zijn.
-    let oidc_config = regelrecht_auth::parse_oidc_from_env()
+    let mut oidc_config = regelrecht_auth::parse_oidc_from_env()
         .map_err(|e| anyhow::anyhow!("OIDC-configuratie ongeldig: {e}"))?;
+    // ZAD provisiont per app een eigen Keycloak-realm; wie tot het realm is
+    // toegelaten, mag de beoordelingsomgeving in. Zonder expliciete
+    // OIDC_REQUIRED_ROLE eist de auth-crate de rol `allowed-user`, die in
+    // ZAD-realms niet bestaat — val dan terug op de composietrol die elke
+    // realm-gebruiker draagt.
+    let role_overridden = std::env::var("OIDC_REQUIRED_ROLE")
+        .map(|v| !v.is_empty())
+        .unwrap_or(false);
+    if !role_overridden {
+        if let Some(config) = oidc_config.as_mut() {
+            if let Some(role) = realm_membership_role(&config.issuer_url) {
+                tracing::info!(
+                    role,
+                    "OIDC_REQUIRED_ROLE niet gezet; realm-lidmaatschap volstaat als toegangseis"
+                );
+                config.required_role = role;
+            }
+        }
+    }
     let (oidc_client, end_session_url) = if let Some(ref config) = oidc_config {
         match regelrecht_auth::discover_client(config).await {
             Ok(result) => {
@@ -227,6 +246,23 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// De Keycloak-composietrol die elk lid van een realm draagt
+/// (`default-roles-<realm>`), afgeleid uit de issuer-URL. Geeft `None` voor
+/// issuers zonder `/realms/`-pad (niet-Keycloak), zodat de strikte default
+/// van de auth-crate dan blijft gelden.
+fn realm_membership_role(issuer_url: &str) -> Option<String> {
+    let realm = issuer_url
+        .split("/realms/")
+        .nth(1)?
+        .trim_end_matches('/')
+        .split('/')
+        .next()?;
+    if realm.is_empty() {
+        return None;
+    }
+    Some(format!("default-roles-{realm}"))
+}
+
 /// Dezelfde portal-rewrites als de vite-dev-server: extensieloze paden onder
 /// /aanvrager en /beoordelaar wijzen naar de entry-html van dat portaal,
 /// zodat ServeDir niet terugvalt op index.html (het publieke portaal).
@@ -256,7 +292,29 @@ async fn rewrite_portal_path(mut req: Request) -> Request {
 
 #[cfg(test)]
 mod tests {
-    use super::portal_rewrite_target;
+    use super::{portal_rewrite_target, realm_membership_role};
+
+    #[test]
+    fn realm_rol_uit_keycloak_issuer() {
+        assert_eq!(
+            realm_membership_role("https://keycloak.rijksapp.nl/realms/napp-avm-odcn-production")
+                .as_deref(),
+            Some("default-roles-napp-avm-odcn-production")
+        );
+        assert_eq!(
+            realm_membership_role("https://keycloak.example.com/realms/demo/").as_deref(),
+            Some("default-roles-demo")
+        );
+    }
+
+    #[test]
+    fn geen_realm_rol_voor_niet_keycloak_issuer() {
+        assert_eq!(realm_membership_role("https://idp.example.com"), None);
+        assert_eq!(
+            realm_membership_role("https://keycloak.example.com/realms/"),
+            None
+        );
+    }
 
     #[test]
     fn portal_paden_wijzen_naar_eigen_entry() {
