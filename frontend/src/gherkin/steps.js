@@ -76,6 +76,17 @@ export const stepDefinitions = [
     },
   },
   {
+    // Feiten uit de orchestratie (databronnen) als wet-parameters; zelfde
+    // mechaniek als de aanvraagdata.
+    pattern: /^the following facts:$/,
+    execute: (ctx, _engine, _match, step) => {
+      if (!step.dataTable) return;
+      for (const row of step.dataTable) {
+        ctx.parameters[row[0]] = parseValue(row[1] ?? '');
+      }
+    },
+  },
+  {
     pattern: /^the subsidiebesluit is executed$/,
     execute: (ctx, engine) => {
       try {
@@ -200,6 +211,74 @@ export const stepDefinitions = [
       }
       ctx.executed = true;
     },
+  },
+  {
+    // Wpp art. 13: eenmalige verstrekking per subsidiejaar.
+    pattern: /^the beschikbaarheid of artikel 13 is evaluated$/,
+    execute: (ctx, engine) => {
+      try {
+        ctx.result = engine.executeMultiple(
+          WPP_ID,
+          ['onderdeel_beschikbaar'],
+          ctx.parameters,
+          ctx.calculationDate ?? '2026-06-01',
+        );
+        ctx.error = null;
+      } catch (e) {
+        ctx.error = e;
+        ctx.result = null;
+      }
+      ctx.executed = true;
+    },
+  },
+  {
+    // Wpp art. 27: rekening op naam van de rechtspersoon.
+    pattern: /^the rekening-regels of artikel 27 are evaluated$/,
+    execute: (ctx, engine) => {
+      try {
+        ctx.result = engine.executeMultiple(
+          WPP_ID,
+          ['rekening_aanvaardbaar', 'mag_rekening_wijzigen', 'uitbetaling_aangehouden'],
+          ctx.parameters,
+          ctx.calculationDate ?? '2026-06-01',
+        );
+        ctx.error = null;
+      } catch (e) {
+        ctx.error = e;
+        ctx.result = null;
+      }
+      ctx.executed = true;
+    },
+  },
+  {
+    // Kieswet G 1: registratie-eisen voor een aanduiding.
+    pattern: /^the registratie-eisen of Kieswet G 1 are evaluated$/,
+    execute: (ctx, engine) => {
+      try {
+        ctx.result = engine.executeMultiple(
+          'kieswet',
+          [
+            'voldoet_aan_registratie_eisen',
+            'voldoet_eis_inschrijving',
+            'voldoet_eis_rechtsvorm',
+            'voldoet_eis_naam',
+          ],
+          ctx.parameters,
+          ctx.calculationDate ?? '2026-06-01',
+        );
+        ctx.error = null;
+      } catch (e) {
+        ctx.error = e;
+        ctx.result = null;
+      }
+      ctx.executed = true;
+    },
+  },
+  {
+    // Generieke boolean-assertie op een wet-output.
+    pattern: /^the output "([^"]+)" is (true|false)$/,
+    execute: (ctx, _engine, match) =>
+      assertOutput(ctx, match[1], match[2] === 'true'),
   },
   {
     pattern: /^the verlengde einddatum is "([^"]+)"$/,

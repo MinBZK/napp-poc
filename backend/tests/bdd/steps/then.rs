@@ -114,3 +114,9 @@ fn check_beslistermijn_einddatum(world: &mut NappWorld, expected: String) {
 fn check_voorschotpercentage(world: &mut NappWorld, expected: String) {
     assert_amount_output(world, "voorschotpercentage", expected.parse().unwrap());
 }
+
+/// Generieke boolean-assertie op een wet-output.
+#[then(regex = r#"^the output "([^"]+)" is (true|false)$"#)]
+fn check_bool_output(world: &mut NappWorld, name: String, expected: String) {
+    assert_bool_output(world, &name, expected == "true");
+}

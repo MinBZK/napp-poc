@@ -74,3 +74,37 @@ fn execute_bezwaartermijn_keten(world: &mut NappWorld) {
     world.parameters.insert("einddatum".to_string(), einddatum);
     world.execute("algemene_termijnenwet", &["verlengde_einddatum"]);
 }
+
+/// Wpp art. 13: eenmalige verstrekking per subsidiejaar.
+#[when("the beschikbaarheid of artikel 13 is evaluated")]
+fn execute_artikel_13(world: &mut NappWorld) {
+    world.execute("wet_op_de_politieke_partijen", &["onderdeel_beschikbaar"]);
+}
+
+/// Wpp art. 27: rekening op naam van de rechtspersoon, wijzigen alleen
+/// door het tekenbevoegd bestuur, aanhouden zonder rekening.
+#[when("the rekening-regels of artikel 27 are evaluated")]
+fn execute_artikel_27(world: &mut NappWorld) {
+    world.execute(
+        "wet_op_de_politieke_partijen",
+        &[
+            "rekening_aanvaardbaar",
+            "mag_rekening_wijzigen",
+            "uitbetaling_aangehouden",
+        ],
+    );
+}
+
+/// Kieswet G 1: de registratie-eisen voor een aanduiding.
+#[when("the registratie-eisen of Kieswet G 1 are evaluated")]
+fn execute_kieswet_g1(world: &mut NappWorld) {
+    world.execute(
+        "kieswet",
+        &[
+            "voldoet_aan_registratie_eisen",
+            "voldoet_eis_inschrijving",
+            "voldoet_eis_rechtsvorm",
+            "voldoet_eis_naam",
+        ],
+    );
+}

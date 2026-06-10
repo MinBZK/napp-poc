@@ -39,3 +39,15 @@ fn set_application_data(world: &mut NappWorld, step: &Step) {
         world.parameters.insert(key, value);
     }
 }
+
+/// Feiten uit de orchestratie (databronnen) die als parameters de wet in
+/// gaan — zelfde mechaniek als de aanvraagdata, andere lading.
+#[given(regex = r"^the following facts:$")]
+fn set_facts(world: &mut NappWorld, step: &Step) {
+    let table = step.table.as_ref().expect("step requires a data table");
+    for row in &table.rows {
+        let key = row[0].trim().to_string();
+        let value = parse_value(row[1].trim());
+        world.parameters.insert(key, value);
+    }
+}

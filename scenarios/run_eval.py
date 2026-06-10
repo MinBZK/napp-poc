@@ -21,6 +21,7 @@ EXTRA = [
     (LAW / "regeling_subsidiebedragen" / "2026-01-01.yaml").read_text(),
     (LAW / "besluit_subsidiering_decentrale_politieke_partijen" / "2026-01-01.yaml").read_text(),
     (LAW / "algemene_wet_bestuursrecht" / "1994-01-01.yaml").read_text(),
+    (LAW / "kieswet" / "1989-09-28.yaml").read_text(),
 ]
 
 

@@ -11,6 +11,7 @@ import regelingYaml from '../../law/regeling_subsidiebedragen/2026-01-01.yaml?ra
 import besluitDecentraalYaml from '../../law/besluit_subsidiering_decentrale_politieke_partijen/2026-01-01.yaml?raw';
 import awbYaml from '../../law/algemene_wet_bestuursrecht/1994-01-01.yaml?raw';
 import termijnenwetYaml from '../../law/algemene_termijnenwet/1964-04-01.yaml?raw';
+import kieswetYaml from '../../law/kieswet/1989-09-28.yaml?raw';
 
 let enginePromise = null;
 
@@ -35,6 +36,7 @@ export function getEngine() {
     engine.loadLaw(besluitDecentraalYaml);
     engine.loadLaw(awbYaml);
     engine.loadLaw(termijnenwetYaml);
+    engine.loadLaw(kieswetYaml);
     return engine;
   })();
   return enginePromise;
