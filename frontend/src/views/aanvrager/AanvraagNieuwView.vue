@@ -268,8 +268,10 @@ watch(() => session.aanvrager, laadRegistratie);
               @change="leden = num($event)"
             ></nldd-number-field>
             <nldd-form-field-help-text>
-              Eigen opgave, vereist voor de landelijke subsidie: leden die
-              jaarlijks ten minste € 12 contributie betalen (minimaal 1.000).
+              Eigen opgave, alleen vereist voor de landelijke subsidie: leden
+              met vergader- en stemrecht die jaarlijks ten minste € 12
+              contributie betalen (minimaal 1.000). Voor decentrale
+              onderdelen geldt geen ledeneis.
             </nldd-form-field-help-text>
           </nldd-form-field>
           <nldd-spacer size="24"></nldd-spacer>
