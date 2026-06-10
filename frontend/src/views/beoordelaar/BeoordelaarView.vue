@@ -26,8 +26,6 @@ const utilityItems = computed(() =>
     ? [{ text: `${session.beoordelaar.naam}`, icon: 'person', key: 'noop' }]
     : [],
 );
-function onUtility() {}
-
 const aanvragen = ref([]);
 const betaalopdrachten = ref([]);
 
@@ -68,8 +66,7 @@ watch(() => session.beoordelaar, laad);
       slot="header"
       subtitle="Beoordelingsomgeving"
       :items="navItems"
-      :utility-items="utilityItems"
-      @utility="onUtility"
+      portal="beoordelaar"
     />
 
     <!-- Niet ingelogd: SSO Rijk -->

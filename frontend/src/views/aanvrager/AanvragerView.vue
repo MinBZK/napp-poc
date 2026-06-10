@@ -35,12 +35,6 @@ const navItems = computed(() =>
       ]
     : [],
 );
-const utilityItems = computed(() =>
-  session.aanvrager
-    ? [{ text: `Uitloggen (${session.aanvrager.partij_naam})`, icon: 'logout', key: 'logout' }]
-    : [],
-);
-
 async function login() {
   loginFout.value = '';
   if (!/^\d{8}$/.test(kvk.value.trim())) {
@@ -56,12 +50,6 @@ async function login() {
   } finally {
     bezig.value = false;
   }
-}
-
-async function logout() {
-  await api.eherkenningLogout();
-  await refreshSession();
-  aanvragen.value = [];
 }
 
 async function laadAanvragen() {
@@ -91,8 +79,7 @@ watch(() => session.aanvrager, laadAanvragen);
       slot="header"
       subtitle="Subsidieportaal politieke partijen"
       :items="navItems"
-      :utility-items="utilityItems"
-      @utility="logout"
+      portal="aanvrager"
     />
 
     <!-- Niet ingelogd: eHerkenning (gemockt) -->

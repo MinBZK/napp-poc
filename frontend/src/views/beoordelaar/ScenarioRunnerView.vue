@@ -140,6 +140,7 @@ onMounted(run);
     <PortalHeader
       slot="header"
       subtitle="Beoordelingsomgeving"
+      portal="beoordelaar"
       :items="[{ text: 'Werkvoorraad', to: '/' }, { text: 'Scenario’s', to: '/scenarios' }]"
     />
 

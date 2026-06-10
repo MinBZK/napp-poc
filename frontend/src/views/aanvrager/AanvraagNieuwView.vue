@@ -160,6 +160,7 @@ watch(() => session.aanvrager, laadRegistratie);
     <PortalHeader
       slot="header"
       subtitle="Subsidieportaal politieke partijen"
+      portal="aanvrager"
       :items="[{ text: 'Mijn aanvragen', to: '/' }, { text: 'Nieuwe aanvraag', to: '/nieuw' }]"
     />
 
