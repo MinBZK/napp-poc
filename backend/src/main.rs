@@ -86,6 +86,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/aanvragen", post(handlers::create_aanvraag))
         .route("/api/aanvragen/proef", post(handlers::proef_aanspraken))
         .route("/api/aanvragen", get(handlers::list_aanvragen))
+        .route("/api/mijn-aanvragen", get(handlers::list_mijn_aanvragen))
+        .route("/api/mijn-aanvragen/{id}", get(handlers::get_mijn_aanvraag))
         .route("/api/aanvragen/{id}", get(handlers::get_aanvraag))
         .route(
             "/api/aanvragen/{id}/proefberekening",

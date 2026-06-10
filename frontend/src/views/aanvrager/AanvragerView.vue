@@ -56,7 +56,7 @@ async function laadAanvragen() {
   if (!session.aanvrager) return;
   laden.value = true;
   try {
-    aanvragen.value = await api.aanvragen();
+    aanvragen.value = await api.mijnAanvragen();
   } finally {
     laden.value = false;
   }

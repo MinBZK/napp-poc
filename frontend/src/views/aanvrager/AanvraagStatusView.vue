@@ -27,7 +27,7 @@ function componentLabel(c) {
 
 onMounted(async () => {
   try {
-    item.value = await api.aanvraag(route.params.id);
+    item.value = await api.mijnAanvraag(route.params.id);
   } catch (e) {
     fout.value = e.message;
   }

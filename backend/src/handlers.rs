@@ -412,20 +412,10 @@ pub async fn proef_aanspraken(
     })))
 }
 
-pub async fn list_aanvragen(
-    State(state): State<AppState>,
-    session: Session,
-) -> Result<Json<serde_json::Value>, ApiError> {
-    // Beoordelaar ziet alles; aanvrager alleen de eigen aanvragen.
-    let beoordelaar = session_beoordelaar(&session).await;
-    let kvk = session_kvk(&session).await;
-    let aanvragen = match (&beoordelaar, &kvk) {
-        (Some(_), _) => db::list_aanvragen(&state.pool, None).await,
-        (None, Some(kvk)) => db::list_aanvragen(&state.pool, Some(kvk)).await,
-        (None, None) => return Err(forbidden()),
-    }
-    .map_err(internal_error)?;
-
+async fn aanvragen_met_besluit(
+    state: &AppState,
+    aanvragen: Vec<db::Aanvraag>,
+) -> Result<Vec<serde_json::Value>, ApiError> {
     let mut result = Vec::with_capacity(aanvragen.len());
     for aanvraag in aanvragen {
         let besluit = db::get_besluit_by_aanvraag(&state.pool, &aanvraag.id)
@@ -433,7 +423,57 @@ pub async fn list_aanvragen(
             .map_err(internal_error)?;
         result.push(json!({"aanvraag": aanvraag, "besluit": besluit}));
     }
-    Ok(Json(json!(result)))
+    Ok(result)
+}
+
+/// Aanvragersportaal: uitsluitend de aanvragen van de eigen rechtspersoon.
+/// Bewust een eigen endpoint: een sessie kan beide rollen tegelijk dragen
+/// en mag in dit portaal nooit andermans dossiers zien.
+pub async fn list_mijn_aanvragen(
+    State(state): State<AppState>,
+    session: Session,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let Some(kvk) = session_kvk(&session).await else {
+        return Err(forbidden());
+    };
+    let aanvragen = db::list_aanvragen(&state.pool, Some(&kvk))
+        .await
+        .map_err(internal_error)?;
+    Ok(Json(json!(aanvragen_met_besluit(&state, aanvragen).await?)))
+}
+
+pub async fn get_mijn_aanvraag(
+    State(state): State<AppState>,
+    session: Session,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let Some(kvk) = session_kvk(&session).await else {
+        return Err(forbidden());
+    };
+    let Some(aanvraag) = db::get_aanvraag(&state.pool, &id).await.map_err(internal_error)? else {
+        return Err(not_found());
+    };
+    if aanvraag.kvk_nummer != kvk {
+        return Err(not_found());
+    }
+    let besluit = db::get_besluit_by_aanvraag(&state.pool, &id)
+        .await
+        .map_err(internal_error)?;
+    Ok(Json(json!({"aanvraag": aanvraag, "besluit": besluit})))
+}
+
+/// Beoordelingsomgeving: de volledige werkvoorraad.
+pub async fn list_aanvragen(
+    State(state): State<AppState>,
+    session: Session,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    if session_beoordelaar(&session).await.is_none() {
+        return Err(forbidden());
+    }
+    let aanvragen = db::list_aanvragen(&state.pool, None)
+        .await
+        .map_err(internal_error)?;
+    Ok(Json(json!(aanvragen_met_besluit(&state, aanvragen).await?)))
 }
 
 pub async fn get_aanvraag(
@@ -441,15 +481,12 @@ pub async fn get_aanvraag(
     session: Session,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let beoordelaar = session_beoordelaar(&session).await;
-    let kvk = session_kvk(&session).await;
+    if session_beoordelaar(&session).await.is_none() {
+        return Err(forbidden());
+    }
     let Some(aanvraag) = db::get_aanvraag(&state.pool, &id).await.map_err(internal_error)? else {
         return Err(not_found());
     };
-    let allowed = beoordelaar.is_some() || kvk.as_deref() == Some(aanvraag.kvk_nummer.as_str());
-    if !allowed {
-        return Err(forbidden());
-    }
     let besluit = db::get_besluit_by_aanvraag(&state.pool, &id)
         .await
         .map_err(internal_error)?;
