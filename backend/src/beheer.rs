@@ -16,7 +16,9 @@ use serde::Deserialize;
 use serde_json::json;
 use tower_sessions::Session;
 
-use crate::handlers::{bad_request, forbidden, internal_error, not_found, session_beoordelaar, ApiError};
+use crate::handlers::{
+    bad_request, forbidden, internal_error, not_found, session_beoordelaar, ApiError,
+};
 use crate::register;
 use crate::state::AppState;
 
@@ -49,7 +51,9 @@ async fn validate_moederpartij(
         return Ok(None);
     };
     if moeder == eigen_kvk {
-        return Err(bad_request("Een partij kan niet haar eigen moederpartij zijn."));
+        return Err(bad_request(
+            "Een partij kan niet haar eigen moederpartij zijn.",
+        ));
     }
     if register::partij_by_kvk(&state.pool, moeder)
         .await
@@ -100,10 +104,7 @@ pub async fn list_partijen(
     })))
 }
 
-async fn partij_detail(
-    state: &AppState,
-    kvk: &str,
-) -> Result<Option<serde_json::Value>, ApiError> {
+async fn partij_detail(state: &AppState, kvk: &str) -> Result<Option<serde_json::Value>, ApiError> {
     let Some(partij) = register::partij_by_kvk(&state.pool, kvk)
         .await
         .map_err(internal_error)?
@@ -229,6 +230,12 @@ mod tests {
                 termijnenwet: String::new(),
                 kieswet: String::new(),
             }),
+            procedure: Arc::new(
+                crate::engine::beschikking_procedure(include_str!(
+                    "../../law/wet_op_de_politieke_partijen/2026-01-01.yaml"
+                ))
+                .expect("procedure uit de wet"),
+            ),
             oidc_client: None,
             oidc_config: None,
             end_session_url: None,

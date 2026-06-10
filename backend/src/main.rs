@@ -68,9 +68,12 @@ async fn main() -> anyhow::Result<()> {
         (None, None)
     };
 
+    let procedure = Arc::new(engine::beschikking_procedure(&corpus.wpp)?);
+
     let app_state = AppState {
         pool,
         corpus,
+        procedure,
         oidc_client,
         oidc_config,
         end_session_url,
@@ -165,7 +168,9 @@ async fn main() -> anyhow::Result<()> {
         .with_state(app_state)
         .layer(session_layer)
         .layer(TraceLayer::new_for_http())
-        .fallback_service(ServeDir::new(&static_dir).not_found_service(ServeFile::new(&index_file)));
+        .fallback_service(
+            ServeDir::new(&static_dir).not_found_service(ServeFile::new(&index_file)),
+        );
 
     let port: u16 = std::env::var("NAPP_PORT")
         .ok()

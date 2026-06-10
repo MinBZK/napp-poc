@@ -246,12 +246,13 @@ pub async fn insert_aanvraag(
     subsidiejaar: i64,
     componenten_json: &str,
     parameters_json: &str,
+    status: &str,
     aanvraag_datum: &str,
     beslistermijn_einddatum: Option<&str>,
 ) -> anyhow::Result<()> {
     sqlx::query(
-        "INSERT INTO aanvragen (id, kvk_nummer, partij_naam, subsidiejaar, componenten, parameters, aanvraag_datum, beslistermijn_einddatum)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO aanvragen (id, kvk_nummer, partij_naam, subsidiejaar, componenten, parameters, status, aanvraag_datum, beslistermijn_einddatum)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(id)
     .bind(kvk_nummer)
@@ -259,6 +260,7 @@ pub async fn insert_aanvraag(
     .bind(subsidiejaar)
     .bind(componenten_json)
     .bind(parameters_json)
+    .bind(status)
     .bind(aanvraag_datum)
     .bind(beslistermijn_einddatum)
     .execute(pool)
@@ -324,7 +326,7 @@ pub async fn bezette_componenten(
     let mut bezet = std::collections::HashMap::new();
     for row in rows {
         let status: String = row.get("status");
-        if status == "BEHANDELING" {
+        if status == crate::engine::STAGE_BEHANDELING {
             let componenten: Vec<Component> =
                 serde_json::from_str(row.get::<String, _>("componenten").as_str())
                     .unwrap_or_default();
@@ -373,14 +375,12 @@ pub async fn landelijke_opgaven(
     let mut opgaven = Vec::new();
     for row in rows {
         let componenten: Vec<Component> =
-            serde_json::from_str(row.get::<String, _>("componenten").as_str())
-                .unwrap_or_default();
+            serde_json::from_str(row.get::<String, _>("componenten").as_str()).unwrap_or_default();
         let Some(landelijk) = componenten.iter().find(|c| c.soort == "LANDELIJK") else {
             continue;
         };
         let parameters: serde_json::Map<String, serde_json::Value> =
-            serde_json::from_str(row.get::<String, _>("parameters").as_str())
-                .unwrap_or_default();
+            serde_json::from_str(row.get::<String, _>("parameters").as_str()).unwrap_or_default();
         opgaven.push(LandelijkeOpgave {
             zetels: landelijk.zetels,
             parameters,

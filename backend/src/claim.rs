@@ -519,6 +519,12 @@ mod tests {
                 // tests gebruiken daarvoor de echte wettekst.
                 kieswet: include_str!("../../law/kieswet/1989-09-28.yaml").to_string(),
             }),
+            procedure: Arc::new(
+                crate::engine::beschikking_procedure(include_str!(
+                    "../../law/wet_op_de_politieke_partijen/2026-01-01.yaml"
+                ))
+                .expect("procedure uit de wet"),
+            ),
             oidc_client: None,
             oidc_config: None,
             end_session_url: None,
@@ -735,7 +741,10 @@ mod tests {
             claim.hr_toets["wettelijke_toets"]["voldoet_aan_registratie_eisen"],
             true
         );
-        assert_eq!(claim.hr_toets["wettelijke_toets"]["voldoet_eis_rechtsvorm"], true);
+        assert_eq!(
+            claim.hr_toets["wettelijke_toets"]["voldoet_eis_rechtsvorm"],
+            true
+        );
 
         let result = mijn_claim(State(state), aanvrager_session(NIEUW).await)
             .await

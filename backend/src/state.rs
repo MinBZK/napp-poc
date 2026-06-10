@@ -10,6 +10,9 @@ use sqlx::SqlitePool;
 pub struct AppState {
     pub pool: SqlitePool,
     pub corpus: Arc<LawCorpus>,
+    /// De beschikking-procedure uit de wet (RFC-008): de orchestratie
+    /// valideert elke statusovergang tegen deze definitie.
+    pub procedure: Arc<crate::engine::Procedure>,
     pub oidc_client: Option<Arc<ConfiguredClient>>,
     pub oidc_config: Option<OidcConfig>,
     pub end_session_url: Option<String>,

@@ -19,6 +19,80 @@ pub const AWB_ID: &str = "algemene_wet_bestuursrecht";
 pub const ATW_ID: &str = "algemene_termijnenwet";
 pub const KIESWET_ID: &str = "kieswet";
 
+// Stage-namen waarnaar de orchestratie verwijst. Hun bestaan en volgorde
+// worden bij het laden gecontroleerd tegen de proceduredefinitie in de wet
+// (RFC-008): hernoemt of herordent de wet de stages, dan faalt de start of
+// de transitie — de wet is leidend, niet deze constanten.
+pub const STAGE_AANVRAAG: &str = "AANVRAAG";
+pub const STAGE_BEHANDELING: &str = "BEHANDELING";
+pub const STAGE_BESLUIT: &str = "BESLUIT";
+pub const STAGE_BEKENDMAKING: &str = "BEKENDMAKING";
+pub const STAGE_BEZWAAR: &str = "BEZWAAR";
+
+/// De beschikking-procedure zoals de wet die definieert: de geordende
+/// lifecycle-stages. De orchestratie bewaart per aanvraag de huidige stage
+/// (RFC-008: engine stateless, orchestratie persisteert) en valideert elke
+/// overgang tegen deze volgorde.
+#[derive(Debug, Clone)]
+pub struct Procedure {
+    stages: Vec<String>,
+}
+
+impl Procedure {
+    fn index(&self, stage: &str) -> anyhow::Result<usize> {
+        self.stages
+            .iter()
+            .position(|s| s == stage)
+            .ok_or_else(|| anyhow::anyhow!("stage '{stage}' bestaat niet in de procedure"))
+    }
+
+    /// De stage waarin een zojuist ingediende aanvraag belandt: de stage
+    /// volgend op de indieningsstage (de eerste van de procedure).
+    pub fn na_indiening(&self) -> anyhow::Result<&str> {
+        self.stages
+            .get(1)
+            .map(String::as_str)
+            .ok_or_else(|| anyhow::anyhow!("de procedure heeft geen stage na de indiening"))
+    }
+
+    /// Valideer een statusovergang tegen de volgorde van de wet: de
+    /// doelstage moet na de huidige stage komen. Tussenliggende momentane
+    /// stages (zoals BEKENDMAKING) mogen in één overgang worden doorlopen.
+    pub fn transitie(&self, van: &str, naar: &str) -> anyhow::Result<()> {
+        if self.index(naar)? <= self.index(van)? {
+            anyhow::bail!("overgang van stage '{van}' naar '{naar}' is in strijd met de procedure");
+        }
+        Ok(())
+    }
+}
+
+/// Lees de beschikking-procedure uit de wet. De stages waarnaar de
+/// orchestratie verwijst moeten bestaan; ontbreekt er een, dan weigert de
+/// applicatie te starten.
+pub fn beschikking_procedure(wpp_yaml: &str) -> anyhow::Result<Procedure> {
+    let mut service = LawExecutionService::new();
+    service
+        .load_law(wpp_yaml)
+        .map_err(|e| anyhow::anyhow!("laden Wpp voor procedure mislukt: {e}"))?;
+    let definitie = service
+        .resolver()
+        .find_procedure("BESCHIKKING", None)
+        .ok_or_else(|| anyhow::anyhow!("de wet definieert geen BESCHIKKING-procedure"))?;
+    let procedure = Procedure {
+        stages: definitie.stages.iter().map(|s| s.name.clone()).collect(),
+    };
+    for stage in [
+        STAGE_AANVRAAG,
+        STAGE_BEHANDELING,
+        STAGE_BESLUIT,
+        STAGE_BEKENDMAKING,
+        STAGE_BEZWAAR,
+    ] {
+        procedure.index(stage)?;
+    }
+    Ok(procedure)
+}
+
 /// Uitkomst van een samengestelde jaaraanvraag.
 #[derive(Debug, Clone, Serialize)]
 pub struct JaaruitkomstUitkomst {
@@ -146,7 +220,12 @@ fn component_params(
         params.insert("niveau".into(), Value::String("DECENTRAAL".into()));
         params.insert(
             "orgaan".into(),
-            Value::String(component.orgaan.clone().unwrap_or_else(|| "GEMEENTERAAD".into())),
+            Value::String(
+                component
+                    .orgaan
+                    .clone()
+                    .unwrap_or_else(|| "GEMEENTERAAD".into()),
+            ),
         );
         params.insert("aantal_raadszetels".into(), Value::Int(component.zetels));
         params.insert(
@@ -172,7 +251,10 @@ fn orgaan_label(component: &Component) -> String {
         "LANDELIJK" => "landelijk".to_string(),
         _ => match component.orgaan.as_deref() {
             Some("PROVINCIALE_STATEN") => {
-                format!("provinciale staten {}", component.gebied.as_deref().unwrap_or("?"))
+                format!(
+                    "provinciale staten {}",
+                    component.gebied.as_deref().unwrap_or("?")
+                )
             }
             Some("WATERSCHAP") => {
                 format!("waterschap {}", component.gebied.as_deref().unwrap_or("?"))
@@ -180,7 +262,10 @@ fn orgaan_label(component: &Component) -> String {
             Some("EILANDSRAAD") => {
                 format!("eilandsraad {}", component.gebied.as_deref().unwrap_or("?"))
             }
-            _ => format!("gemeenteraad {}", component.gebied.as_deref().unwrap_or("?")),
+            _ => format!(
+                "gemeenteraad {}",
+                component.gebied.as_deref().unwrap_or("?")
+            ),
         },
     }
 }
@@ -293,7 +378,8 @@ fn build_motivering(
             redenen.push("de partij ontvangt giften van niet-ingezetenen");
         }
         if !transparantie.meldplicht_giften {
-            redenen.push("de partij voldoet niet aan de meldplicht voor giften van € 10.000 of meer");
+            redenen
+                .push("de partij voldoet niet aan de meldplicht voor giften van € 10.000 of meer");
         }
         if !transparantie.openbaarmaking_financien {
             redenen.push("de partij maakt haar financiën niet openbaar op haar website");
@@ -368,10 +454,7 @@ pub async fn evaluate_jaaraanvraag(
                     &date,
                 )
                 .map_err(|e| {
-                    anyhow::anyhow!(
-                        "berekening onderdeel {} mislukt: {e}",
-                        component.key
-                    )
+                    anyhow::anyhow!("berekening onderdeel {} mislukt: {e}", component.key)
                 })?;
 
             let toegekend = as_bool(&result.outputs, "subsidie_toegekend");
@@ -677,4 +760,39 @@ pub async fn evaluate_bezwaartermijn(
         })
     })
     .await?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn procedure() -> Procedure {
+        beschikking_procedure(include_str!(
+            "../../law/wet_op_de_politieke_partijen/2026-01-01.yaml"
+        ))
+        .expect("procedure uit de wet")
+    }
+
+    /// De stages waarnaar de orchestratie verwijst bestaan in de wet en de
+    /// indiening mondt uit in de behandelstage.
+    #[test]
+    fn procedure_komt_uit_de_wet() {
+        let p = procedure();
+        assert_eq!(
+            p.na_indiening().expect("stage na indiening"),
+            STAGE_BEHANDELING
+        );
+    }
+
+    /// Vooruit mag (ook over momentane stages heen), terug of stilstaan niet.
+    #[test]
+    fn transities_volgen_de_volgorde_van_de_wet() {
+        let p = procedure();
+        assert!(p.transitie(STAGE_BEHANDELING, STAGE_BESLUIT).is_ok());
+        assert!(p.transitie(STAGE_BESLUIT, STAGE_BEKENDMAKING).is_ok());
+        assert!(p.transitie(STAGE_BESLUIT, STAGE_BEZWAAR).is_ok());
+        assert!(p.transitie(STAGE_BESLUIT, STAGE_BESLUIT).is_err());
+        assert!(p.transitie(STAGE_BEZWAAR, STAGE_BESLUIT).is_err());
+        assert!(p.transitie("ONBEKEND", STAGE_BESLUIT).is_err());
+    }
 }

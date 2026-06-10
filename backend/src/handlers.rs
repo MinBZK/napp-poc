@@ -216,10 +216,7 @@ pub async fn mijn_registratie(
 /// Bouw de componenten (aanspraken) van een rechtspersoon uit het register.
 /// Een onbekende organisatie krijgt één landelijke component met nul zetels:
 /// de aanvraagroute blijft open (AWB 4:1), de wet wijst af.
-async fn aanspraken_voor(
-    pool: &sqlx::SqlitePool,
-    kvk: &str,
-) -> anyhow::Result<Vec<db::Component>> {
+async fn aanspraken_voor(pool: &sqlx::SqlitePool, kvk: &str) -> anyhow::Result<Vec<db::Component>> {
     // Expliciete check: een ONGEKOPPELD record geeft géén aanspraken. Het
     // kvk_nummer is daar een placeholder; wie ermee inlogt is niet de
     // rechtspersoon achter de aanduiding (die is juist nog onbekend).
@@ -378,14 +375,19 @@ pub async fn sso_mock_login(
         .await
         .map_err(internal_error)?;
     session
-        .insert(SESSION_KEY_EMAIL, format!("{}@napp.nl", naam.replace(' ', ".").to_lowercase()))
+        .insert(
+            SESSION_KEY_EMAIL,
+            format!("{}@napp.nl", naam.replace(' ', ".").to_lowercase()),
+        )
         .await
         .map_err(internal_error)?;
     session
         .insert(SESSION_KEY_SUB, format!("mock-{naam}"))
         .await
         .map_err(internal_error)?;
-    Ok(Json(json!({"rol": "beoordelaar", "naam": naam, "mock": true})))
+    Ok(Json(
+        json!({"rol": "beoordelaar", "naam": naam, "mock": true}),
+    ))
 }
 
 /// De weergavenaam van een ingelogde rechtspersoon. De sessie draagt alleen
@@ -451,7 +453,9 @@ pub async fn create_aanvraag(
     let jaar = subsidiejaar_voor(&vandaag);
 
     if body.componenten.is_empty() {
-        return Err(bad_request("Kies ten minste één onderdeel om aan te vragen."));
+        return Err(bad_request(
+            "Kies ten minste één onderdeel om aan te vragen.",
+        ));
     }
 
     // De componenten komen uit het register, nooit uit de client: de client
@@ -498,7 +502,9 @@ pub async fn create_aanvraag(
         "financien_openbaar_op_website",
     ] {
         let Some(waarde) = body.parameters.get(key).and_then(|v| v.as_bool()) else {
-            return Err(bad_request(&format!("Verplichte verklaring '{key}' ontbreekt.")));
+            return Err(bad_request(&format!(
+                "Verplichte verklaring '{key}' ontbreekt."
+            )));
         };
         eigen.insert(key.to_string(), json!(waarde));
     }
@@ -511,6 +517,9 @@ pub async fn create_aanvraag(
         .await
         .map_err(internal_error)?;
     let beslistermijn = termijnen.beslistermijn_einddatum;
+    // Een ingediende aanvraag belandt in de stage na de indiening; welke dat
+    // is bepaalt de procedure in de wet (AANVRAAG → BEHANDELING).
+    let status = state.procedure.na_indiening().map_err(internal_error)?;
     db::insert_aanvraag(
         &state.pool,
         &id,
@@ -519,6 +528,7 @@ pub async fn create_aanvraag(
         jaar,
         &serde_json::to_string(&componenten).map_err(internal_error)?,
         &serde_json::to_string(&eigen).map_err(internal_error)?,
+        status,
         &vandaag,
         Some(&beslistermijn),
     )
@@ -527,7 +537,7 @@ pub async fn create_aanvraag(
 
     Ok(Json(json!({
         "id": id,
-        "status": "BEHANDELING",
+        "status": status,
         "subsidiejaar": jaar,
         "beslistermijn_einddatum": beslistermijn,
     })))
@@ -564,7 +574,11 @@ pub async fn proef_aanspraken(
         "voldoet_aan_meldplicht_giften",
         "financien_openbaar_op_website",
     ] {
-        let waarde = body.parameters.get(key).and_then(|v| v.as_bool()).unwrap_or(false);
+        let waarde = body
+            .parameters
+            .get(key)
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
         eigen.insert(key.to_string(), json!(waarde));
     }
     neem_landelijke_opgaven_over(&body.parameters, &mut eigen)?;
@@ -649,7 +663,10 @@ pub async fn get_mijn_aanvraag(
     let Some(kvk) = session_kvk(&session).await else {
         return Err(forbidden());
     };
-    let Some(aanvraag) = db::get_aanvraag(&state.pool, &id).await.map_err(internal_error)? else {
+    let Some(aanvraag) = db::get_aanvraag(&state.pool, &id)
+        .await
+        .map_err(internal_error)?
+    else {
         return Err(not_found());
     };
     if aanvraag.kvk_nummer != kvk {
@@ -689,7 +706,10 @@ pub async fn get_aanvraag(
     if session_beoordelaar(&session).await.is_none() {
         return Err(forbidden());
     }
-    let Some(aanvraag) = db::get_aanvraag(&state.pool, &id).await.map_err(internal_error)? else {
+    let Some(aanvraag) = db::get_aanvraag(&state.pool, &id)
+        .await
+        .map_err(internal_error)?
+    else {
         return Err(not_found());
     };
     let besluit = db::get_besluit_by_aanvraag(&state.pool, &id)
@@ -711,11 +731,16 @@ pub async fn proefberekening(
     if session_beoordelaar(&session).await.is_none() {
         return Err(forbidden());
     }
-    let Some(aanvraag) = db::get_aanvraag(&state.pool, &id).await.map_err(internal_error)? else {
+    let Some(aanvraag) = db::get_aanvraag(&state.pool, &id)
+        .await
+        .map_err(internal_error)?
+    else {
         return Err(not_found());
     };
     let uitkomst = run_engine(&state, &aanvraag).await?;
-    Ok(Json(serde_json::to_value(uitkomst).map_err(internal_error)?))
+    Ok(Json(
+        serde_json::to_value(uitkomst).map_err(internal_error)?,
+    ))
 }
 
 /// Besluit vaststellen: de wet bepaalt per onderdeel; samen één beschikking.
@@ -728,10 +753,19 @@ pub async fn stel_besluit_vast(
     let Some(beoordelaar) = session_beoordelaar(&session).await else {
         return Err(forbidden());
     };
-    let Some(aanvraag) = db::get_aanvraag(&state.pool, &id).await.map_err(internal_error)? else {
+    let Some(aanvraag) = db::get_aanvraag(&state.pool, &id)
+        .await
+        .map_err(internal_error)?
+    else {
         return Err(not_found());
     };
-    if aanvraag.status != "BEHANDELING" {
+    // De overgang naar BESLUIT moet passen in de procedure van de wet; een
+    // aanvraag die al in of voorbij BESLUIT is, kan niet opnieuw.
+    if state
+        .procedure
+        .transitie(&aanvraag.status, engine::STAGE_BESLUIT)
+        .is_err()
+    {
         return Err(bad_request(
             "Deze aanvraag is al beoordeeld of nog niet in behandeling.",
         ));
@@ -754,7 +788,7 @@ pub async fn stel_besluit_vast(
     )
     .await
     .map_err(internal_error)?;
-    db::set_aanvraag_status(&state.pool, &id, "BESLUIT")
+    db::set_aanvraag_status(&state.pool, &id, engine::STAGE_BESLUIT)
         .await
         .map_err(internal_error)?;
 
@@ -837,10 +871,19 @@ pub async fn bekendmaking(
     if session_beoordelaar(&session).await.is_none() {
         return Err(forbidden());
     }
-    let Some(aanvraag) = db::get_aanvraag(&state.pool, &id).await.map_err(internal_error)? else {
+    let Some(aanvraag) = db::get_aanvraag(&state.pool, &id)
+        .await
+        .map_err(internal_error)?
+    else {
         return Err(not_found());
     };
-    if aanvraag.status != "BESLUIT" {
+    // Bekendmaking moet volgens de procedure ná het besluit komen; daarna
+    // gaat het dossier door naar de bezwaarperiode (momentane stage).
+    if state
+        .procedure
+        .transitie(&aanvraag.status, engine::STAGE_BEKENDMAKING)
+        .is_err()
+    {
         return Err(bad_request("Er is nog geen besluit om bekend te maken."));
     }
     let Some(besluit) = db::get_besluit_by_aanvraag(&state.pool, &id)
@@ -864,7 +907,7 @@ pub async fn bekendmaking(
     )
     .await
     .map_err(internal_error)?;
-    db::set_aanvraag_status(&state.pool, &id, "BEZWAAR")
+    db::set_aanvraag_status(&state.pool, &id, engine::STAGE_BEZWAAR)
         .await
         .map_err(internal_error)?;
 
@@ -896,17 +939,19 @@ pub async fn list_betaalopdrachten(
 // Openbaar register (geen login)
 // ---------------------------------------------------------------------------
 
-pub async fn register(
-    State(state): State<AppState>,
-) -> Result<Json<serde_json::Value>, ApiError> {
-    let entries = db::list_register(&state.pool).await.map_err(internal_error)?;
+pub async fn register(State(state): State<AppState>) -> Result<Json<serde_json::Value>, ApiError> {
+    let entries = db::list_register(&state.pool)
+        .await
+        .map_err(internal_error)?;
     Ok(Json(json!(entries)))
 }
 
 pub async fn statistieken(
     State(state): State<AppState>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let stats = db::statistieken(&state.pool).await.map_err(internal_error)?;
+    let stats = db::statistieken(&state.pool)
+        .await
+        .map_err(internal_error)?;
     Ok(Json(serde_json::to_value(stats).map_err(internal_error)?))
 }
 
@@ -954,7 +999,9 @@ mod tests {
 
         // Zelfde uitkomst als een onbekend nummer: één lege landelijke
         // component (de wet wijst af), géén decentrale aanspraken.
-        let componenten = aanspraken_voor(&pool, "98765432").await.expect("aanspraken");
+        let componenten = aanspraken_voor(&pool, "98765432")
+            .await
+            .expect("aanspraken");
         assert_eq!(componenten.len(), 1);
         assert_eq!(componenten[0].key, "LANDELIJK");
         assert_eq!(componenten[0].zetels, 0);
