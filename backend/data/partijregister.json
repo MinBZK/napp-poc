@@ -4,7 +4,9 @@
   "gemeenteraden": "Verkiezingsuitslagen Gemeenteraad 2026 (Kiesraad, data.overheid.nl)",
   "provinciale_staten": "Verkiezingsuitslagen Provinciale Staten 2023, Resultaat-EML (Kiesraad)",
   "waterschappen": "Verkiezingsuitslagen Waterschappen 2023, Resultaat-EML (Kiesraad)",
+  "eilandsraden": "Verkiezingsuitslag Eilandsraad 2023 (Kiesraad, data.overheid.nl, CSV)",
   "inwoneraantallen": "CBS StatLine 37230ned, januari 2026",
+  "inwoneraantallen_caribisch_nederland": "CBS StatLine 83698NED, 1 januari 2026",
   "kvk_nummers": "synthetisch (koppeling rechtspersoon-aanduiding is geen open data)",
   "organisatiemodellen": "demo-aanname (volgt uit partijstatuten, geen open data)"
  },
@@ -16166,6 +16168,20 @@
    ]
   },
   {
+   "kvk_nummer": "97373758",
+   "naam": "DEMOKRAT",
+   "organisatiemodel": "CENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": null,
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "EILANDSRAAD",
+     "gebied_code": "GM9001",
+     "zetels": 3
+    }
+   ]
+  },
+  {
    "kvk_nummer": "98474712",
    "naam": "DENK-PGenR",
    "organisatiemodel": "CENTRAAL",
@@ -16638,6 +16654,20 @@
      "orgaan": "GEMEENTERAAD",
      "gebied_code": "GM0512",
      "zetels": 7
+    }
+   ]
+  },
+  {
+   "kvk_nummer": "94714567",
+   "naam": "Democratic Party of Sint Eustatius",
+   "organisatiemodel": "CENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": null,
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "EILANDSRAAD",
+     "gebied_code": "GM9002",
+     "zetels": 2
     }
    ]
   },
@@ -22802,6 +22832,20 @@
    ]
   },
   {
+   "kvk_nummer": "97487357",
+   "naam": "MPB",
+   "organisatiemodel": "CENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": null,
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "EILANDSRAAD",
+     "gebied_code": "GM9001",
+     "zetels": 2
+    }
+   ]
+  },
+  {
    "kvk_nummer": "93003733",
    "naam": "Meedenken met Lochem (MmL)",
    "organisatiemodel": "CENTRAAL",
@@ -22896,6 +22940,20 @@
      "orgaan": "GEMEENTERAAD",
      "gebied_code": "GM0779",
      "zetels": 2
+    }
+   ]
+  },
+  {
+   "kvk_nummer": "96793322",
+   "naam": "Movementu 21",
+   "organisatiemodel": "CENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": null,
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "EILANDSRAAD",
+     "gebied_code": "GM9001",
+     "zetels": 1
     }
    ]
   },
@@ -24016,6 +24074,20 @@
      "orgaan": "GEMEENTERAAD",
      "gebied_code": "GM0406",
      "zetels": 2
+    }
+   ]
+  },
+  {
+   "kvk_nummer": "92331782",
+   "naam": "PLP",
+   "organisatiemodel": "CENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": null,
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "EILANDSRAAD",
+     "gebied_code": "GM9002",
+     "zetels": 3
     }
    ]
   },
@@ -25262,6 +25334,20 @@
      "orgaan": "PROVINCIALE_STATEN",
      "gebied_code": "PV20",
      "zetels": 1
+    }
+   ]
+  },
+  {
+   "kvk_nummer": "90244876",
+   "naam": "Party for Progress Equality Prosperity (PEP)",
+   "organisatiemodel": "CENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": null,
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "EILANDSRAAD",
+     "gebied_code": "GM9003",
+     "zetels": 2
     }
    ]
   },
@@ -28836,6 +28922,20 @@
    ]
   },
   {
+   "kvk_nummer": "92947991",
+   "naam": "UPB",
+   "organisatiemodel": "CENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": null,
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "EILANDSRAAD",
+     "gebied_code": "GM9001",
+     "zetels": 3
+    }
+   ]
+  },
+  {
    "kvk_nummer": "99755892",
    "naam": "Uitgeest Lokaal",
    "organisatiemodel": "CENTRAAL",
@@ -30348,6 +30448,20 @@
    ]
   },
   {
+   "kvk_nummer": "93360857",
+   "naam": "Windward Islands People's Movement (WIPM)",
+   "organisatiemodel": "CENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": null,
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "EILANDSRAAD",
+     "gebied_code": "GM9003",
+     "zetels": 3
+    }
+   ]
+  },
+  {
    "kvk_nummer": "93239186",
    "naam": "Woerden & Democratie",
    "organisatiemodel": "CENTRAAL",
@@ -30850,6 +30964,12 @@
    "code": "GM0755",
    "naam": "Boekel",
    "inwoneraantal": 11685
+  },
+  {
+   "orgaan": "EILANDSRAAD",
+   "code": "GM9001",
+   "naam": "Bonaire",
+   "inwoneraantal": 27611
   },
   {
    "orgaan": "GEMEENTERAAD",
@@ -32238,6 +32358,12 @@
    "inwoneraantal": 23984
   },
   {
+   "orgaan": "EILANDSRAAD",
+   "code": "GM9003",
+   "naam": "Saba",
+   "inwoneraantal": 2270
+  },
+  {
    "orgaan": "GEMEENTERAAD",
    "code": "GM0441",
    "naam": "Schagen",
@@ -32272,6 +32398,12 @@
    "code": "GM0965",
    "naam": "Simpelveld",
    "inwoneraantal": 10462
+  },
+  {
+   "orgaan": "EILANDSRAAD",
+   "code": "GM9002",
+   "naam": "Sint Eustatius",
+   "inwoneraantal": 3348
   },
   {
    "orgaan": "GEMEENTERAAD",
@@ -32866,6 +32998,11 @@
    "kvk_nummer": "93178212",
    "naam": "Water Natuurlijk",
    "profiel": "waterschapspartij"
+  },
+  {
+   "kvk_nummer": "97373758",
+   "naam": "DEMOKRAT",
+   "profiel": "grootste eilandspartij (eilandsraad Bonaire, Caribisch Nederland)"
   }
  ]
 }

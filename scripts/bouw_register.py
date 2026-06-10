@@ -8,8 +8,14 @@ Bronnen (alle Kiesraad-datasets via data.overheid.nl, CBS via StatLine):
   statenzetels per provincie (gekozen kandidaten per lijst).
 - Verkiezingsuitslagen Waterschappen 2023 (EML, Resultaat-bestanden):
   AB-zetels per waterschap.
+- Verkiezingsuitslag Eilandsraad 2023 (CSV): eilandsraadszetels per
+  openbaar lichaam (Bonaire, Sint Eustatius, Saba). De Kiesraad publiceert
+  deze uitslag alleen als CSV, niet als EML.
 - CBS StatLine 37230ned (OData): inwoneraantal per gemeente en provincie
   (januari 2026).
+- CBS StatLine 83698NED (OData): inwoneraantal Caribisch Nederland per
+  openbaar lichaam (1 januari 2026); de openbare lichamen staan niet in
+  37230ned.
 
 KvK-nummers zijn synthetisch en deterministisch: de koppeling
 rechtspersoon-aanduiding is geen open data en is precies wat de Napp bij
@@ -58,11 +64,25 @@ AB2023_EML_ZIPS = [
     f"ee19bcda-0282-44a6-a464-44738afd755c/resources/EML_bestanden_AB2023_deel_{i}.zip"
     for i in (1, 2, 3)
 ]
+ER2023_CSV = (
+    "https://data.overheid.nl/sites/default/files/dataset/"
+    "139bd69c-dfc7-47e3-9cfa-79d789769079/resources/Verkiezingsuitslag_ER2023.csv"
+)
 CBS_BEVOLKING = (
     "https://opendata.cbs.nl/ODataApi/odata/37230ned/TypedDataSet"
     "?$filter=(startswith(RegioS,'GM')%20or%20startswith(RegioS,'PV'))"
     "%20and%20Perioden%20eq%20'2026MM01'"
     "&$select=RegioS,BevolkingAanHetBeginVanDePeriode_1&$top=10000&$format=json"
+)
+# Bevolking Caribisch Nederland: eigen StatLine-tabel (83698NED); totalen
+# (geslacht, leeftijd, burgerlijke staat) per openbaar lichaam, 1 jan 2026.
+CBS_BEVOLKING_CN = (
+    "https://opendata.cbs.nl/ODataApi/odata/83698NED/TypedDataSet"
+    "?$filter=startswith(CaribischNederland,'GM')"
+    "%20and%20Geslacht%20eq%20'T001038'%20and%20Leeftijd%20eq%20'10000'"
+    "%20and%20BurgerlijkeStaat%20eq%20'T001019'"
+    "%20and%20Perioden%20eq%20'2026JJ00'"
+    "&$select=CaribischNederland,BevolkingOp1Januari_1&$format=json"
 )
 
 # CBS-codes van de twaalf provincies.
@@ -207,6 +227,26 @@ def main() -> None:
             uitslagen.append(("WATERSCHAP", code, lijst, zetels))
     print(f"AB2023: {len(ab)} waterschappen")
 
+    # --- ER2023: eilandsraadszetels per openbaar lichaam (CSV) ---
+    # De Kiesraad-CSV codeert de openbare lichamen als O9001 (Bonaire),
+    # O9002 (Sint Eustatius) en O9003 (Saba); CBS gebruikt in de Caribisch
+    # Nederland-tabellen GM9001/GM9002/GM9003. We herschrijven naar de
+    # CBS-codes zodat de inwoneraantallen direct aansluiten (de openbare
+    # lichamen hebben geen reguliere gemeentecode in 37230ned).
+    er_telling = 0
+    tekst = io.StringIO(haal(ER2023_CSV).decode("utf-8-sig"))
+    for rij in csv.DictReader(tekst, delimiter=";"):
+        if rij["VeldType"] != "LijstAantalZetels":
+            continue
+        code = rij["RegioCode"]
+        if not code.startswith("O"):
+            continue
+        gm = "GM" + code[1:]
+        gebied_namen[gm] = rij["Regio"]
+        uitslagen.append(("EILANDSRAAD", gm, rij["LijstNaam"], int(rij["Waarde"])))
+        er_telling += 1
+    print(f"ER2023: {er_telling} uitslagen, 3 openbare lichamen")
+
     # --- CBS: inwoneraantallen (gemeenten + provincies) ---
     cbs = json.loads(haal(CBS_BEVOLKING))
     inwoners = {
@@ -214,6 +254,10 @@ def main() -> None:
         for rij in cbs["value"]
         if rij["BevolkingAanHetBeginVanDePeriode_1"] is not None
     }
+    cbs_cn = json.loads(haal(CBS_BEVOLKING_CN))
+    for rij in cbs_cn["value"]:
+        if rij["BevolkingOp1Januari_1"] is not None:
+            inwoners[rij["CaribischNederland"].strip()] = rij["BevolkingOp1Januari_1"]
     print(f"CBS: inwoneraantallen voor {len(inwoners)} regio's")
 
     # --- Partijen samenstellen ---
@@ -298,6 +342,12 @@ def main() -> None:
         and p["decentrale_uitslagen"]
         and all(u["orgaan"] == "WATERSCHAP" for u in p["decentrale_uitslagen"])
     ]
+    eiland = [
+        p for p in alle
+        if p["kamerzetels"] == 0 and p["moederpartij_kvk"] is None
+        and p["decentrale_uitslagen"]
+        and all(u["orgaan"] == "EILANDSRAAD" for u in p["decentrale_uitslagen"])
+    ]
 
     grootste = max(landelijke, key=lambda p: (p["kamerzetels"], p["naam"]))
     breedste = max(landelijke, key=lambda p: len(p["decentrale_uitslagen"]))
@@ -314,6 +364,13 @@ def main() -> None:
     grootste_lokaal = max(lokale_gr, key=lambda p: max(u["zetels"] for u in p["decentrale_uitslagen"]))
     kleinste_lokaal = min(lokale_gr, key=lambda p: (max(u["zetels"] for u in p["decentrale_uitslagen"]), p["naam"]))
     waterschap = max(waterschaps, key=lambda p: max(u["zetels"] for u in p["decentrale_uitslagen"]))
+    # Grootste eilandspartij: DEMOKRAT en UPB hebben beide 3 zetels op
+    # Bonaire; de alfabetische tiebreak kiest DEMOKRAT, dat ook de meeste
+    # stemmen haalde (4.004 tegen 2.903, officiële uitslag ER2023).
+    grootste_eiland = min(
+        eiland,
+        key=lambda p: (-max(u["zetels"] for u in p["decentrale_uitslagen"]), p["naam"]),
+    )
 
     demo = [
         voorbeeld(grootste, f"grootste landelijke partij ({grootste['kamerzetels']} kamerzetels)"),
@@ -324,6 +381,7 @@ def main() -> None:
         voorbeeld(grootste_lokaal, "grootste lokale partij"),
         voorbeeld(kleinste_lokaal, "lokale partij met een raadszetel"),
         voorbeeld(waterschap, "waterschapspartij"),
+        voorbeeld(grootste_eiland, "grootste eilandspartij (eilandsraad Bonaire, Caribisch Nederland)"),
     ]
     # dedupliceer (criteria kunnen samenvallen) met behoud van volgorde
     gezien = set()
@@ -335,7 +393,9 @@ def main() -> None:
             "gemeenteraden": "Verkiezingsuitslagen Gemeenteraad 2026 (Kiesraad, data.overheid.nl)",
             "provinciale_staten": "Verkiezingsuitslagen Provinciale Staten 2023, Resultaat-EML (Kiesraad)",
             "waterschappen": "Verkiezingsuitslagen Waterschappen 2023, Resultaat-EML (Kiesraad)",
+            "eilandsraden": "Verkiezingsuitslag Eilandsraad 2023 (Kiesraad, data.overheid.nl, CSV)",
             "inwoneraantallen": "CBS StatLine 37230ned, januari 2026",
+            "inwoneraantallen_caribisch_nederland": "CBS StatLine 83698NED, 1 januari 2026",
             "kvk_nummers": "synthetisch (koppeling rechtspersoon-aanduiding is geen open data)",
             "organisatiemodellen": "demo-aanname (volgt uit partijstatuten, geen open data)",
         },
