@@ -13,7 +13,7 @@ const stappen = [
   {
     titel: 'U dient een aanvraag in',
     tekst:
-      'Log in met eHerkenning namens uw partij en vul de gegevens over zetels, leden en transparantie in.',
+      'Log in met eHerkenning namens uw partij en vul uw ledental en transparantieverklaringen in. Uw zetels komen uit de officiële verkiezingsuitslag.',
   },
   {
     titel: 'De Napp beoordeelt uw aanvraag',
@@ -63,7 +63,7 @@ const stappen = [
       <nldd-title size="2" slot="header">
         <h2>Hoe werkt het?</h2>
       </nldd-title>
-      <nldd-list variant="simple">
+      <nldd-list variant="simple" no-dividers>
         <nldd-list-item v-for="(stap, i) in stappen" :key="stap.titel" size="md">
           <nldd-timeline-track-cell
             step="past"
