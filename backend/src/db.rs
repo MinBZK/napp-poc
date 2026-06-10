@@ -552,9 +552,11 @@ const BETAALOPDRACHT_SELECT: &str =
     "SELECT bo.*, b.aanvraag_id FROM betaalopdrachten bo JOIN besluiten b ON bo.besluit_id = b.id";
 
 pub async fn list_betaalopdrachten(pool: &SqlitePool) -> anyhow::Result<Vec<Betaalopdracht>> {
-    let rows = sqlx::query(&format!("{BETAALOPDRACHT_SELECT} ORDER BY bo.created_at DESC"))
-        .fetch_all(pool)
-        .await?;
+    let rows = sqlx::query(&format!(
+        "{BETAALOPDRACHT_SELECT} ORDER BY bo.created_at DESC"
+    ))
+    .fetch_all(pool)
+    .await?;
     Ok(rows.iter().map(row_to_betaalopdracht).collect())
 }
 

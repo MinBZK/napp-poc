@@ -16,6 +16,7 @@ mod state;
 
 use std::sync::Arc;
 
+use axum::extract::Request;
 use axum::routing::{get, post};
 use axum::Router;
 use regelrecht_auth::OidcAppState;
@@ -173,11 +174,10 @@ async fn main() -> anyhow::Result<()> {
         .merge(auth_routes)
         .merge(api)
         .with_state(app_state)
+        .fallback_service(ServeDir::new(&static_dir).not_found_service(ServeFile::new(&index_file)))
         .layer(session_layer)
-        .layer(TraceLayer::new_for_http())
-        .fallback_service(
-            ServeDir::new(&static_dir).not_found_service(ServeFile::new(&index_file)),
-        );
+        .layer(axum::middleware::map_request(rewrite_portal_path))
+        .layer(TraceLayer::new_for_http());
 
     let port: u16 = std::env::var("NAPP_PORT")
         .ok()
@@ -187,4 +187,62 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("NAPP-backend luistert op http://localhost:{port}");
     axum::serve(listener, app).await?;
     Ok(())
+}
+
+/// Dezelfde portal-rewrites als de vite-dev-server: extensieloze paden onder
+/// /aanvrager en /beoordelaar wijzen naar de entry-html van dat portaal,
+/// zodat ServeDir niet terugvalt op index.html (het publieke portaal).
+fn portal_rewrite_target(path: &str) -> Option<&'static str> {
+    if path.contains('.') {
+        return None;
+    }
+    if path == "/aanvrager" || path.starts_with("/aanvrager/") {
+        Some("/aanvrager.html")
+    } else if path == "/beoordelaar" || path.starts_with("/beoordelaar/") {
+        Some("/beoordelaar.html")
+    } else {
+        None
+    }
+}
+
+async fn rewrite_portal_path(mut req: Request) -> Request {
+    if let Some(target) = portal_rewrite_target(req.uri().path()) {
+        let mut parts = req.uri().clone().into_parts();
+        parts.path_and_query = Some(target.parse().expect("rewrite-doel is een geldig URI-pad"));
+        if let Ok(uri) = axum::http::Uri::from_parts(parts) {
+            *req.uri_mut() = uri;
+        }
+    }
+    req
+}
+
+#[cfg(test)]
+mod tests {
+    use super::portal_rewrite_target;
+
+    #[test]
+    fn portal_paden_wijzen_naar_eigen_entry() {
+        assert_eq!(portal_rewrite_target("/aanvrager"), Some("/aanvrager.html"));
+        assert_eq!(
+            portal_rewrite_target("/aanvrager/dossier/42"),
+            Some("/aanvrager.html")
+        );
+        assert_eq!(
+            portal_rewrite_target("/beoordelaar/"),
+            Some("/beoordelaar.html")
+        );
+    }
+
+    #[test]
+    fn overige_paden_blijven_ongemoeid() {
+        assert_eq!(portal_rewrite_target("/"), None);
+        assert_eq!(portal_rewrite_target("/register"), None);
+        assert_eq!(portal_rewrite_target("/aanvrager.html"), None);
+        assert_eq!(portal_rewrite_target("/aanvragers"), None);
+        assert_eq!(
+            portal_rewrite_target("/wasm/pkg/regelrecht_engine.js"),
+            None
+        );
+        assert_eq!(portal_rewrite_target("/api/aanvragen"), None);
+    }
 }

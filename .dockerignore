@@ -1,0 +1,11 @@
+.git
+.claude
+.github
+target
+frontend/node_modules
+frontend/dist
+frontend/public/wasm/pkg
+*.db
+*.db-journal
+Dockerfile
+.dockerignore

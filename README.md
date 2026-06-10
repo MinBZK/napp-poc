@@ -44,6 +44,33 @@ Ingangen:
 SSO Rijk wordt actief zodra de `OIDC_*`-omgevingsvariabelen zijn gezet
 (zelfde configuratie als regelrecht's editor-api).
 
+## Deployen
+
+Eén container met alles erin (backend serveert de gebouwde frontend zelf):
+
+```bash
+just docker-build   # backend + frontend + WASM-engine in één image
+just docker-run     # draait op :8400, database in named volume napp-data
+```
+
+De build clonet [regelrecht](https://github.com/MinBZK/regelrecht) (main) als
+path-dependency; pin een ref met `--build-arg REGELRECHT_REF=<tag-of-sha>`.
+
+`.github/workflows/deploy.yml` bouwt en pusht het image naar
+`ghcr.io/minbzk/napp-poc` bij elke push naar main, en deployt naar ZAD zodra
+de repository variable `ZAD_PROJECT_ID` en het secret `RIG_API_KEY` gezet
+zijn (component `app`, deployment `productie`).
+
+Omgevingsvariabelen (defaults in het image):
+
+| Variabele | Default | Betekenis |
+|---|---|---|
+| `NAPP_PORT` | `8400` | luisterpoort |
+| `DATABASE_URL` | `sqlite:/data/napp.db?mode=rwc` | SQLite op het persistente volume |
+| `NAPP_LAW_DIR` | `/app/law` | wetscorpus |
+| `NAPP_STATIC_DIR` | `/app/frontend/dist` | frontend-assets |
+| `OIDC_*` | (leeg) | SSO Rijk; zonder configuratie is de demo-login actief |
+
 ## Hoe het werkt
 
 1. Een partij dient een aanvraag in; de backend persisteert de besluit-state

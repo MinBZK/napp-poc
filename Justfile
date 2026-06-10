@@ -64,3 +64,11 @@ check: format lint law-validate bdd
 # Vul een draaiende backend met demo-dossiers
 seed:
     ./scripts/seed_demo.sh
+
+# Build het productie-image (backend + frontend + WASM in één)
+docker-build tag="napp-poc:local":
+    docker build -t {{tag}} .
+
+# Draai het productie-image lokaal op :8400, met named volume voor de database
+docker-run tag="napp-poc:local":
+    docker run --rm -p 8400:8400 -v napp-data:/data {{tag}}
