@@ -184,9 +184,95 @@ fn orgaan_label(component: &Component) -> String {
     }
 }
 
+/// De transparantietoets van art. 5, per voorwaarde zoals de wet die
+/// teruggeeft. De motivering benoemt geschonden eisen op basis van deze
+/// outputs; de voorwaarden zelf staan uitsluitend in de YAML.
+struct TransparantieToets {
+    voldoet: bool,
+    verbod_anonieme_giften: bool,
+    verbod_giften_niet_ingezetenen: bool,
+    meldplicht_giften: bool,
+    openbaarmaking_financien: bool,
+}
+
+fn transparantie_toets(
+    service: &LawExecutionService,
+    params: BTreeMap<String, Value>,
+    date: &str,
+) -> anyhow::Result<TransparantieToets> {
+    let result = service
+        .evaluate_law(
+            WPP_ID,
+            &[
+                "voldoet_aan_transparantie",
+                "voldoet_verbod_anonieme_giften",
+                "voldoet_verbod_giften_niet_ingezetenen",
+                "voldoet_meldplicht_giften",
+                "voldoet_openbaarmaking_financien",
+            ],
+            params,
+            date,
+        )
+        .map_err(|e| anyhow::anyhow!("toetsing transparantie mislukt: {e}"))?;
+    Ok(TransparantieToets {
+        voldoet: as_bool(&result.outputs, "voldoet_aan_transparantie"),
+        verbod_anonieme_giften: as_bool(&result.outputs, "voldoet_verbod_anonieme_giften"),
+        verbod_giften_niet_ingezetenen: as_bool(
+            &result.outputs,
+            "voldoet_verbod_giften_niet_ingezetenen",
+        ),
+        meldplicht_giften: as_bool(&result.outputs, "voldoet_meldplicht_giften"),
+        openbaarmaking_financien: as_bool(&result.outputs, "voldoet_openbaarmaking_financien"),
+    })
+}
+
+/// De motiveringszin voor een afgewezen onderdeel, op basis van de
+/// per-voorwaarde outputs van art. 6 (landelijk) of art. 7 (decentraal).
+/// De drempels (één zetel, duizend leden) staan alleen in de wet; hier
+/// wordt uitsluitend geformuleerd.
+fn afwijzingsgrond(
+    service: &LawExecutionService,
+    component: &Component,
+    params: BTreeMap<String, Value>,
+    date: &str,
+) -> anyhow::Result<String> {
+    if component.soort == "LANDELIJK" {
+        let eisen = service
+            .evaluate_law(
+                WPP_ID,
+                &["voldoet_zeteleis_landelijk", "voldoet_ledeneis"],
+                params,
+                date,
+            )
+            .map_err(|e| anyhow::anyhow!("toetsing artikel 6 mislukt: {e}"))?;
+        let reden = if !as_bool(&eisen.outputs, "voldoet_zeteleis_landelijk") {
+            "de partij geen zetel in de Eerste of Tweede Kamer heeft"
+        } else if !as_bool(&eisen.outputs, "voldoet_ledeneis") {
+            "de partij minder dan duizend betalende leden heeft"
+        } else {
+            "niet aan de voorwaarden van artikel 6 is voldaan"
+        };
+        Ok(format!(
+            "Het landelijke onderdeel wordt afgewezen omdat {reden} (artikel 6)."
+        ))
+    } else {
+        let eisen = service
+            .evaluate_law(WPP_ID, &["voldoet_zeteleis_decentraal"], params, date)
+            .map_err(|e| anyhow::anyhow!("toetsing artikel 7 mislukt: {e}"))?;
+        let reden = if !as_bool(&eisen.outputs, "voldoet_zeteleis_decentraal") {
+            "daar geen zetel is toegewezen"
+        } else {
+            "niet aan de voorwaarden van artikel 7 is voldaan"
+        };
+        Ok(format!(
+            "Het onderdeel {} wordt afgewezen omdat {reden} (artikel 7).",
+            orgaan_label(component)
+        ))
+    }
+}
+
 fn build_motivering(
-    eigen: &serde_json::Map<String, serde_json::Value>,
-    voldoet_transparantie: bool,
+    transparantie: &TransparantieToets,
     uitkomsten: &[ComponentUitkomst],
     totaal: i64,
     subsidiejaar: i64,
@@ -197,19 +283,18 @@ fn build_motivering(
 
     let mut delen: Vec<String> = Vec::new();
 
-    if !voldoet_transparantie {
+    if !transparantie.voldoet {
         let mut redenen = Vec::new();
-        let b = |k: &str| eigen.get(k).and_then(|v| v.as_bool());
-        if b("ontvangt_anonieme_giften") == Some(true) {
+        if !transparantie.verbod_anonieme_giften {
             redenen.push("de partij ontvangt anonieme giften");
         }
-        if b("ontvangt_giften_niet_ingezetenen") == Some(true) {
+        if !transparantie.verbod_giften_niet_ingezetenen {
             redenen.push("de partij ontvangt giften van niet-ingezetenen");
         }
-        if b("voldoet_aan_meldplicht_giften") == Some(false) {
+        if !transparantie.meldplicht_giften {
             redenen.push("de partij voldoet niet aan de meldplicht voor giften van € 10.000 of meer");
         }
-        if b("financien_openbaar_op_website") == Some(false) {
+        if !transparantie.openbaarmaking_financien {
             redenen.push("de partij maakt haar financiën niet openbaar op haar website");
         }
         delen.push(format!(
@@ -239,26 +324,8 @@ fn build_motivering(
         ));
     }
     for u in &afgewezen {
-        if u.component.soort == "LANDELIJK" {
-            let leden = eigen
-                .get("aantal_betalende_leden")
-                .and_then(|v| v.as_i64())
-                .unwrap_or(0);
-            let reden = if u.component.zetels < 1 {
-                "de partij geen zetel in de Eerste of Tweede Kamer heeft"
-            } else if leden < 1000 {
-                "de partij minder dan duizend betalende leden heeft"
-            } else {
-                "niet aan de voorwaarden van artikel 6 is voldaan"
-            };
-            delen.push(format!(
-                "Het landelijke onderdeel wordt afgewezen omdat {reden} (artikel 6)."
-            ));
-        } else {
-            delen.push(format!(
-                "Het onderdeel {} wordt afgewezen omdat daar geen zetel is toegewezen (artikel 7).",
-                orgaan_label(&u.component)
-            ));
+        if let Some(grond) = &u.afwijzingsgrond {
+            delen.push(grond.clone());
         }
     }
     if toegekend.is_empty() && afgewezen.is_empty() {
@@ -345,31 +412,43 @@ pub async fn evaluate_jaaraanvraag(
                 None
             };
 
+            // Bij afwijzing levert de wet de gefaalde voorwaarde; hier wordt
+            // alleen de zin samengesteld.
+            let grond = if toegekend {
+                None
+            } else {
+                Some(afwijzingsgrond(&service, component, params, &date)?)
+            };
+
             uitkomsten.push(ComponentUitkomst {
                 component: component.clone(),
                 toegekend,
                 bedrag,
                 delen,
+                afwijzingsgrond: grond,
             });
         }
 
         // Transparantie geldt op rechtspersoonsniveau; één toets volstaat.
-        if let Some(component) = componenten.first() {
-            let checks = service
-                .evaluate_law(
-                    WPP_ID,
-                    &["voldoet_aan_transparantie"],
-                    component_params(component, &eigen, totaal_leden),
-                    &date,
-                )
-                .map_err(|e| anyhow::anyhow!("toetsing transparantie mislukt: {e}"))?;
-            voldoet_transparantie = as_bool(&checks.outputs, "voldoet_aan_transparantie");
-        }
+        let transparantie = match componenten.first() {
+            Some(component) => transparantie_toets(
+                &service,
+                component_params(component, &eigen, totaal_leden),
+                &date,
+            )?,
+            None => TransparantieToets {
+                voldoet: true,
+                verbod_anonieme_giften: true,
+                verbod_giften_niet_ingezetenen: true,
+                meldplicht_giften: true,
+                openbaarmaking_financien: true,
+            },
+        };
+        voldoet_transparantie = transparantie.voldoet;
 
         let toegekend = uitkomsten.iter().any(|u| u.toegekend);
         let motivering = build_motivering(
-            &eigen,
-            voldoet_transparantie,
+            &transparantie,
             &uitkomsten,
             totaal,
             subsidiejaar,
@@ -387,6 +466,53 @@ pub async fn evaluate_jaaraanvraag(
             componenten: uitkomsten,
             motivering,
         })
+    })
+    .await?
+}
+
+/// De noemer van de ledencomponent (art. 14): de som van de opgegeven
+/// ledentallen van de partijen waaraan subsidie wordt verstrekt. Of een
+/// opgave meetelt bepaalt de wet (art. 6, via heeft_recht_landelijk); de
+/// som zelf is orchestratie (RFC-012). De transparantieverklaringen en het
+/// ledental komen uit de opgeslagen eigen opgaven van elke aanvraag.
+pub async fn ledentotaal(
+    corpus: Arc<LawCorpus>,
+    opgaven: Vec<crate::db::LandelijkeOpgave>,
+    date: String,
+) -> anyhow::Result<i64> {
+    tokio::task::spawn_blocking(move || {
+        let service = service_with_corpus(&corpus)?;
+        let mut totaal: i64 = 0;
+        for opgave in &opgaven {
+            let leden = opgave
+                .parameters
+                .get("aantal_betalende_leden")
+                .and_then(|v| v.as_i64())
+                .unwrap_or(0);
+            let mut params: BTreeMap<String, Value> = BTreeMap::new();
+            params.insert("aantal_kamerzetels".into(), Value::Int(opgave.zetels));
+            params.insert("aantal_betalende_leden".into(), Value::Int(leden));
+            for key in [
+                "ontvangt_anonieme_giften",
+                "ontvangt_giften_niet_ingezetenen",
+                "voldoet_aan_meldplicht_giften",
+                "financien_openbaar_op_website",
+            ] {
+                let waarde = opgave
+                    .parameters
+                    .get(key)
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                params.insert(key.to_string(), Value::Bool(waarde));
+            }
+            let result = service
+                .evaluate_law(WPP_ID, &["heeft_recht_landelijk"], params, &date)
+                .map_err(|e| anyhow::anyhow!("toetsing ledenbudget-opgave mislukt: {e}"))?;
+            if as_bool(&result.outputs, "heeft_recht_landelijk") {
+                totaal += leden;
+            }
+        }
+        Ok(totaal)
     })
     .await?
 }

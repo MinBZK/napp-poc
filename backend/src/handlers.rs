@@ -313,21 +313,23 @@ fn neem_landelijke_opgaven_over(
 
 /// De noemer van de ledencomponent voor een (proef)berekening: de opgaven
 /// die al in de aanvragentabel staan, plus — als de eigen aanvraag daar nog
-/// niet bij zit — de eigen opgave voor zover die aan de ledeneis voldoet.
+/// niet bij zit — de eigen opgave. Of een opgave meetelt bepaalt de wet
+/// (art. 6 jo. art. 14); hier wordt alleen verzameld en opgeteld.
 async fn ledentotaal_voor(
     state: &AppState,
     jaar: i64,
-    eigen_leden: Option<i64>,
+    eigen: Option<db::LandelijkeOpgave>,
 ) -> Result<i64, ApiError> {
-    let mut totaal = db::totaal_opgegeven_leden(&state.pool, jaar)
+    let mut opgaven = db::landelijke_opgaven(&state.pool, jaar)
         .await
         .map_err(internal_error)?;
-    if let Some(leden) = eigen_leden {
-        if leden >= 1000 {
-            totaal += leden;
-        }
+    if let Some(opgave) = eigen {
+        opgaven.push(opgave);
     }
-    Ok(totaal)
+    let vandaag = Utc::now().format("%Y-%m-%d").to_string();
+    engine::ledentotaal(state.corpus.clone(), opgaven, vandaag)
+        .await
+        .map_err(internal_error)
 }
 
 /// Demo-voorbeelden voor de gemockte eHerkenning-login (alleen metadata).
@@ -570,12 +572,16 @@ pub async fn proef_aanspraken(
     let vandaag = Utc::now().format("%Y-%m-%d").to_string();
     let jaar = subsidiejaar_voor(&vandaag);
     // De eigen opgave telt mee in de noemer van de ledencomponent als de
-    // landelijke component onderdeel is van deze (proef)aanvraag.
-    let eigen_leden = componenten
+    // landelijke component onderdeel is van deze (proef)aanvraag; of zij
+    // werkelijk meetelt beslist de wet in ledentotaal_voor.
+    let eigen_opgave = componenten
         .iter()
-        .any(|c| c.soort == "LANDELIJK")
-        .then(|| eigen.get("aantal_betalende_leden").and_then(|v| v.as_i64()).unwrap_or(0));
-    let totaal_leden = ledentotaal_voor(&state, jaar, eigen_leden).await?;
+        .find(|c| c.soort == "LANDELIJK")
+        .map(|c| db::LandelijkeOpgave {
+            zetels: c.zetels,
+            parameters: eigen.clone(),
+        });
+    let totaal_leden = ledentotaal_voor(&state, jaar, eigen_opgave).await?;
     let uitkomst = engine::evaluate_jaaraanvraag(
         state.corpus.clone(),
         componenten,

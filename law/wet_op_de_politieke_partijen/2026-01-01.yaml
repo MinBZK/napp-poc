@@ -76,7 +76,39 @@ articles:
         output:
           - name: voldoet_aan_transparantie
             type: boolean
+          # Per transparantie-eis een eigen output, zodat een afwijzend
+          # besluit de geschonden eis(en) uit de wet zelf kan halen
+          # (motiveringsplicht, AWB 3:46) in plaats van de voorwaarden in de
+          # uitvoering te herhalen.
+          - name: voldoet_verbod_anonieme_giften
+            type: boolean
+          - name: voldoet_verbod_giften_niet_ingezetenen
+            type: boolean
+          - name: voldoet_meldplicht_giften
+            type: boolean
+          - name: voldoet_openbaarmaking_financien
+            type: boolean
         actions:
+          - output: voldoet_verbod_anonieme_giften
+            value:
+              operation: EQUALS
+              subject: $ontvangt_anonieme_giften
+              value: false
+          - output: voldoet_verbod_giften_niet_ingezetenen
+            value:
+              operation: EQUALS
+              subject: $ontvangt_giften_niet_ingezetenen
+              value: false
+          - output: voldoet_meldplicht_giften
+            value:
+              operation: EQUALS
+              subject: $voldoet_aan_meldplicht_giften
+              value: true
+          - output: voldoet_openbaarmaking_financien
+            value:
+              operation: EQUALS
+              subject: $financien_openbaar_op_website
+              value: true
           - output: voldoet_aan_transparantie
             value:
               operation: AND
@@ -123,7 +155,25 @@ articles:
         output:
           - name: heeft_recht_landelijk
             type: boolean
+          # De afzonderlijke voorwaarden als eigen outputs: de motivering van
+          # een afwijzend besluit benoemt zo de gefaalde eis uit de wet zelf,
+          # en de ledeneis bepaalt mede de noemer van het ledenbudget
+          # (art. 14: partijen waaraan subsidie wordt verstrekt).
+          - name: voldoet_zeteleis_landelijk
+            type: boolean
+          - name: voldoet_ledeneis
+            type: boolean
         actions:
+          - output: voldoet_zeteleis_landelijk
+            value:
+              operation: GREATER_THAN_OR_EQUAL
+              subject: $aantal_kamerzetels
+              value: 1
+          - output: voldoet_ledeneis
+            value:
+              operation: GREATER_THAN_OR_EQUAL
+              subject: $aantal_betalende_leden
+              value: 1000
           - output: heeft_recht_landelijk
             value:
               operation: AND
@@ -164,7 +214,14 @@ articles:
         output:
           - name: heeft_recht_decentraal
             type: boolean
+          - name: voldoet_zeteleis_decentraal
+            type: boolean
         actions:
+          - output: voldoet_zeteleis_decentraal
+            value:
+              operation: GREATER_THAN_OR_EQUAL
+              subject: $aantal_raadszetels
+              value: 1
           - output: heeft_recht_decentraal
             value:
               operation: AND

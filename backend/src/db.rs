@@ -154,6 +154,10 @@ pub struct ComponentUitkomst {
     /// Alleen voor de landelijke component: de delen van art. 14.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub delen: Option<LandelijkeDelen>,
+    /// Bij afwijzing: de motiveringszin, opgebouwd uit de per-voorwaarde
+    /// outputs van de wet (art. 6/7), niet uit drempels in de uitvoering.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub afwijzingsgrond: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -348,18 +352,41 @@ pub async fn bezette_componenten(
 /// de ledencomponent (art. 14, onderdeel a): bij verlening werkt de Napp
 /// met de opgaven die op dat moment binnen zijn; de definitieve verdeling
 /// volgt bij de vaststelling (art. 18, buiten scope).
-pub async fn totaal_opgegeven_leden(pool: &SqlitePool, subsidiejaar: i64) -> anyhow::Result<i64> {
-    let totaal: i64 = sqlx::query_scalar(
-        "SELECT COALESCE(SUM(json_extract(parameters, '$.aantal_betalende_leden')), 0)
-         FROM aanvragen
-         WHERE subsidiejaar = ?
-           AND componenten LIKE '%\"key\":\"LANDELIJK\"%'
-           AND json_extract(parameters, '$.aantal_betalende_leden') >= 1000",
-    )
-    .bind(subsidiejaar)
-    .fetch_one(pool)
-    .await?;
-    Ok(totaal)
+/// Eén landelijke opgave voor het ledenbudget: de bevroren kamerzetels en de
+/// eigen opgaven van een aanvraag. Of de opgave meetelt in de noemer van de
+/// ledencomponent bepaalt de wet (art. 6 jo. art. 14), niet deze query.
+pub struct LandelijkeOpgave {
+    pub zetels: i64,
+    pub parameters: serde_json::Map<String, serde_json::Value>,
+}
+
+/// Alle aanvragen voor het subsidiejaar die de landelijke component
+/// bevatten, als ruwe opgaven. De wet beoordeelt ze stuk voor stuk.
+pub async fn landelijke_opgaven(
+    pool: &SqlitePool,
+    subsidiejaar: i64,
+) -> anyhow::Result<Vec<LandelijkeOpgave>> {
+    let rows = sqlx::query("SELECT componenten, parameters FROM aanvragen WHERE subsidiejaar = ?")
+        .bind(subsidiejaar)
+        .fetch_all(pool)
+        .await?;
+    let mut opgaven = Vec::new();
+    for row in rows {
+        let componenten: Vec<Component> =
+            serde_json::from_str(row.get::<String, _>("componenten").as_str())
+                .unwrap_or_default();
+        let Some(landelijk) = componenten.iter().find(|c| c.soort == "LANDELIJK") else {
+            continue;
+        };
+        let parameters: serde_json::Map<String, serde_json::Value> =
+            serde_json::from_str(row.get::<String, _>("parameters").as_str())
+                .unwrap_or_default();
+        opgaven.push(LandelijkeOpgave {
+            zetels: landelijk.zetels,
+            parameters,
+        });
+    }
+    Ok(opgaven)
 }
 
 #[allow(clippy::too_many_arguments)]
