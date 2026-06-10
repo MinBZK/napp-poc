@@ -38,6 +38,16 @@ const GROEPEN = [
 
 const aanspraken = computed(() => registratie.value?.aanspraken ?? []);
 
+// Branch login (beperkte machtiging): the server already filters the
+// aanspraken; here we only adjust the texts around them.
+const machtiging = computed(() => session.aanvrager?.machtiging ?? null);
+const beperkt = computed(() => machtiging.value?.type === 'BEPERKT');
+const overline = computed(() =>
+  beperkt.value
+    ? `${session.aanvrager?.partij_naam} · afdeling ${machtiging.value.gebied_naam}`
+    : session.aanvrager?.partij_naam,
+);
+
 function groepLeden(groep) {
   return aanspraken.value.filter((a) =>
     groep.soort ? a.soort === groep.soort : a.orgaan === groep.orgaan,
@@ -203,12 +213,17 @@ watch(() => session.aanvrager, laadRegistratie);
     <template v-else>
       <nldd-simple-section width="820px">
         <nldd-title size="2">
-          <span slot="overline">{{ session.aanvrager?.partij_naam }}</span>
+          <span slot="overline">{{ overline }}</span>
           <h2>Subsidie aanvragen voor {{ registratie?.subsidiejaar ?? '…' }}</h2>
         </nldd-title>
         <nldd-spacer size="12"></nldd-spacer>
         <nldd-rich-text>
-          <p>
+          <p v-if="beperkt">
+            U bent ingelogd als afdelingsbestuurder met een beperkte machtiging.
+            U ziet alleen de aanspraken van uw afdeling en vraagt die namens de
+            partij aan; de Napp beslist in één beschikking.
+          </p>
+          <p v-else>
             Dit zijn uw aanspraken volgens het partijregister, gebaseerd op de
             verkiezingsuitslagen van de Kiesraad. U vraagt alles in één keer aan;
             onderdelen uitvinken kan. De Napp beslist in één beschikking met een
@@ -223,6 +238,15 @@ watch(() => session.aanvrager, laadRegistratie);
           </p>
         </nldd-rich-text>
         <nldd-spacer size="24"></nldd-spacer>
+
+        <template v-if="beperkt">
+          <NBanner
+            variant="neutral"
+            text="Beperkte machtiging"
+            :supporting-text="`Uw volmacht geldt voor ${machtiging.gebied_naam}. De transparantieverklaringen legt u met die volmacht namens de hele partij af; het ledental is alleen relevant voor de landelijke subsidie en blijft hier buiten beschouwing.`"
+          />
+          <nldd-spacer size="16"></nldd-spacer>
+        </template>
 
         <NBanner
           v-if="registratie && !registratie.partij"

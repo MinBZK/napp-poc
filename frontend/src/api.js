@@ -45,8 +45,15 @@ export function apiDelete(path) {
 
 export const api = {
   me: () => apiGet('/api/me'),
-  eherkenningLogin: (kvkNummer) =>
-    apiPost('/api/eherkenning/login', { kvk_nummer: kvkNummer }),
+  eherkenningLogin: (kvkNummer, machtiging) =>
+    apiPost(
+      '/api/eherkenning/login',
+      machtiging
+        ? { kvk_nummer: kvkNummer, machtiging }
+        : { kvk_nummer: kvkNummer },
+    ),
+  eherkenningMachtigingen: (kvkNummer) =>
+    apiGet(`/api/eherkenning/machtigingen?kvk=${encodeURIComponent(kvkNummer)}`),
   eherkenningLogout: () => apiPost('/api/eherkenning/logout'),
   mijnRegistratie: () => apiGet('/api/mijn-registratie'),
   registerDemo: () => apiGet('/api/register/demo'),

@@ -372,9 +372,19 @@ def main() -> None:
         key=lambda p: (-max(u["zetels"] for u in p["decentrale_uitslagen"]), p["naam"]),
     )
 
+    # Demo voor het machtigingenmodel: D66 is centraal georganiseerd, dus de
+    # login biedt naast het tekenbevoegd bestuur ook afdelingsvolmachten aan.
+    centraal_demo = next(
+        (p for p in landelijke
+         if p["organisatiemodel"] == "CENTRAAL" and p["naam"] == "D66"),
+        None,
+    )
+
     demo = [
         voorbeeld(grootste, f"grootste landelijke partij ({grootste['kamerzetels']} kamerzetels)"),
         voorbeeld(breedste, f"breedste decentrale dekking ({len(breedste['decentrale_uitslagen'])} gebieden)"),
+        *([voorbeeld(centraal_demo, "centraal organisatiemodel: log in als bestuur of als afdeling (beperkte machtiging)")]
+          if centraal_demo else []),
         voorbeeld(kleinste, f"kleinste landelijke partij ({kleinste['kamerzetels']} kamerzetel{'s' if kleinste['kamerzetels'] != 1 else ''}, op de ledendrempel)"),
         voorbeeld(meeste_ps, "sterk in provinciale staten"),
         voorbeeld(afdeling, "afdeling met eigen rechtspersoon (decentraal organisatiemodel)"),

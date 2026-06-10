@@ -375,6 +375,7 @@ mod tests {
             corpus: Arc::new(LawCorpus {
                 wpp: String::new(),
                 regeling: String::new(),
+                besluit_decentraal: String::new(),
                 awb: String::new(),
                 termijnenwet: String::new(),
             }),
