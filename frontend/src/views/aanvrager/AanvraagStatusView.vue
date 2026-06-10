@@ -250,7 +250,7 @@ watch(item, (i) => {
           <nldd-spacer size="24"></nldd-spacer>
 
           <!-- Lopend of beslist bezwaar -->
-          <template v-if="item.bezwaar">
+          <template v-if="item.bezwaar && (item.bezwaar.beslissing || item.bezwaar.status === 'HERSTEL')">
             <nldd-title size="4"><h3>Uw bezwaar</h3></nldd-title>
             <nldd-spacer size="12"></nldd-spacer>
             <NBanner
@@ -316,14 +316,6 @@ watch(item, (i) => {
                 </nldd-form-actions>
               </nldd-form>
             </template>
-            <NBanner
-              v-else
-              variant="accent"
-              text="Uw bezwaar is in behandeling"
-              :supporting-text="item.bezwaar.beslistermijn_einddatum
-                ? `De Napp beslist uiterlijk ${datum(item.bezwaar.beslistermijn_einddatum)} op uw bezwaar (artikel 7:10 Awb). U wordt gehoord, tenzij daarvan mag worden afgezien (artikel 7:3).`
-                : 'De Napp behandelt uw bezwaar (AWB hoofdstuk 7).'"
-            />
           </template>
 
           <!-- Nog geen bezwaar: informatie + formulier -->
