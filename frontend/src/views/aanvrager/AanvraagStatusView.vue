@@ -53,7 +53,7 @@ onMounted(async () => {
       slot="header"
       subtitle="Subsidieportaal politieke partijen"
       portal="aanvrager"
-      :items="[{ text: 'Mijn aanvragen', to: '/' }, { text: 'Nieuwe aanvraag', to: '/nieuw' }]"
+      :items="[{ text: 'Mijn aanvragen', to: '/' }, { text: 'Nieuwe aanvraag', to: '/nieuw' }, { text: 'Mijn organisatie', to: '/organisatie' }]"
     />
 
     <nldd-simple-section v-if="fout" width="560px">

@@ -226,7 +226,7 @@ watch(() => session.aanvrager, laadRegistratie);
       slot="header"
       subtitle="Subsidieportaal politieke partijen"
       portal="aanvrager"
-      :items="[{ text: 'Mijn aanvragen', to: '/' }, { text: 'Nieuwe aanvraag', to: '/nieuw' }]"
+      :items="[{ text: 'Mijn aanvragen', to: '/' }, { text: 'Nieuwe aanvraag', to: '/nieuw' }, { text: 'Mijn organisatie', to: '/organisatie' }]"
     />
 
     <template v-if="session.loaded && !session.aanvrager">
