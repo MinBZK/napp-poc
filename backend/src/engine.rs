@@ -37,6 +37,12 @@ pub const STAGE_BESLUIT: &str = "BESLUIT";
 pub const STAGE_BEKENDMAKING: &str = "BEKENDMAKING";
 pub const STAGE_BEZWAAR: &str = "BEZWAAR";
 
+// Stages van de bezwaarprocedure (AWB, proceduredefinitie 'bezwaar').
+pub const BEZWAAR_STAGE_BEZWAARSCHRIFT: &str = "BEZWAARSCHRIFT";
+pub const BEZWAAR_STAGE_HERSTEL: &str = "HERSTEL";
+pub const BEZWAAR_STAGE_BEHANDELING: &str = "BEHANDELING";
+pub const BEZWAAR_STAGE_BESLISSING: &str = "BESLISSING";
+
 /// Outputs die de orchestratie opvraagt of (via hooks) uitleest, per wet.
 /// `valideer_contract` controleert bij het opstarten dat ze allemaal in de
 /// geladen corpus bestaan: een hernoemde output in de YAML faalt dan bij de
@@ -79,6 +85,17 @@ const CONTRACT: &[(&str, &[&str])] = &[
             "bezwaartermijn_startdatum",
             "bezwaartermijn_einddatum",
             "betaaltermijn_einddatum",
+            "voldoet_aan_bezwaarschriftvereisten",
+            "ontbreekt_naam_en_adres",
+            "ontbreekt_dagtekening",
+            "ontbreekt_besluitomschrijving",
+            "ontbreken_gronden",
+            "ontbreekt_ondertekening",
+            "herstel_vereist",
+            "mag_niet_ontvankelijk_wegens_verzuim",
+            "bezwaar_tijdig",
+            "mag_afzien_van_horen",
+            "beslistermijn_bezwaar_einddatum",
         ],
     ),
     (ATW_ID, &["verlengde_einddatum"]),
@@ -174,6 +191,30 @@ pub fn beschikking_procedure(wpp_yaml: &str) -> anyhow::Result<Procedure> {
         STAGE_BESLUIT,
         STAGE_BEKENDMAKING,
         STAGE_BEZWAAR,
+    ] {
+        procedure.index(stage)?;
+    }
+    Ok(procedure)
+}
+
+/// Lees de bezwaarprocedure uit de AWB (proceduredefinitie 'bezwaar').
+pub fn bezwaar_procedure(awb_yaml: &str) -> anyhow::Result<Procedure> {
+    let mut service = LawExecutionService::new();
+    service
+        .load_law(awb_yaml)
+        .map_err(|e| anyhow::anyhow!("laden AWB voor bezwaarprocedure mislukt: {e}"))?;
+    let definitie = service
+        .resolver()
+        .find_procedure("BESCHIKKING", Some("bezwaar"))
+        .ok_or_else(|| anyhow::anyhow!("de AWB definieert geen bezwaarprocedure"))?;
+    let procedure = Procedure {
+        stages: definitie.stages.iter().map(|s| s.name.clone()).collect(),
+    };
+    for stage in [
+        BEZWAAR_STAGE_BEZWAARSCHRIFT,
+        BEZWAAR_STAGE_HERSTEL,
+        BEZWAAR_STAGE_BEHANDELING,
+        BEZWAAR_STAGE_BESLISSING,
     ] {
         procedure.index(stage)?;
     }
@@ -996,6 +1037,168 @@ pub async fn evaluate_betaaltermijn(
                 )
                 .map_err(|e| anyhow::anyhow!("betaaltermijn berekenen mislukt: {e}"))?;
             req_date(&result.outputs, "betaaltermijn_einddatum")
+        })
+    })
+    .await?
+}
+
+/// Feiten over een bezwaarschrift, aangeleverd door de orchestratie
+/// (formuliervelden en datumvergelijkingen); de oordelen komen uit de AWB.
+#[derive(Debug, Clone, Default)]
+pub struct BezwaarFeiten {
+    // AWB 6:5 — vereisten aan het bezwaarschrift.
+    pub naam_en_adres_vermeld: bool,
+    pub dagtekening_vermeld: bool,
+    pub besluit_omschreven: bool,
+    pub gronden_vermeld: bool,
+    pub ondertekend: bool,
+    // AWB 6:6 — verzuimherstel.
+    pub herstelgelegenheid_geboden: bool,
+    pub binnen_hersteltermijn_aangevuld: bool,
+    // AWB 6:9 — tijdigheid; de datumvergelijkingen zijn orchestratie
+    // (engine vergelijkt geen datums), de regel staat in de wet.
+    pub ontvangen_voor_einde_termijn: bool,
+    pub ter_post_bezorgd_voor_einde_termijn: bool,
+    pub ontvangen_binnen_week_na_termijn: bool,
+}
+
+/// Het AWB-oordeel over een bezwaarschrift (6:5, 6:6 en 6:9), plus alle
+/// ruwe outputs voor opslag bij het bezwaar (zelfde bewijs-patroon als het
+/// besluit).
+#[derive(Debug, Clone, Serialize)]
+pub struct BezwaarToets {
+    pub voldoet_aan_vereisten: bool,
+    pub herstel_vereist: bool,
+    pub mag_niet_ontvankelijk_wegens_verzuim: bool,
+    pub tijdig: bool,
+    pub outputs: serde_json::Value,
+}
+
+pub async fn evaluate_bezwaarschrift(
+    corpus: Arc<LawCorpus>,
+    feiten: BezwaarFeiten,
+    date: String,
+) -> anyhow::Result<BezwaarToets> {
+    tokio::task::spawn_blocking(move || {
+        with_service(&corpus, |service| {
+            let mut params: BTreeMap<String, Value> = BTreeMap::new();
+            for (k, v) in [
+                ("naam_en_adres_vermeld", feiten.naam_en_adres_vermeld),
+                ("dagtekening_vermeld", feiten.dagtekening_vermeld),
+                ("besluit_omschreven", feiten.besluit_omschreven),
+                ("gronden_vermeld", feiten.gronden_vermeld),
+                ("ondertekend", feiten.ondertekend),
+                (
+                    "herstelgelegenheid_geboden",
+                    feiten.herstelgelegenheid_geboden,
+                ),
+                (
+                    "binnen_hersteltermijn_aangevuld",
+                    feiten.binnen_hersteltermijn_aangevuld,
+                ),
+                (
+                    "ontvangen_voor_einde_termijn",
+                    feiten.ontvangen_voor_einde_termijn,
+                ),
+                (
+                    "ter_post_bezorgd_voor_einde_termijn",
+                    feiten.ter_post_bezorgd_voor_einde_termijn,
+                ),
+                (
+                    "ontvangen_binnen_week_na_termijn",
+                    feiten.ontvangen_binnen_week_na_termijn,
+                ),
+            ] {
+                params.insert(k.to_string(), Value::Bool(v));
+            }
+            let mut outputs: BTreeMap<String, Value> = BTreeMap::new();
+            for gevraagd in [
+                &[
+                    "voldoet_aan_bezwaarschriftvereisten",
+                    "ontbreekt_naam_en_adres",
+                    "ontbreekt_dagtekening",
+                    "ontbreekt_besluitomschrijving",
+                    "ontbreken_gronden",
+                    "ontbreekt_ondertekening",
+                ][..],
+                &["herstel_vereist", "mag_niet_ontvankelijk_wegens_verzuim"][..],
+                &["bezwaar_tijdig"][..],
+            ] {
+                let result = service
+                    .evaluate_law(AWB_ID, gevraagd, params.clone(), &date)
+                    .map_err(|e| anyhow::anyhow!("toetsing bezwaarschrift mislukt: {e}"))?;
+                outputs.extend(result.outputs);
+            }
+            Ok(BezwaarToets {
+                voldoet_aan_vereisten: req_bool(&outputs, "voldoet_aan_bezwaarschriftvereisten")?,
+                herstel_vereist: req_bool(&outputs, "herstel_vereist")?,
+                mag_niet_ontvankelijk_wegens_verzuim: req_bool(
+                    &outputs,
+                    "mag_niet_ontvankelijk_wegens_verzuim",
+                )?,
+                tijdig: req_bool(&outputs, "bezwaar_tijdig")?,
+                outputs: serde_json::to_value(&outputs).unwrap_or_default(),
+            })
+        })
+    })
+    .await?
+}
+
+/// AWB 7:3: mag van het horen worden afgezien? Advies aan de beoordelaar.
+pub async fn evaluate_afzien_van_horen(
+    corpus: Arc<LawCorpus>,
+    kennelijk_niet_ontvankelijk: bool,
+    kennelijk_ongegrond: bool,
+    indiener_ziet_af_van_horen: bool,
+    volledig_tegemoetgekomen: bool,
+    date: String,
+) -> anyhow::Result<bool> {
+    tokio::task::spawn_blocking(move || {
+        with_service(&corpus, |service| {
+            let mut params: BTreeMap<String, Value> = BTreeMap::new();
+            params.insert(
+                "kennelijk_niet_ontvankelijk".into(),
+                Value::Bool(kennelijk_niet_ontvankelijk),
+            );
+            params.insert(
+                "kennelijk_ongegrond".into(),
+                Value::Bool(kennelijk_ongegrond),
+            );
+            params.insert(
+                "indiener_ziet_af_van_horen".into(),
+                Value::Bool(indiener_ziet_af_van_horen),
+            );
+            params.insert(
+                "volledig_tegemoetgekomen".into(),
+                Value::Bool(volledig_tegemoetgekomen),
+            );
+            let result = service
+                .evaluate_law(AWB_ID, &["mag_afzien_van_horen"], params, &date)
+                .map_err(|e| anyhow::anyhow!("toetsing artikel 7:3 mislukt: {e}"))?;
+            req_bool(&result.outputs, "mag_afzien_van_horen")
+        })
+    })
+    .await?
+}
+
+/// AWB 7:10: de beslistermijn op het bezwaar (zes weken na afloop van de
+/// bezwaartermijn).
+pub async fn evaluate_beslistermijn_bezwaar(
+    corpus: Arc<LawCorpus>,
+    bezwaartermijn_einddatum: String,
+    date: String,
+) -> anyhow::Result<String> {
+    tokio::task::spawn_blocking(move || {
+        with_service(&corpus, |service| {
+            let mut params = BTreeMap::new();
+            params.insert(
+                "bezwaartermijn_verstreken_op".to_string(),
+                Value::String(bezwaartermijn_einddatum.clone()),
+            );
+            let result = service
+                .evaluate_law(AWB_ID, &["beslistermijn_bezwaar_einddatum"], params, &date)
+                .map_err(|e| anyhow::anyhow!("beslistermijn bezwaar berekenen mislukt: {e}"))?;
+            req_date(&result.outputs, "beslistermijn_bezwaar_einddatum")
         })
     })
     .await?

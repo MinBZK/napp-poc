@@ -275,6 +275,25 @@ export const stepDefinitions = [
     },
   },
   {
+    // Generieke AWB-evaluatie: de gevraagde outputs, kommagescheiden.
+    pattern: /^the AWB outputs "([^"]+)" are evaluated$/,
+    execute: (ctx, engine, match) => {
+      try {
+        ctx.result = engine.executeMultiple(
+          'algemene_wet_bestuursrecht',
+          match[1].split(',').map((s) => s.trim()),
+          ctx.parameters,
+          ctx.calculationDate ?? '2026-06-01',
+        );
+        ctx.error = null;
+      } catch (e) {
+        ctx.error = e;
+        ctx.result = null;
+      }
+      ctx.executed = true;
+    },
+  },
+  {
     // Generieke boolean-assertie op een wet-output.
     pattern: /^the output "([^"]+)" is (true|false)$/,
     execute: (ctx, _engine, match) =>

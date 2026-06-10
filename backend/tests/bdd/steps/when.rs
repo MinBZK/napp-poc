@@ -108,3 +108,10 @@ fn execute_kieswet_g1(world: &mut NappWorld) {
         ],
     );
 }
+
+/// Generieke AWB-evaluatie: de gevraagde outputs, kommagescheiden.
+#[when(regex = r#"^the AWB outputs "([^"]+)" are evaluated$"#)]
+fn execute_awb_outputs(world: &mut NappWorld, outputs: String) {
+    let gevraagd: Vec<&str> = outputs.split(',').map(str::trim).collect();
+    world.execute("algemene_wet_bestuursrecht", &gevraagd);
+}

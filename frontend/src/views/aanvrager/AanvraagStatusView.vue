@@ -38,13 +38,67 @@ const landelijkeDelen = computed(() => {
   ].filter((d) => d.bedrag > 0);
 });
 
-onMounted(async () => {
+async function laad() {
   try {
     item.value = await api.mijnAanvraag(route.params.id);
   } catch (e) {
     fout.value = e.message;
   }
-});
+}
+onMounted(laad);
+
+// Bezwaar maken (AWB 6:4 e.v.): het formulier levert de feiten voor de
+// vereisten van 6:5; de wet oordeelt (incl. herstelgelegenheid, 6:6).
+const bezwaarOpen = ref(false);
+const bezwaarBezig = ref(false);
+const bezwaarFout = ref('');
+const bezwaarForm = ref({ naam: '', adres: '', gronden: '', ondertekend: false });
+
+function veld(event) {
+  return event.detail?.value ?? event.target?.value ?? '';
+}
+
+async function dienBezwaarIn() {
+  bezwaarFout.value = '';
+  bezwaarBezig.value = true;
+  try {
+    await api.dienBezwaarIn(item.value.besluit.id, {
+      naam_indiener: bezwaarForm.value.naam.trim(),
+      adres_indiener: bezwaarForm.value.adres.trim(),
+      gronden: bezwaarForm.value.gronden.trim(),
+      ondertekend: bezwaarForm.value.ondertekend,
+    });
+    bezwaarOpen.value = false;
+    await laad();
+  } catch (e) {
+    bezwaarFout.value = e.message;
+  } finally {
+    bezwaarBezig.value = false;
+  }
+}
+
+async function herstelBezwaar() {
+  bezwaarFout.value = '';
+  bezwaarBezig.value = true;
+  try {
+    await api.herstelBezwaar(item.value.bezwaar.id, {
+      adres_indiener: bezwaarForm.value.adres.trim() || undefined,
+      gronden: bezwaarForm.value.gronden.trim() || undefined,
+      ondertekend: bezwaarForm.value.ondertekend || undefined,
+    });
+    await laad();
+  } catch (e) {
+    bezwaarFout.value = e.message;
+  } finally {
+    bezwaarBezig.value = false;
+  }
+}
+
+const BESLISSING_LABELS = {
+  NIET_ONTVANKELIJK: 'Niet-ontvankelijk',
+  ONGEGROND: 'Ongegrond',
+  GEGROND: 'Gegrond',
+};
 </script>
 
 <template>
@@ -167,18 +221,141 @@ onMounted(async () => {
 
         <template v-if="item.besluit?.bezwaartermijn_einddatum">
           <nldd-spacer size="24"></nldd-spacer>
-          <nldd-box>
-            <nldd-container padding="16">
-              <nldd-rich-text>
-                <p>
-                  Bent u het niet eens met dit besluit? U kunt tot en met
-                  <strong>{{ datum(item.besluit.bezwaartermijn_einddatum) }}</strong>
-                  bezwaar maken bij de Nederlandse autoriteit politieke partijen
-                  (artikel 6:4 Algemene wet bestuursrecht).
-                </p>
-              </nldd-rich-text>
-            </nldd-container>
-          </nldd-box>
+
+          <!-- Lopend of beslist bezwaar -->
+          <template v-if="item.bezwaar">
+            <nldd-title size="4"><h3>Uw bezwaar</h3></nldd-title>
+            <nldd-spacer size="12"></nldd-spacer>
+            <NBanner
+              v-if="item.bezwaar.beslissing"
+              :variant="item.bezwaar.beslissing === 'GEGROND' ? 'success' : 'critical'"
+              :text="`Beslissing op bezwaar: ${BESLISSING_LABELS[item.bezwaar.beslissing] ?? item.bezwaar.beslissing}`"
+              :supporting-text="item.bezwaar.beslissing_motivering"
+            />
+            <template v-else-if="item.bezwaar.status === 'HERSTEL'">
+              <NBanner
+                variant="warning"
+                text="Uw bezwaarschrift is onvolledig"
+                supporting-text="U krijgt gelegenheid het verzuim te herstellen (artikel 6:6 Awb). Vul de ontbrekende onderdelen aan; anders kan het bezwaar niet-ontvankelijk worden verklaard."
+              />
+              <nldd-spacer size="12"></nldd-spacer>
+              <nldd-form novalidate @submit.prevent="herstelBezwaar">
+                <nldd-form-field label="Gronden van het bezwaar">
+                  <nldd-text-field
+                    :value="bezwaarForm.gronden"
+                    name="gronden"
+                    @input="bezwaarForm.gronden = veld($event)"
+                  ></nldd-text-field>
+                </nldd-form-field>
+                <nldd-form-field label="Adres van de indiener">
+                  <nldd-text-field
+                    :value="bezwaarForm.adres"
+                    name="adres"
+                    @input="bezwaarForm.adres = veld($event)"
+                  ></nldd-text-field>
+                </nldd-form-field>
+                <nldd-checkbox
+                  :checked="bezwaarForm.ondertekend || undefined"
+                  text="Ik onderteken dit bezwaarschrift"
+                  @change="bezwaarForm.ondertekend = !bezwaarForm.ondertekend"
+                ></nldd-checkbox>
+                <template v-if="bezwaarFout">
+                  <nldd-spacer size="8"></nldd-spacer>
+                  <NBanner variant="critical" :text="bezwaarFout" />
+                </template>
+                <nldd-form-actions>
+                  <nldd-button
+                    variant="primary"
+                    type="submit"
+                    text="Verzuim herstellen"
+                    :disabled="bezwaarBezig || undefined"
+                  ></nldd-button>
+                </nldd-form-actions>
+              </nldd-form>
+            </template>
+            <NBanner
+              v-else
+              variant="accent"
+              text="Uw bezwaar is in behandeling"
+              :supporting-text="item.bezwaar.beslistermijn_einddatum
+                ? `De Napp beslist uiterlijk ${datum(item.bezwaar.beslistermijn_einddatum)} op uw bezwaar (artikel 7:10 Awb). U wordt gehoord, tenzij daarvan mag worden afgezien (artikel 7:3).`
+                : 'De Napp behandelt uw bezwaar (AWB hoofdstuk 7).'"
+            />
+          </template>
+
+          <!-- Nog geen bezwaar: informatie + formulier -->
+          <template v-else>
+            <nldd-box>
+              <nldd-container padding="16" gap="8">
+                <nldd-rich-text>
+                  <p>
+                    Bent u het niet eens met dit besluit? U kunt tot en met
+                    <strong>{{ datum(item.besluit.bezwaartermijn_einddatum) }}</strong>
+                    bezwaar maken bij de Nederlandse autoriteit politieke partijen
+                    (artikel 6:4 Algemene wet bestuursrecht).
+                  </p>
+                </nldd-rich-text>
+                <div v-if="!bezwaarOpen">
+                  <nldd-button
+                    variant="secondary"
+                    text="Bezwaar maken"
+                    @click="bezwaarOpen = true"
+                  ></nldd-button>
+                </div>
+                <nldd-form v-else novalidate @submit.prevent="dienBezwaarIn">
+                  <nldd-form-field label="Naam van de indiener">
+                    <nldd-text-field
+                      :value="bezwaarForm.naam"
+                      name="naam"
+                      @input="bezwaarForm.naam = veld($event)"
+                    ></nldd-text-field>
+                  </nldd-form-field>
+                  <nldd-form-field label="Adres">
+                    <nldd-text-field
+                      :value="bezwaarForm.adres"
+                      name="adres"
+                      @input="bezwaarForm.adres = veld($event)"
+                    ></nldd-text-field>
+                  </nldd-form-field>
+                  <nldd-form-field label="Gronden van het bezwaar">
+                    <nldd-text-field
+                      :value="bezwaarForm.gronden"
+                      name="gronden"
+                      placeholder="Waarom bent u het niet eens met het besluit?"
+                      @input="bezwaarForm.gronden = veld($event)"
+                    ></nldd-text-field>
+                    <nldd-form-field-help-text>
+                      Het bezwaarschrift moet de gronden bevatten (artikel 6:5
+                      Awb). Ontbreekt er iets, dan krijgt u gelegenheid tot
+                      herstel (artikel 6:6).
+                    </nldd-form-field-help-text>
+                  </nldd-form-field>
+                  <nldd-checkbox
+                    :checked="bezwaarForm.ondertekend || undefined"
+                    text="Ik onderteken dit bezwaarschrift"
+                    @change="bezwaarForm.ondertekend = !bezwaarForm.ondertekend"
+                  ></nldd-checkbox>
+                  <template v-if="bezwaarFout">
+                    <nldd-spacer size="8"></nldd-spacer>
+                    <NBanner variant="critical" :text="bezwaarFout" />
+                  </template>
+                  <nldd-form-actions>
+                    <nldd-button
+                      variant="primary"
+                      type="submit"
+                      text="Bezwaarschrift indienen"
+                      :disabled="bezwaarBezig || undefined"
+                    ></nldd-button>
+                    <nldd-button
+                      variant="secondary"
+                      text="Annuleren"
+                      @click="bezwaarOpen = false"
+                    ></nldd-button>
+                  </nldd-form-actions>
+                </nldd-form>
+              </nldd-container>
+            </nldd-box>
+          </template>
         </template>
       </nldd-simple-section>
     </template>

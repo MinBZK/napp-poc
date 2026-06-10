@@ -77,6 +77,11 @@ export const api = {
   bekendmaking: (id) => apiPost(`/api/aanvragen/${id}/bekendmaking`),
   betaalopdrachten: () => apiGet('/api/betaalopdrachten'),
   betaalopdrachtUitbetalen: (id) => apiPost(`/api/betaalopdrachten/${id}/uitbetalen`),
+  dienBezwaarIn: (besluitId, payload) => apiPost(`/api/besluiten/${besluitId}/bezwaar`, payload),
+  herstelBezwaar: (id, payload) => apiPut(`/api/bezwaren/${id}/herstel`, payload),
+  bezwaren: () => apiGet('/api/bezwaren'),
+  bezwaarHoren: (id, payload) => apiPost(`/api/bezwaren/${id}/horen`, payload),
+  bezwaarBeslissen: (id, payload) => apiPost(`/api/bezwaren/${id}/beslissen`, payload),
   register: () => apiGet('/api/register'),
   statistieken: () => apiGet('/api/register/statistieken'),
   // Partijregister-beheer (beoordelaar-only).

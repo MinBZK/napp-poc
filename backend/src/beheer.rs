@@ -229,6 +229,12 @@ mod tests {
                 ))
                 .expect("procedure uit de wet"),
             ),
+            bezwaar_procedure: Arc::new(
+                crate::engine::bezwaar_procedure(include_str!(
+                    "../../law/algemene_wet_bestuursrecht/1994-01-01.yaml"
+                ))
+                .expect("bezwaarprocedure uit de AWB"),
+            ),
             oidc_client: None,
             oidc_config: None,
             end_session_url: None,

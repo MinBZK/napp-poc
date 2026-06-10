@@ -157,6 +157,64 @@ async function betaalUit() {
   }
 }
 
+// Bezwaarbehandeling (AWB hoofdstuk 7): horen of geldig afzien (7:3),
+// daarna beslissen; bij gegrond volgt volledige heroverweging (7:11).
+const bezwaarFout = ref('');
+const afzienGrond = ref('KENNELIJK_ONGEGROND');
+const beslisKeuze = ref('ONGEGROND');
+const correctieLeden = ref('');
+
+const AFZIEN_GRONDEN = [
+  { value: 'KENNELIJK_NIET_ONTVANKELIJK', label: 'Kennelijk niet-ontvankelijk' },
+  { value: 'KENNELIJK_ONGEGROND', label: 'Kennelijk ongegrond' },
+  { value: 'INDIENER_ZIET_AF', label: 'Indiener ziet af van horen' },
+  { value: 'VOLLEDIG_TEGEMOETGEKOMEN', label: 'Volledig tegemoetgekomen' },
+];
+
+const BESLISSING_LABELS = {
+  NIET_ONTVANKELIJK: 'Niet-ontvankelijk',
+  ONGEGROND: 'Ongegrond',
+  GEGROND: 'Gegrond',
+};
+
+async function registreerHoren(gehoord) {
+  bezwaarFout.value = '';
+  bezig.value = true;
+  try {
+    await api.bezwaarHoren(item.value.bezwaar.id, {
+      gehoord,
+      afzien_grond: gehoord ? undefined : afzienGrond.value,
+    });
+    await laad();
+  } catch (e) {
+    bezwaarFout.value = e.message;
+  } finally {
+    bezig.value = false;
+  }
+}
+
+async function beslisBezwaar() {
+  bezwaarFout.value = '';
+  bezig.value = true;
+  try {
+    const payload = { beslissing: beslisKeuze.value };
+    const leden = parseInt(correctieLeden.value, 10);
+    if (beslisKeuze.value === 'GEGROND' && Number.isFinite(leden)) {
+      payload.gecorrigeerde_parameters = { aantal_betalende_leden: leden };
+    }
+    await api.bezwaarBeslissen(item.value.bezwaar.id, payload);
+    await laad();
+  } catch (e) {
+    bezwaarFout.value = e.message;
+  } finally {
+    bezig.value = false;
+  }
+}
+
+function bezwaarVeld(event) {
+  return event.detail?.value ?? event.target?.value ?? '';
+}
+
 onMounted(laad);
 </script>
 
@@ -292,6 +350,127 @@ onMounted(laad);
                   :disabled="bezig || undefined"
                   @click="betaalUit"
                 ></nldd-button>
+              </template>
+            </template>
+
+            <template v-if="item.bezwaar">
+              <nldd-spacer size="24"></nldd-spacer>
+              <nldd-title size="4">
+                <h3>Bezwaar (AWB hoofdstuk 6/7)</h3>
+                <div slot="actions">
+                  <nldd-tag
+                    :color="item.bezwaar.beslissing ? (item.bezwaar.beslissing === 'GEGROND' ? 'success' : 'critical') : 'accent'"
+                    :text="item.bezwaar.beslissing ? (BESLISSING_LABELS[item.bezwaar.beslissing] ?? item.bezwaar.beslissing) : item.bezwaar.status"
+                  ></nldd-tag>
+                </div>
+              </nldd-title>
+              <nldd-spacer size="12"></nldd-spacer>
+              <nldd-list variant="box">
+                <nldd-list-item size="sm">
+                  <nldd-text-cell text="Indiener" color="secondary"></nldd-text-cell>
+                  <nldd-text-cell :text="item.bezwaar.naam_indiener" horizontal-alignment="right"></nldd-text-cell>
+                </nldd-list-item>
+                <nldd-list-item size="sm">
+                  <nldd-text-cell text="Gronden" color="secondary"></nldd-text-cell>
+                  <nldd-text-cell :text="item.bezwaar.gronden || '— (vormgebrek)'" horizontal-alignment="right"></nldd-text-cell>
+                </nldd-list-item>
+                <nldd-list-item size="sm">
+                  <nldd-text-cell text="Tijdig (AWB 6:9) · oordeel wet" color="secondary"></nldd-text-cell>
+                  <nldd-cell width="fit-content">
+                    <nldd-tag
+                      :color="item.bezwaar.toets?.tijdig ? 'success' : 'critical'"
+                      :text="item.bezwaar.toets?.tijdig ? 'Tijdig' : 'Niet tijdig'"
+                    ></nldd-tag>
+                  </nldd-cell>
+                </nldd-list-item>
+                <nldd-list-item size="sm">
+                  <nldd-text-cell text="Vereisten (AWB 6:5) · oordeel wet" color="secondary"></nldd-text-cell>
+                  <nldd-cell width="fit-content">
+                    <nldd-tag
+                      :color="item.bezwaar.toets?.voldoet_aan_vereisten ? 'success' : 'warning'"
+                      :text="item.bezwaar.toets?.voldoet_aan_vereisten ? 'Compleet' : 'Onvolledig'"
+                    ></nldd-tag>
+                  </nldd-cell>
+                </nldd-list-item>
+                <nldd-list-item v-if="item.bezwaar.beslistermijn_einddatum" size="sm">
+                  <nldd-text-cell text="Beslissen vóór · AWB 7:10" color="secondary"></nldd-text-cell>
+                  <nldd-text-cell :text="datum(item.bezwaar.beslistermijn_einddatum)" horizontal-alignment="right"></nldd-text-cell>
+                </nldd-list-item>
+                <nldd-list-item v-if="item.bezwaar.gehoord !== null" size="sm">
+                  <nldd-text-cell text="Horen (AWB 7:2/7:3)" color="secondary"></nldd-text-cell>
+                  <nldd-text-cell
+                    :text="item.bezwaar.gehoord ? 'Gehoord' : `Afgezien: ${item.bezwaar.afzien_grond}`"
+                    horizontal-alignment="right"
+                  ></nldd-text-cell>
+                </nldd-list-item>
+              </nldd-list>
+
+              <template v-if="!item.bezwaar.beslissing && item.bezwaar.status === 'BEHANDELING'">
+                <template v-if="item.bezwaar.gehoord === null">
+                  <nldd-spacer size="12"></nldd-spacer>
+                  <nldd-button
+                    variant="secondary"
+                    text="Indiener gehoord"
+                    :disabled="bezig || undefined"
+                    @click="registreerHoren(true)"
+                  ></nldd-button>
+                  <nldd-spacer size="8"></nldd-spacer>
+                  <nldd-form-field label="Of afzien van horen (AWB 7:3)">
+                    <nldd-dropdown>
+                      <select :value="afzienGrond" @change="afzienGrond = bezwaarVeld($event)">
+                        <option v-for="g in AFZIEN_GRONDEN" :key="g.value" :value="g.value">{{ g.label }}</option>
+                      </select>
+                    </nldd-dropdown>
+                  </nldd-form-field>
+                  <nldd-spacer size="8"></nldd-spacer>
+                  <nldd-button
+                    variant="neutral"
+                    text="Afzien van horen"
+                    :disabled="bezig || undefined"
+                    @click="registreerHoren(false)"
+                  ></nldd-button>
+                </template>
+                <template v-else>
+                  <nldd-spacer size="12"></nldd-spacer>
+                  <nldd-form-field label="Beslissing op bezwaar">
+                    <nldd-dropdown>
+                      <select :value="beslisKeuze" @change="beslisKeuze = bezwaarVeld($event)">
+                        <option value="NIET_ONTVANKELIJK">Niet-ontvankelijk</option>
+                        <option value="ONGEGROND">Ongegrond</option>
+                        <option value="GEGROND">Gegrond (heroverweging, AWB 7:11)</option>
+                      </select>
+                    </nldd-dropdown>
+                  </nldd-form-field>
+                  <template v-if="beslisKeuze === 'GEGROND'">
+                    <nldd-form-field label="Gecorrigeerd ledental (eigen opgave)">
+                      <nldd-text-field
+                        :value="correctieLeden"
+                        name="correctie-leden"
+                        placeholder="bijv. 24000"
+                        @input="correctieLeden = bezwaarVeld($event)"
+                      ></nldd-text-field>
+                      <nldd-form-field-help-text>
+                        De wet wordt opnieuw uitgevoerd op de gecorrigeerde
+                        feiten; het besluit en het bewijs worden herzien.
+                      </nldd-form-field-help-text>
+                    </nldd-form-field>
+                  </template>
+                  <nldd-spacer size="8"></nldd-spacer>
+                  <nldd-button
+                    variant="primary"
+                    text="Beslissing op bezwaar vaststellen"
+                    :disabled="bezig || undefined"
+                    @click="beslisBezwaar"
+                  ></nldd-button>
+                </template>
+              </template>
+              <template v-if="bezwaarFout">
+                <nldd-spacer size="8"></nldd-spacer>
+                <NBanner variant="critical" :text="bezwaarFout" />
+              </template>
+              <template v-if="item.bezwaar.beslissing_motivering">
+                <nldd-spacer size="12"></nldd-spacer>
+                <nldd-rich-text><p>{{ item.bezwaar.beslissing_motivering }}</p></nldd-rich-text>
               </template>
             </template>
           </div>

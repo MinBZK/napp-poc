@@ -4,6 +4,7 @@
 //! beoordelaars wanneer geconfigureerd, gemockte eHerkenning voor aanvragers.
 
 mod beheer;
+mod bezwaar;
 mod claim;
 mod db;
 mod engine;
@@ -17,7 +18,7 @@ mod state;
 use std::sync::Arc;
 
 use axum::extract::Request;
-use axum::routing::{get, post};
+use axum::routing::{get, post, put};
 use axum::Router;
 use regelrecht_auth::OidcAppState;
 use sqlx::sqlite::SqlitePoolOptions;
@@ -73,11 +74,13 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let procedure = Arc::new(engine::beschikking_procedure(&corpus.wpp)?);
+    let bezwaar_procedure = Arc::new(engine::bezwaar_procedure(&corpus.awb)?);
 
     let app_state = AppState {
         pool,
         corpus,
         procedure,
+        bezwaar_procedure,
         oidc_client,
         oidc_config,
         end_session_url,
@@ -134,6 +137,18 @@ async fn main() -> anyhow::Result<()> {
         .route(
             "/api/betaalopdrachten/{id}/uitbetalen",
             post(handlers::betaal_uit),
+        )
+        // Bezwaar (AWB hoofdstuk 6/7, zie bezwaar.rs).
+        .route(
+            "/api/besluiten/{id}/bezwaar",
+            post(bezwaar::dien_bezwaar_in),
+        )
+        .route("/api/bezwaren/{id}/herstel", put(bezwaar::herstel_bezwaar))
+        .route("/api/bezwaren", get(bezwaar::list_bezwaren))
+        .route("/api/bezwaren/{id}/horen", post(bezwaar::registreer_horen))
+        .route(
+            "/api/bezwaren/{id}/beslissen",
+            post(bezwaar::beslis_bezwaar),
         )
         .route("/api/register", get(handlers::register))
         .route("/api/register/statistieken", get(handlers::statistieken))

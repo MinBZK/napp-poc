@@ -113,6 +113,29 @@ pub async fn init(pool: &SqlitePool) -> anyhow::Result<()> {
             beoordeeld_door TEXT,
             beoordeeld_at TEXT
         );
+        -- Bezwaren tegen beschikkingen (AWB hoofdstuk 6/7). De status volgt
+        -- de bezwaarprocedure uit de AWB-YAML; het AWB-oordeel over het
+        -- bezwaarschrift (6:5/6:6/6:9) staat als JSON in toets.
+        CREATE TABLE IF NOT EXISTS bezwaren (
+            id TEXT PRIMARY KEY,
+            besluit_id TEXT NOT NULL REFERENCES besluiten(id),
+            aanvraag_id TEXT NOT NULL REFERENCES aanvragen(id),
+            kvk_nummer TEXT NOT NULL,
+            naam_indiener TEXT NOT NULL,
+            adres_indiener TEXT,
+            gronden TEXT,
+            ondertekend INTEGER NOT NULL DEFAULT 0,
+            ontvangen_op TEXT NOT NULL,
+            toets TEXT,
+            status TEXT NOT NULL,
+            beslistermijn_einddatum TEXT,
+            gehoord INTEGER,
+            afzien_grond TEXT,
+            beslissing TEXT,
+            beslissing_motivering TEXT,
+            beslissing_datum TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
         "#,
     )
     .execute(pool)
@@ -470,6 +493,55 @@ pub async fn insert_besluit(
     .bind(bewijs_json)
     .execute(pool)
     .await?;
+    Ok(())
+}
+
+pub async fn get_besluit_by_id(pool: &SqlitePool, id: &str) -> anyhow::Result<Option<Besluit>> {
+    let row = sqlx::query("SELECT * FROM besluiten WHERE id = ?")
+        .bind(id)
+        .fetch_optional(pool)
+        .await?;
+    Ok(row.as_ref().map(row_to_besluit))
+}
+
+/// Vervang de uitkomst van een besluit na volledige heroverweging op
+/// bezwaar (AWB 7:11): zelfde beschikking, herziene inhoud, nieuw bewijs.
+pub async fn herzie_besluit(
+    pool: &SqlitePool,
+    id: &str,
+    toegekend: bool,
+    totaal: i64,
+    componenten_json: &str,
+    motivering: &str,
+    bewijs_json: &str,
+) -> anyhow::Result<()> {
+    sqlx::query(
+        "UPDATE besluiten SET subsidie_toegekend = ?, subsidiebedrag = ?, componenten = ?,
+         motivering = ?, bewijs = ? WHERE id = ?",
+    )
+    .bind(toegekend as i64)
+    .bind(totaal)
+    .bind(componenten_json)
+    .bind(motivering)
+    .bind(bewijs_json)
+    .bind(id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// De feitenbasis van een dossier bijwerken na gegrond bezwaar: de
+/// gecorrigeerde eigen opgaven worden de parameters van de aanvraag.
+pub async fn update_aanvraag_parameters(
+    pool: &SqlitePool,
+    id: &str,
+    parameters_json: &str,
+) -> anyhow::Result<()> {
+    sqlx::query("UPDATE aanvragen SET parameters = ?, updated_at = datetime('now') WHERE id = ?")
+        .bind(parameters_json)
+        .bind(id)
+        .execute(pool)
+        .await?;
     Ok(())
 }
 

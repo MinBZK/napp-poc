@@ -717,9 +717,26 @@ pub async fn get_mijn_aanvraag(
         .await
         .map_err(internal_error)?;
     let betaalopdracht = betaalopdracht_voor(&state, besluit.as_ref()).await?;
-    Ok(Json(
-        json!({"aanvraag": aanvraag, "besluit": besluit, "betaalopdracht": betaalopdracht}),
-    ))
+    let bezwaar = bezwaar_voor(&state, besluit.as_ref()).await?;
+    Ok(Json(json!({
+        "aanvraag": aanvraag,
+        "besluit": besluit,
+        "betaalopdracht": betaalopdracht,
+        "bezwaar": bezwaar,
+    })))
+}
+
+/// Het (laatste) bezwaar tegen een besluit, voor het dossierbeeld.
+async fn bezwaar_voor(
+    state: &AppState,
+    besluit: Option<&db::Besluit>,
+) -> Result<Option<crate::bezwaar::Bezwaar>, ApiError> {
+    let Some(besluit) = besluit else {
+        return Ok(None);
+    };
+    crate::bezwaar::bezwaar_by_besluit(&state.pool, &besluit.id)
+        .await
+        .map_err(internal_error)
 }
 
 /// De betaalopdracht die uit een besluit voortvloeit, voor het
@@ -768,9 +785,13 @@ pub async fn get_aanvraag(
         .await
         .map_err(internal_error)?;
     let betaalopdracht = betaalopdracht_voor(&state, besluit.as_ref()).await?;
-    Ok(Json(
-        json!({"aanvraag": aanvraag, "besluit": besluit, "betaalopdracht": betaalopdracht}),
-    ))
+    let bezwaar = bezwaar_voor(&state, besluit.as_ref()).await?;
+    Ok(Json(json!({
+        "aanvraag": aanvraag,
+        "besluit": besluit,
+        "betaalopdracht": betaalopdracht,
+        "bezwaar": bezwaar,
+    })))
 }
 
 // ---------------------------------------------------------------------------
