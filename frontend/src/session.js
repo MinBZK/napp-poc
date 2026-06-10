@@ -4,7 +4,7 @@ import { api } from './api.js';
 
 export const session = reactive({
   loaded: false,
-  aanvrager: null, // { kvk_nummer, partij_naam }
+  aanvrager: null, // { kvk_nummer, partij_naam, machtiging: { type, orgaan?, gebied_code?, gebied_naam? } }
   beoordelaar: null, // { naam }
 });
 

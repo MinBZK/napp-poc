@@ -6,6 +6,7 @@
 mod db;
 mod engine;
 mod handlers;
+mod machtiging;
 mod register;
 mod state;
 
@@ -80,6 +81,10 @@ async fn main() -> anyhow::Result<()> {
         .route(
             "/api/eherkenning/logout",
             post(handlers::eherkenning_logout),
+        )
+        .route(
+            "/api/eherkenning/machtigingen",
+            get(machtiging::machtigingen),
         )
         .route("/api/mijn-registratie", get(handlers::mijn_registratie))
         .route("/api/register/demo", get(handlers::register_demo))

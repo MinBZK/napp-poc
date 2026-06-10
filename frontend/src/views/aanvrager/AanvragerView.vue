@@ -13,6 +13,14 @@ const kvk = ref('');
 const loginFout = ref('');
 const bezig = ref(false);
 
+// Two-step login: after the KvK number the mocked eHerkenning may offer
+// multiple representation profiles (full board vs. branch volmacht).
+const stap = ref('kvk'); // 'kvk' | 'machtiging'
+const partijNaam = ref('');
+const profielen = ref([]);
+const afdelingKiezen = ref(false);
+const zoek = ref('');
+
 const aanvragen = ref([]);
 const laden = ref(false);
 const demoVoorbeelden = ref([]);
@@ -21,6 +29,12 @@ const demoTekst =
   'eHerkenning is gesimuleerd: alleen het KVK-nummer telt. Kies hieronder een ' +
   'voorbeeldpartij, of voer elk ander nummer in om als ongeregistreerde ' +
   'organisatie in te loggen.';
+
+const ORGAAN_LABEL = {
+  GEMEENTERAAD: 'Gemeenteraad',
+  PROVINCIALE_STATEN: 'Provinciale staten',
+  WATERSCHAP: 'Waterschap',
+};
 
 function kiesDemo(d) {
   kvk.value = d.kvk_nummer;
@@ -35,6 +49,35 @@ const navItems = computed(() =>
       ]
     : [],
 );
+
+const beperkteProfielen = computed(() =>
+  profielen.value.filter((p) => p.type === 'BEPERKT'),
+);
+
+const aanvragerOverline = computed(() => {
+  const a = session.aanvrager;
+  if (!a) return '';
+  const afdeling =
+    a.machtiging?.type === 'BEPERKT' ? ` · afdeling ${a.machtiging.gebied_naam}` : '';
+  return `${a.partij_naam}${afdeling} · KVK ${a.kvk_nummer}`;
+});
+
+const MAX_GETOOND = 12;
+const gefilterdeProfielen = computed(() => {
+  const q = zoek.value.trim().toLowerCase();
+  return q
+    ? beperkteProfielen.value.filter((p) =>
+        p.gebied_naam.toLowerCase().includes(q),
+      )
+    : beperkteProfielen.value;
+});
+const getoondeProfielen = computed(() =>
+  gefilterdeProfielen.value.slice(0, MAX_GETOOND),
+);
+const restAantal = computed(
+  () => gefilterdeProfielen.value.length - getoondeProfielen.value.length,
+);
+
 async function login() {
   loginFout.value = '';
   if (!/^\d{8}$/.test(kvk.value.trim())) {
@@ -43,13 +86,45 @@ async function login() {
   }
   bezig.value = true;
   try {
-    await api.eherkenningLogin(kvk.value.trim());
-    await refreshSession();
+    const result = await api.eherkenningMachtigingen(kvk.value.trim());
+    profielen.value = result.profielen ?? [];
+    partijNaam.value = result.partij_naam ?? `Organisatie ${kvk.value.trim()}`;
+    if (beperkteProfielen.value.length) {
+      // The party knows branch volmachten: ask on whose behalf to log in.
+      stap.value = 'machtiging';
+      afdelingKiezen.value = false;
+      zoek.value = '';
+    } else {
+      await doLogin(null);
+    }
   } catch (e) {
     loginFout.value = e.message;
   } finally {
     bezig.value = false;
   }
+}
+
+async function doLogin(machtiging) {
+  loginFout.value = '';
+  bezig.value = true;
+  try {
+    await api.eherkenningLogin(kvk.value.trim(), machtiging);
+    await refreshSession();
+    stap.value = 'kvk';
+    profielen.value = [];
+  } catch (e) {
+    loginFout.value = e.message;
+  } finally {
+    bezig.value = false;
+  }
+}
+
+function terugNaarKvk() {
+  stap.value = 'kvk';
+  profielen.value = [];
+  afdelingKiezen.value = false;
+  zoek.value = '';
+  loginFout.value = '';
 }
 
 async function laadAanvragen() {
@@ -83,7 +158,96 @@ watch(() => session.aanvrager, laadAanvragen);
     />
 
     <!-- Niet ingelogd: eHerkenning (gemockt) -->
-    <template v-if="session.loaded && !session.aanvrager">
+    <template v-if="session.loaded && !session.aanvrager && stap === 'machtiging'">
+      <nldd-simple-section width="560px">
+        <nldd-title size="2">
+          <span slot="overline">{{ partijNaam }} · KVK {{ kvk }}</span>
+          <h2>Namens wie logt u in?</h2>
+        </nldd-title>
+        <nldd-spacer size="12"></nldd-spacer>
+        <nldd-rich-text>
+          <p>
+            Deze partij is centraal georganiseerd: afdelingen vallen onder de
+            landelijke rechtspersoon. Afdelingsbestuurders kunnen met een
+            beperkte volmacht namens de partij een deelaanvraag doen.
+          </p>
+        </nldd-rich-text>
+        <nldd-spacer size="24"></nldd-spacer>
+
+        <nldd-list variant="box">
+          <nldd-list-item size="md" type="button" @click="doLogin({ type: 'VOLLEDIG' })">
+            <nldd-title-cell
+              text="De gehele partij"
+              supporting-text="Tekenbevoegd bestuur: alle aanspraken, landelijk en decentraal"
+            ></nldd-title-cell>
+            <nldd-spacer-cell size="8"></nldd-spacer-cell>
+            <nldd-icon-cell icon="chevron-right" size="16"></nldd-icon-cell>
+          </nldd-list-item>
+          <nldd-list-item size="md" type="button" @click="afdelingKiezen = !afdelingKiezen">
+            <nldd-title-cell
+              text="Een afdeling"
+              :supporting-text="`Beperkte machtiging voor één gebied (${beperkteProfielen.length} gebieden)`"
+            ></nldd-title-cell>
+            <nldd-spacer-cell size="8"></nldd-spacer-cell>
+            <nldd-icon-cell
+              :icon="afdelingKiezen ? 'chevron-up' : 'chevron-down'"
+              size="16"
+            ></nldd-icon-cell>
+          </nldd-list-item>
+        </nldd-list>
+
+        <template v-if="afdelingKiezen">
+          <nldd-spacer size="16"></nldd-spacer>
+          <nldd-form-field label="Zoek uw gebied">
+            <nldd-text-field
+              name="zoek-gebied"
+              :value="zoek"
+              placeholder="Bijvoorbeeld: Utrecht"
+              @input="zoek = $event.detail?.value ?? $event.target?.value ?? ''"
+            ></nldd-text-field>
+          </nldd-form-field>
+          <nldd-spacer size="8"></nldd-spacer>
+          <nldd-list v-if="getoondeProfielen.length" variant="box">
+            <nldd-list-item
+              v-for="p in getoondeProfielen"
+              :key="`${p.orgaan}:${p.gebied_code}`"
+              size="sm"
+              type="button"
+              @click="doLogin({ type: 'BEPERKT', gebied_code: p.gebied_code })"
+            >
+              <nldd-text-cell
+                :text="p.gebied_naam"
+                :supporting-text="ORGAAN_LABEL[p.orgaan] ?? p.orgaan"
+              ></nldd-text-cell>
+              <nldd-spacer-cell size="8"></nldd-spacer-cell>
+              <nldd-icon-cell icon="chevron-right" size="16"></nldd-icon-cell>
+            </nldd-list-item>
+          </nldd-list>
+          <nldd-rich-text v-if="restAantal > 0">
+            <p>Nog {{ restAantal }} gebieden. Verfijn uw zoekopdracht.</p>
+          </nldd-rich-text>
+          <nldd-rich-text v-if="!getoondeProfielen.length">
+            <p>Geen gebied gevonden voor &lsquo;{{ zoek }}&rsquo;.</p>
+          </nldd-rich-text>
+        </template>
+
+        <nldd-spacer size="24"></nldd-spacer>
+        <nldd-button
+          variant="neutral-transparent"
+          text="Terug"
+          start-icon="arrow-left"
+          :disabled="bezig || undefined"
+          @click="terugNaarKvk"
+        ></nldd-button>
+
+        <template v-if="loginFout">
+          <nldd-spacer size="16"></nldd-spacer>
+          <NBanner variant="critical" :text="loginFout" />
+        </template>
+      </nldd-simple-section>
+    </template>
+
+    <template v-else-if="session.loaded && !session.aanvrager">
       <nldd-simple-section width="560px">
         <nldd-title size="2">
           <span slot="overline">Voor politieke partijen</span>
@@ -169,7 +333,7 @@ watch(() => session.aanvrager, laadAanvragen);
     <template v-else-if="session.aanvrager">
       <nldd-simple-section>
         <nldd-title size="2">
-          <span slot="overline">{{ session.aanvrager.partij_naam }} · KVK {{ session.aanvrager.kvk_nummer }}</span>
+          <span slot="overline">{{ aanvragerOverline }}</span>
           <h2>Uw subsidieaanvragen</h2>
           <div v-if="aanvragen.length" slot="actions">
             <nldd-button

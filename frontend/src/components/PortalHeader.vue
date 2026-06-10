@@ -25,6 +25,18 @@ const route = useRoute();
 
 const sessieItems = computed(() => {
   if (props.portal === 'aanvrager' && session.aanvrager) {
+    const machtiging = session.aanvrager.machtiging;
+    if (machtiging?.type === 'BEPERKT') {
+      // Branch login: show who is represented plus a subtle scope marker.
+      return [
+        {
+          text: `${session.aanvrager.partij_naam} · afdeling ${machtiging.gebied_naam} (beperkte machtiging)`,
+          icon: 'person',
+          key: 'machtiging-info',
+        },
+        { text: 'Uitloggen', icon: 'logout', key: 'logout-aanvrager' },
+      ];
+    }
     return [
       {
         text: `Uitloggen (${session.aanvrager.partij_naam})`,
@@ -42,6 +54,7 @@ const sessieItems = computed(() => {
 const alleUtilityItems = computed(() => [...props.utilityItems, ...sessieItems.value]);
 
 async function onUtility(item) {
+  if (item.key === 'machtiging-info') return; // informational, no action
   if (item.key === 'logout-aanvrager') {
     await api.eherkenningLogout();
     await refreshSession();

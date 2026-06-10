@@ -15,6 +15,7 @@ use uuid::Uuid;
 
 use crate::db;
 use crate::engine;
+use crate::machtiging;
 use crate::state::AppState;
 
 const SESSION_KEY_EH_KVK: &str = "eh_kvk";
@@ -42,10 +43,11 @@ fn not_found() -> ApiError {
 }
 
 fn forbidden() -> ApiError {
-    (
-        StatusCode::FORBIDDEN,
-        Json(json!({"fout": "Geen toegang."})),
-    )
+    forbidden_with("Geen toegang.")
+}
+
+fn forbidden_with(msg: &str) -> ApiError {
+    (StatusCode::FORBIDDEN, Json(json!({"fout": msg})))
 }
 
 async fn session_kvk(session: &Session) -> Option<String> {
@@ -73,12 +75,17 @@ async fn session_beoordelaar(session: &Session) -> Option<String> {
 #[derive(Deserialize)]
 pub struct EherkenningLogin {
     pub kvk_nummer: String,
+    /// Optional representation profile; absent means VOLLEDIG (backwards
+    /// compatible with existing clients and the seed script).
+    #[serde(default)]
+    pub machtiging: Option<machtiging::Machtiging>,
 }
 
 /// MOCK eHerkenning-login voor aanvragers. eHerkenning levert alleen de
 /// identiteit van de rechtspersoon (KvK); de partijnaam volgt uit het
 /// partijregister van de Napp. Een onbekend KvK-nummer kan gewoon inloggen
 /// en aanvragen — de wet wijst dan af (AWB 4:1: iedereen mag aanvragen).
+/// De optionele machtiging beperkt de sessie tot één afdeling (volmacht).
 pub async fn eherkenning_login(
     session: Session,
     Json(body): Json<EherkenningLogin>,
@@ -87,6 +94,8 @@ pub async fn eherkenning_login(
     if !kvk.chars().all(|c| c.is_ascii_digit()) || kvk.len() != 8 {
         return Err(bad_request("Vul een geldig KVK-nummer in (8 cijfers)."));
     }
+    let m = body.machtiging.unwrap_or_default();
+    machtiging::valideer(&kvk, &m).map_err(|msg| bad_request(&msg))?;
     let naam = match crate::register::partij_by_kvk(&kvk) {
         Some(partij) => partij.naam.to_string(),
         None => format!("Organisatie {kvk}"),
@@ -99,10 +108,15 @@ pub async fn eherkenning_login(
         .insert(SESSION_KEY_EH_PARTIJ, naam.clone())
         .await
         .map_err(internal_error)?;
+    session
+        .insert(machtiging::SESSION_KEY_EH_MACHTIGING, m.clone())
+        .await
+        .map_err(internal_error)?;
     Ok(Json(json!({
         "rol": "aanvrager",
         "kvk_nummer": kvk,
         "partij_naam": naam,
+        "machtiging": m.to_json(),
         "mock": true,
     })))
 }
@@ -125,7 +139,9 @@ pub async fn mijn_registratie(
         .await
         .map_err(internal_error)?;
 
-    let componenten = aanspraken_voor(&kvk);
+    // A limited machtiging (branch volmacht) only sees its own area.
+    let m = machtiging::session_machtiging(&session).await;
+    let componenten = m.filter_componenten(aanspraken_voor(&kvk));
     let aanspraken: Vec<serde_json::Value> = componenten
         .iter()
         .map(|c| {
@@ -208,6 +224,10 @@ pub async fn eherkenning_logout(session: Session) -> Result<Json<serde_json::Val
         .remove::<String>(SESSION_KEY_EH_PARTIJ)
         .await
         .map_err(internal_error)?;
+    session
+        .remove::<machtiging::Machtiging>(machtiging::SESSION_KEY_EH_MACHTIGING)
+        .await
+        .map_err(internal_error)?;
     Ok(Json(json!({"uitgelogd": true})))
 }
 
@@ -250,9 +270,14 @@ pub async fn sso_mock_login(
 pub async fn me(session: Session) -> Result<Json<serde_json::Value>, ApiError> {
     let kvk = session_kvk(&session).await;
     let partij: Option<String> = session.get(SESSION_KEY_EH_PARTIJ).await.ok().flatten();
+    let m = machtiging::session_machtiging(&session).await;
     let beoordelaar = session_beoordelaar(&session).await;
     Ok(Json(json!({
-        "aanvrager": kvk.map(|k| json!({"kvk_nummer": k, "partij_naam": partij})),
+        "aanvrager": kvk.map(|k| json!({
+            "kvk_nummer": k,
+            "partij_naam": partij,
+            "machtiging": m.to_json(),
+        })),
         "beoordelaar": beoordelaar.map(|n| json!({"naam": n})),
     })))
 }
@@ -292,9 +317,16 @@ pub async fn create_aanvraag(
     // De componenten komen uit het register, nooit uit de client: de client
     // stuurt alleen sleutels; gegevens (zetels, inwoneraantallen) worden hier
     // bevroren op registerwaarden.
+    let m = machtiging::session_machtiging(&session).await;
     let beschikbaar = aanspraken_voor(&kvk);
     let mut componenten: Vec<db::Component> = Vec::new();
     for key in &body.componenten {
+        if !m.allows_key(key) {
+            return Err(forbidden_with(&format!(
+                "Uw machtiging als afdelingsbestuurder geldt niet voor onderdeel '{key}'. \
+                 Log in namens de gehele partij om dit onderdeel aan te vragen."
+            )));
+        }
         let Some(c) = beschikbaar.iter().find(|c| &c.key == key) else {
             return Err(bad_request(&format!(
                 "Onderdeel '{key}' hoort niet bij uw registratie."
@@ -375,7 +407,8 @@ pub async fn proef_aanspraken(
     let Some(kvk) = session_kvk(&session).await else {
         return Err(forbidden());
     };
-    let beschikbaar = aanspraken_voor(&kvk);
+    let m = machtiging::session_machtiging(&session).await;
+    let beschikbaar = m.filter_componenten(aanspraken_voor(&kvk));
     let componenten: Vec<db::Component> = beschikbaar
         .into_iter()
         .filter(|c| body.componenten.contains(&c.key))
@@ -436,9 +469,15 @@ pub async fn list_mijn_aanvragen(
     let Some(kvk) = session_kvk(&session).await else {
         return Err(forbidden());
     };
-    let aanvragen = db::list_aanvragen(&state.pool, Some(&kvk))
+    // A limited machtiging only sees dossiers that fall entirely within its
+    // scope; other dossiers of the same legal entity stay hidden.
+    let m = machtiging::session_machtiging(&session).await;
+    let aanvragen: Vec<db::Aanvraag> = db::list_aanvragen(&state.pool, Some(&kvk))
         .await
-        .map_err(internal_error)?;
+        .map_err(internal_error)?
+        .into_iter()
+        .filter(|a| m.covers(&a.componenten))
+        .collect();
     Ok(Json(json!(aanvragen_met_besluit(&state, aanvragen).await?)))
 }
 
@@ -454,6 +493,12 @@ pub async fn get_mijn_aanvraag(
         return Err(not_found());
     };
     if aanvraag.kvk_nummer != kvk {
+        return Err(not_found());
+    }
+    // Outside the machtiging = does not exist for this session (404, not 403:
+    // a branch board member should not learn about other dossiers).
+    let m = machtiging::session_machtiging(&session).await;
+    if !m.covers(&aanvraag.componenten) {
         return Err(not_found());
     }
     let besluit = db::get_besluit_by_aanvraag(&state.pool, &id)
