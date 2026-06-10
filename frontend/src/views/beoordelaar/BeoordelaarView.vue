@@ -17,6 +17,7 @@ const navItems = computed(() =>
   session.beoordelaar
     ? [
         { text: 'Werkvoorraad', to: '/' },
+        { text: 'Partijregister', to: '/partijregister' },
         { text: "Scenario's", to: '/scenarios' },
       ]
     : [],

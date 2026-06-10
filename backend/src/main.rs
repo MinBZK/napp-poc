@@ -3,6 +3,7 @@
 //! Axum API met sessie-gebaseerde auth: echte SSO Rijk (OIDC) voor
 //! beoordelaars wanneer geconfigureerd, gemockte eHerkenning voor aanvragers.
 
+mod beheer;
 mod db;
 mod engine;
 mod handlers;
@@ -11,7 +12,7 @@ mod state;
 
 use std::sync::Arc;
 
-use axum::routing::{get, post};
+use axum::routing::{delete, get, post};
 use axum::Router;
 use regelrecht_auth::OidcAppState;
 use sqlx::sqlite::SqlitePoolOptions;
@@ -41,6 +42,7 @@ async fn main() -> anyhow::Result<()> {
         .connect(&database_url)
         .await?;
     db::init(&pool).await?;
+    register::seed_if_empty(&pool).await?;
     tracing::info!(database = %database_url, "database gereed");
 
     // OIDC (SSO Rijk) — alleen actief wanneer de OIDC_* variabelen gezet zijn.
@@ -106,7 +108,25 @@ async fn main() -> anyhow::Result<()> {
             get(handlers::list_betaalopdrachten),
         )
         .route("/api/register", get(handlers::register))
-        .route("/api/register/statistieken", get(handlers::statistieken));
+        .route("/api/register/statistieken", get(handlers::statistieken))
+        // Partijregister-beheer (beoordelaar-only, zie beheer.rs).
+        .route(
+            "/api/beheer/partijen",
+            get(beheer::list_partijen).post(beheer::create_partij),
+        )
+        .route(
+            "/api/beheer/partijen/{kvk}",
+            get(beheer::get_partij).put(beheer::update_partij),
+        )
+        .route(
+            "/api/beheer/partijen/{kvk}/uitslagen",
+            post(beheer::add_uitslag),
+        )
+        .route(
+            "/api/beheer/partijen/{kvk}/uitslagen/{orgaan}/{gebied_code}",
+            delete(beheer::delete_uitslag),
+        )
+        .route("/api/beheer/gebieden", get(beheer::list_gebieden));
 
     // Mock-SSO-login alleen registreren wanneer echte OIDC uit staat.
     if !app_state.is_auth_enabled() {

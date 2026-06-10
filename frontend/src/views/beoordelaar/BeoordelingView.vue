@@ -138,7 +138,7 @@ onMounted(laad);
       slot="header"
       subtitle="Beoordelingsomgeving"
       portal="beoordelaar"
-      :items="[{ text: 'Werkvoorraad', to: '/' }, { text: 'Scenario’s', to: '/scenarios' }]"
+      :items="[{ text: 'Werkvoorraad', to: '/' }, { text: 'Partijregister', to: '/partijregister' }, { text: 'Scenario’s', to: '/scenarios' }]"
     />
 
     <template v-if="item">
