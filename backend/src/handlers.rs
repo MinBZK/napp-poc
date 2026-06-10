@@ -349,8 +349,32 @@ fn peildatum_voor(subsidiejaar: i64) -> String {
 }
 
 /// Demo-voorbeelden voor de gemockte eHerkenning-login (alleen metadata).
-pub async fn register_demo() -> Json<serde_json::Value> {
-    Json(json!(crate::register::demo_voorbeelden()))
+/// Het claim-demo-nummer is dynamisch: zodra een nummer via de claim-flow
+/// aan een aanduiding is gekoppeld, schuift het voorbeeld door naar het
+/// eerstvolgende vrije nummer, zodat de flow demonstreerbaar blijft.
+pub async fn register_demo(
+    State(state): State<AppState>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let mut voorbeelden =
+        serde_json::to_value(crate::register::demo_voorbeelden()).map_err(internal_error)?;
+    if let Some(lijst) = voorbeelden.as_array_mut() {
+        for v in lijst {
+            let is_claim_demo = v["profiel"]
+                .as_str()
+                .is_some_and(|p| p.contains("claim-flow"));
+            if !is_claim_demo {
+                continue;
+            }
+            let kvk = v["kvk_nummer"].as_str().unwrap_or_default().to_string();
+            if let Some(vrij) = crate::register::vrij_demo_kvk(&state.pool, &kvk)
+                .await
+                .map_err(internal_error)?
+            {
+                v["kvk_nummer"] = json!(vrij);
+            }
+        }
+    }
+    Ok(Json(voorbeelden))
 }
 
 pub async fn eherkenning_logout(session: Session) -> Result<Json<serde_json::Value>, ApiError> {

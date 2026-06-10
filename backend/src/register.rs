@@ -535,3 +535,28 @@ pub async fn list_gebieden(pool: &SqlitePool, orgaan: Option<&str>) -> anyhow::R
     };
     Ok(rows.iter().map(row_to_gebied).collect())
 }
+
+/// Het eerste vrije nummer in de demo-reeks vanaf `vanaf`: nog niet in het
+/// register (een bevestigde claim hangt het nummer aan een partij) en
+/// zonder lopende claim. Geeft None als de reeks op is.
+pub async fn vrij_demo_kvk(pool: &SqlitePool, vanaf: &str) -> anyhow::Result<Option<String>> {
+    let start: i64 = vanaf.parse().unwrap_or(90_000_001);
+    for kandidaat in start..start + 99 {
+        let kvk = kandidaat.to_string();
+        let in_register: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM register_partijen WHERE kvk_nummer = ?")
+                .bind(&kvk)
+                .fetch_one(pool)
+                .await?;
+        let open_claim: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM register_claims WHERE kvk_nummer = ? AND status = 'OPEN'",
+        )
+        .bind(&kvk)
+        .fetch_one(pool)
+        .await?;
+        if in_register == 0 && open_claim == 0 {
+            return Ok(Some(kvk));
+        }
+    }
+    Ok(None)
+}
