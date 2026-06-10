@@ -39,7 +39,6 @@ import csv
 import hashlib
 import io
 import json
-import re
 import urllib.request
 import xml.etree.ElementTree as ET
 import zipfile
@@ -129,6 +128,16 @@ def kvk_voor(sleutel: str) -> str:
     return "9" + str(int(digest, 16) % 10_000_000).zfill(7)
 
 
+def gebiedsnaam_uit_resultaat_eml(xml_bytes: bytes) -> str | None:
+    """De officiële gebiedsnaam uit een Resultaat-EML (kr:ElectionDomain),
+    bv. 'Aa en Maas' of 'Noord-Brabant' — netter dan de mapnaam in de zip."""
+    root = ET.fromstring(xml_bytes)
+    for e in root.iter():
+        if e.tag.split("}")[-1] == "ElectionDomain":
+            return (e.text or "").strip() or None
+    return None
+
+
 def zetels_uit_resultaat_eml(xml_bytes: bytes) -> dict[str, int]:
     """Zetels per lijst uit een Kiesraad Resultaat-EML: tel per lijst de
     gekozen kandidaten (Elected = yes)."""
@@ -159,27 +168,24 @@ def zetels_uit_resultaat_eml(xml_bytes: bytes) -> dict[str, int]:
     return zetels
 
 
-def resultaten_uit_eml_zips(urls: list[str]) -> dict[str, dict[str, int]]:
-    """Map gebiedsnaam → (lijstnaam → zetels) uit Resultaat-EML's in zips."""
-    resultaten: dict[str, dict[str, int]] = {}
+def resultaten_uit_eml_zips(urls: list[str]) -> dict[str, tuple[str, dict[str, int]]]:
+    """Map mapnaam → (officiële gebiedsnaam, lijstnaam → zetels) uit
+    Resultaat-EML's in zips. De mapnaam is de stabiele sleutel voor de
+    gebied-code; de officiële naam (kr:ElectionDomain) is voor weergave."""
+    resultaten: dict[str, tuple[str, dict[str, int]]] = {}
     for url in urls:
         zf = zipfile.ZipFile(io.BytesIO(haal(url)))
         for naam in zf.namelist():
             basis = naam.rsplit("/", 1)[-1]
             if not (basis.startswith("Resultaat_") and basis.endswith(".eml.xml")):
                 continue
-            # Gebiedsnaam uit de mapnaam (PS: provincie, AB: waterschap).
-            gebied = naam.split("/")[1] if "/" in naam else basis
-            zetels = zetels_uit_resultaat_eml(zf.read(naam))
+            sleutel = naam.split("/")[1] if "/" in naam else basis
+            xml = zf.read(naam)
+            zetels = zetels_uit_resultaat_eml(xml)
             if zetels:
-                resultaten[gebied] = zetels
+                officieel = gebiedsnaam_uit_resultaat_eml(xml) or sleutel
+                resultaten[sleutel] = (officieel, zetels)
     return resultaten
-
-
-def normaliseer_waterschap(mapnaam: str) -> str:
-    """Mapnaam ('HunzeenAas') → leesbare benadering van de naam."""
-    naam = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", mapnaam)
-    return naam.replace("_", " ").strip()
 
 
 def main() -> None:
@@ -211,18 +217,18 @@ def main() -> None:
 
     # --- PS2023: statenzetels per provincie (EML) ---
     ps = resultaten_uit_eml_zips(PS2023_EML_ZIPS)
-    for provincie, lijsten in ps.items():
+    for provincie, (officieel, lijsten) in ps.items():
         code = PROVINCIE_CODES.get(provincie, f"PV_{provincie}")
-        gebied_namen[code] = provincie
+        gebied_namen[code] = officieel
         for lijst, zetels in lijsten.items():
             uitslagen.append(("PROVINCIALE_STATEN", code, lijst, zetels))
     print(f"PS2023: {len(ps)} provincies")
 
     # --- AB2023: waterschapszetels (EML) ---
     ab = resultaten_uit_eml_zips(AB2023_EML_ZIPS)
-    for waterschap, lijsten in ab.items():
+    for waterschap, (officieel, lijsten) in ab.items():
         code = f"WS_{waterschap}"
-        gebied_namen[code] = normaliseer_waterschap(waterschap)
+        gebied_namen[code] = officieel
         for lijst, zetels in lijsten.items():
             uitslagen.append(("WATERSCHAP", code, lijst, zetels))
     print(f"AB2023: {len(ab)} waterschappen")

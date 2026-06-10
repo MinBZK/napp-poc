@@ -8762,6 +8762,20 @@
    ]
   },
   {
+   "kvk_nummer": "96740562",
+   "naam": "CDA, afdeling Aa en Maas",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "99727422",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_AaenMaas.eml.xml",
+     "zetels": 2
+    }
+   ]
+  },
+  {
    "kvk_nummer": "93849288",
    "naam": "CDA, afdeling Aalsmeer",
    "organisatiemodel": "DECENTRAAL",
@@ -8940,6 +8954,20 @@
      "orgaan": "GEMEENTERAAD",
      "gebied_code": "GM0307",
      "zetels": 4
+    }
+   ]
+  },
+  {
+   "kvk_nummer": "92056783",
+   "naam": "CDA, afdeling Amstel, Gooi en Vecht",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "99727422",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_AmstelGooienVecht.eml.xml",
+     "zetels": 1
     }
    ]
   },
@@ -9392,6 +9420,20 @@
    ]
   },
   {
+   "kvk_nummer": "91482436",
+   "naam": "CDA, afdeling Brabantse Delta",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "99727422",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_BrabantseDelta.eml.xml",
+     "zetels": 2
+    }
+   ]
+  },
+  {
    "kvk_nummer": "94106996",
    "naam": "CDA, afdeling Breda",
    "organisatiemodel": "DECENTRAAL",
@@ -9588,6 +9630,20 @@
    ]
   },
   {
+   "kvk_nummer": "95645456",
+   "naam": "CDA, afdeling De Dommel",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "99727422",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_DeDommel.eml.xml",
+     "zetels": 2
+    }
+   ]
+  },
+  {
    "kvk_nummer": "99523081",
    "naam": "CDA, afdeling De Fryske Marren",
    "organisatiemodel": "DECENTRAAL",
@@ -9616,6 +9672,20 @@
    ]
   },
   {
+   "kvk_nummer": "94045252",
+   "naam": "CDA, afdeling De Stichtse Rijnlanden",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "99727422",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_DeStichtseRijnlanden.eml.xml",
+     "zetels": 2
+    }
+   ]
+  },
+  {
    "kvk_nummer": "92073802",
    "naam": "CDA, afdeling De Wolden",
    "organisatiemodel": "DECENTRAAL",
@@ -9626,6 +9696,20 @@
      "orgaan": "GEMEENTERAAD",
      "gebied_code": "GM1690",
      "zetels": 3
+    }
+   ]
+  },
+  {
+   "kvk_nummer": "93839115",
+   "naam": "CDA, afdeling Delfland",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "99727422",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_Delfland.eml.xml",
+     "zetels": 2
     }
    ]
   },
@@ -9766,6 +9850,20 @@
      "orgaan": "PROVINCIALE_STATEN",
      "gebied_code": "PV22",
      "zetels": 3
+    }
+   ]
+  },
+  {
+   "kvk_nummer": "93808072",
+   "naam": "CDA, afdeling Drents Overijsselse Delta",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "99727422",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_DrentsOverijsselseDelta.eml.xml",
+     "zetels": 2
     }
    ]
   },
@@ -10023,7 +10121,7 @@
   },
   {
    "kvk_nummer": "90981813",
-   "naam": "CDA, afdeling Fryslan",
+   "naam": "CDA, afdeling Fryslân",
    "organisatiemodel": "DECENTRAAL",
    "kamerzetels": 0,
    "moederpartij_kvk": "99727422",
@@ -10032,6 +10130,20 @@
      "orgaan": "PROVINCIALE_STATEN",
      "gebied_code": "PV21",
      "zetels": 4
+    }
+   ]
+  },
+  {
+   "kvk_nummer": "93976020",
+   "naam": "CDA, afdeling Fryslân",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "99727422",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_Fryslan.eml.xml",
+     "zetels": 2
     }
    ]
   },
@@ -10624,6 +10736,34 @@
    ]
   },
   {
+   "kvk_nummer": "92031652",
+   "naam": "CDA, afdeling Hollands Noorderkwartier",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "99727422",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_HollandsNoorderkwartier.eml.xml",
+     "zetels": 1
+    }
+   ]
+  },
+  {
+   "kvk_nummer": "97079488",
+   "naam": "CDA, afdeling Hollandse Delta",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "99727422",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_HollandseDelta.eml.xml",
+     "zetels": 1
+    }
+   ]
+  },
+  {
    "kvk_nummer": "94006789",
    "naam": "CDA, afdeling Hoogeveen",
    "organisatiemodel": "DECENTRAAL",
@@ -10704,6 +10844,20 @@
      "orgaan": "GEMEENTERAAD",
      "gebied_code": "GM0677",
      "zetels": 4
+    }
+   ]
+  },
+  {
+   "kvk_nummer": "94689328",
+   "naam": "CDA, afdeling Hunze en Aa's",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "99727422",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_HunzeenAas.eml.xml",
+     "zetels": 1
     }
    ]
   },
@@ -11479,7 +11633,7 @@
   },
   {
    "kvk_nummer": "90329703",
-   "naam": "CDA, afdeling NoordBrabant",
+   "naam": "CDA, afdeling Noord-Brabant",
    "organisatiemodel": "DECENTRAAL",
    "kamerzetels": 0,
    "moederpartij_kvk": "99727422",
@@ -11493,7 +11647,7 @@
   },
   {
    "kvk_nummer": "99813409",
-   "naam": "CDA, afdeling NoordHolland",
+   "naam": "CDA, afdeling Noord-Holland",
    "organisatiemodel": "DECENTRAAL",
    "kamerzetels": 0,
    "moederpartij_kvk": "99727422",
@@ -11515,6 +11669,20 @@
     {
      "orgaan": "GEMEENTERAAD",
      "gebied_code": "GM1699",
+     "zetels": 1
+    }
+   ]
+  },
+  {
+   "kvk_nummer": "94451304",
+   "naam": "CDA, afdeling Noorderzijlvest",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "99727422",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_Noorderzijlvest.eml.xml",
      "zetels": 1
     }
    ]
@@ -11996,286 +12164,6 @@
    ]
   },
   {
-   "kvk_nummer": "96740562",
-   "naam": "CDA, afdeling Resultaat AB2023 Aaen Maas.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "99727422",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_AaenMaas.eml.xml",
-     "zetels": 2
-    }
-   ]
-  },
-  {
-   "kvk_nummer": "92056783",
-   "naam": "CDA, afdeling Resultaat AB2023 Amstel Gooien Vecht.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "99727422",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_AmstelGooienVecht.eml.xml",
-     "zetels": 1
-    }
-   ]
-  },
-  {
-   "kvk_nummer": "91482436",
-   "naam": "CDA, afdeling Resultaat AB2023 Brabantse Delta.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "99727422",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_BrabantseDelta.eml.xml",
-     "zetels": 2
-    }
-   ]
-  },
-  {
-   "kvk_nummer": "95645456",
-   "naam": "CDA, afdeling Resultaat AB2023 De Dommel.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "99727422",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_DeDommel.eml.xml",
-     "zetels": 2
-    }
-   ]
-  },
-  {
-   "kvk_nummer": "94045252",
-   "naam": "CDA, afdeling Resultaat AB2023 De Stichtse Rijnlanden.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "99727422",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_DeStichtseRijnlanden.eml.xml",
-     "zetels": 2
-    }
-   ]
-  },
-  {
-   "kvk_nummer": "93839115",
-   "naam": "CDA, afdeling Resultaat AB2023 Delfland.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "99727422",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_Delfland.eml.xml",
-     "zetels": 2
-    }
-   ]
-  },
-  {
-   "kvk_nummer": "93808072",
-   "naam": "CDA, afdeling Resultaat AB2023 Drents Overijsselse Delta.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "99727422",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_DrentsOverijsselseDelta.eml.xml",
-     "zetels": 2
-    }
-   ]
-  },
-  {
-   "kvk_nummer": "93976020",
-   "naam": "CDA, afdeling Resultaat AB2023 Fryslan.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "99727422",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_Fryslan.eml.xml",
-     "zetels": 2
-    }
-   ]
-  },
-  {
-   "kvk_nummer": "92031652",
-   "naam": "CDA, afdeling Resultaat AB2023 Hollands Noorderkwartier.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "99727422",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_HollandsNoorderkwartier.eml.xml",
-     "zetels": 1
-    }
-   ]
-  },
-  {
-   "kvk_nummer": "97079488",
-   "naam": "CDA, afdeling Resultaat AB2023 Hollandse Delta.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "99727422",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_HollandseDelta.eml.xml",
-     "zetels": 1
-    }
-   ]
-  },
-  {
-   "kvk_nummer": "94689328",
-   "naam": "CDA, afdeling Resultaat AB2023 Hunzeen Aas.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "99727422",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_HunzeenAas.eml.xml",
-     "zetels": 1
-    }
-   ]
-  },
-  {
-   "kvk_nummer": "94451304",
-   "naam": "CDA, afdeling Resultaat AB2023 Noorderzijlvest.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "99727422",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_Noorderzijlvest.eml.xml",
-     "zetels": 1
-    }
-   ]
-  },
-  {
-   "kvk_nummer": "92026112",
-   "naam": "CDA, afdeling Resultaat AB2023 Rijnen IJssel.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "99727422",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_RijnenIJssel.eml.xml",
-     "zetels": 3
-    }
-   ]
-  },
-  {
-   "kvk_nummer": "91931516",
-   "naam": "CDA, afdeling Resultaat AB2023 Rijnland.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "99727422",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_Rijnland.eml.xml",
-     "zetels": 2
-    }
-   ]
-  },
-  {
-   "kvk_nummer": "99655316",
-   "naam": "CDA, afdeling Resultaat AB2023 Rivierenland.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "99727422",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_Rivierenland.eml.xml",
-     "zetels": 3
-    }
-   ]
-  },
-  {
-   "kvk_nummer": "97790748",
-   "naam": "CDA, afdeling Resultaat AB2023 Scheldestromen.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "99727422",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_Scheldestromen.eml.xml",
-     "zetels": 2
-    }
-   ]
-  },
-  {
-   "kvk_nummer": "94973421",
-   "naam": "CDA, afdeling Resultaat AB2023 Schielandende Krimpenerwaard.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "99727422",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_SchielandendeKrimpenerwaard.eml.xml",
-     "zetels": 1
-    }
-   ]
-  },
-  {
-   "kvk_nummer": "91531709",
-   "naam": "CDA, afdeling Resultaat AB2023 Valleien Veluwe.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "99727422",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_ValleienVeluwe.eml.xml",
-     "zetels": 2
-    }
-   ]
-  },
-  {
-   "kvk_nummer": "96975707",
-   "naam": "CDA, afdeling Resultaat AB2023 Vechtstromen.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "99727422",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_Vechtstromen.eml.xml",
-     "zetels": 3
-    }
-   ]
-  },
-  {
-   "kvk_nummer": "95362844",
-   "naam": "CDA, afdeling Resultaat AB2023 Zuiderzeeland.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "99727422",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_Zuiderzeeland.eml.xml",
-     "zetels": 1
-    }
-   ]
-  },
-  {
    "kvk_nummer": "98027939",
    "naam": "CDA, afdeling Reusel-De Mierden",
    "organisatiemodel": "DECENTRAAL",
@@ -12332,6 +12220,34 @@
    ]
   },
   {
+   "kvk_nummer": "92026112",
+   "naam": "CDA, afdeling Rijn en IJssel",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "99727422",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_RijnenIJssel.eml.xml",
+     "zetels": 3
+    }
+   ]
+  },
+  {
+   "kvk_nummer": "91931516",
+   "naam": "CDA, afdeling Rijnland",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "99727422",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_Rijnland.eml.xml",
+     "zetels": 2
+    }
+   ]
+  },
+  {
    "kvk_nummer": "97364326",
    "naam": "CDA, afdeling Rijssen-Holten",
    "organisatiemodel": "DECENTRAAL",
@@ -12356,6 +12272,20 @@
      "orgaan": "GEMEENTERAAD",
      "gebied_code": "GM0603",
      "zetels": 2
+    }
+   ]
+  },
+  {
+   "kvk_nummer": "99655316",
+   "naam": "CDA, afdeling Rivierenland",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "99727422",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_Rivierenland.eml.xml",
+     "zetels": 3
     }
    ]
   },
@@ -12444,6 +12374,20 @@
    ]
   },
   {
+   "kvk_nummer": "97790748",
+   "naam": "CDA, afdeling Scheldestromen",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "99727422",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_Scheldestromen.eml.xml",
+     "zetels": 2
+    }
+   ]
+  },
+  {
    "kvk_nummer": "95812086",
    "naam": "CDA, afdeling Scherpenzeel",
    "organisatiemodel": "DECENTRAAL",
@@ -12468,6 +12412,20 @@
      "orgaan": "GEMEENTERAAD",
      "gebied_code": "GM0606",
      "zetels": 3
+    }
+   ]
+  },
+  {
+   "kvk_nummer": "94973421",
+   "naam": "CDA, afdeling Schieland en de Krimpenerwaard",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "99727422",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_SchielandendeKrimpenerwaard.eml.xml",
+     "zetels": 1
     }
    ]
   },
@@ -12986,6 +12944,34 @@
      "orgaan": "GEMEENTERAAD",
      "gebied_code": "GM0858",
      "zetels": 2
+    }
+   ]
+  },
+  {
+   "kvk_nummer": "91531709",
+   "naam": "CDA, afdeling Vallei en Veluwe",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "99727422",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_ValleienVeluwe.eml.xml",
+     "zetels": 2
+    }
+   ]
+  },
+  {
+   "kvk_nummer": "96975707",
+   "naam": "CDA, afdeling Vechtstromen",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "99727422",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_Vechtstromen.eml.xml",
+     "zetels": 3
     }
    ]
   },
@@ -13649,7 +13635,7 @@
   },
   {
    "kvk_nummer": "94399016",
-   "naam": "CDA, afdeling ZuidHolland",
+   "naam": "CDA, afdeling Zuid-Holland",
    "organisatiemodel": "DECENTRAAL",
    "kamerzetels": 0,
    "moederpartij_kvk": "99727422",
@@ -13658,6 +13644,20 @@
      "orgaan": "PROVINCIALE_STATEN",
      "gebied_code": "PV_ZuidHolland",
      "zetels": 4
+    }
+   ]
+  },
+  {
+   "kvk_nummer": "95362844",
+   "naam": "CDA, afdeling Zuiderzeeland",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "99727422",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_Zuiderzeeland.eml.xml",
+     "zetels": 1
     }
    ]
   },
@@ -13956,6 +13956,20 @@
    ]
   },
   {
+   "kvk_nummer": "90048680",
+   "naam": "ChristenUnie, afdeling Amstel, Gooi en Vecht",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "94876288",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_AmstelGooienVecht.eml.xml",
+     "zetels": 1
+    }
+   ]
+  },
+  {
    "kvk_nummer": "92334170",
    "naam": "ChristenUnie, afdeling Apeldoorn",
    "organisatiemodel": "DECENTRAAL",
@@ -14110,6 +14124,20 @@
    ]
   },
   {
+   "kvk_nummer": "90092869",
+   "naam": "ChristenUnie, afdeling De Stichtse Rijnlanden",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "94876288",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_DeStichtseRijnlanden.eml.xml",
+     "zetels": 1
+    }
+   ]
+  },
+  {
    "kvk_nummer": "96153169",
    "naam": "ChristenUnie, afdeling Delft",
    "organisatiemodel": "DECENTRAAL",
@@ -14175,6 +14203,20 @@
     {
      "orgaan": "PROVINCIALE_STATEN",
      "gebied_code": "PV22",
+     "zetels": 2
+    }
+   ]
+  },
+  {
+   "kvk_nummer": "95803161",
+   "naam": "ChristenUnie, afdeling Drents Overijsselse Delta",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "94876288",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_DrentsOverijsselseDelta.eml.xml",
      "zetels": 2
     }
    ]
@@ -14293,7 +14335,7 @@
   },
   {
    "kvk_nummer": "98281990",
-   "naam": "ChristenUnie, afdeling Fryslan",
+   "naam": "ChristenUnie, afdeling Fryslân",
    "organisatiemodel": "DECENTRAAL",
    "kamerzetels": 0,
    "moederpartij_kvk": "94876288",
@@ -14302,6 +14344,20 @@
      "orgaan": "PROVINCIALE_STATEN",
      "gebied_code": "PV21",
      "zetels": 2
+    }
+   ]
+  },
+  {
+   "kvk_nummer": "98505285",
+   "naam": "ChristenUnie, afdeling Fryslân",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "94876288",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_Fryslan.eml.xml",
+     "zetels": 1
     }
    ]
   },
@@ -14488,6 +14544,20 @@
    ]
   },
   {
+   "kvk_nummer": "96955703",
+   "naam": "ChristenUnie, afdeling Hollandse Delta",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "94876288",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_HollandseDelta.eml.xml",
+     "zetels": 1
+    }
+   ]
+  },
+  {
    "kvk_nummer": "95639543",
    "naam": "ChristenUnie, afdeling Hoogeveen",
    "organisatiemodel": "DECENTRAAL",
@@ -14525,6 +14595,20 @@
     {
      "orgaan": "GEMEENTERAAD",
      "gebied_code": "GM0406",
+     "zetels": 1
+    }
+   ]
+  },
+  {
+   "kvk_nummer": "98819430",
+   "naam": "ChristenUnie, afdeling Hunze en Aa's",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "94876288",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_HunzeenAas.eml.xml",
      "zetels": 1
     }
    ]
@@ -14797,7 +14881,7 @@
   },
   {
    "kvk_nummer": "94528183",
-   "naam": "ChristenUnie, afdeling NoordHolland",
+   "naam": "ChristenUnie, afdeling Noord-Holland",
    "organisatiemodel": "DECENTRAAL",
    "kamerzetels": 0,
    "moederpartij_kvk": "94876288",
@@ -14819,6 +14903,20 @@
     {
      "orgaan": "GEMEENTERAAD",
      "gebied_code": "GM1699",
+     "zetels": 1
+    }
+   ]
+  },
+  {
+   "kvk_nummer": "93984683",
+   "naam": "ChristenUnie, afdeling Noorderzijlvest",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "94876288",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_Noorderzijlvest.eml.xml",
      "zetels": 1
     }
    ]
@@ -14978,160 +15076,6 @@
    ]
   },
   {
-   "kvk_nummer": "90048680",
-   "naam": "ChristenUnie, afdeling Resultaat AB2023 Amstel Gooien Vecht.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "94876288",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_AmstelGooienVecht.eml.xml",
-     "zetels": 1
-    }
-   ]
-  },
-  {
-   "kvk_nummer": "90092869",
-   "naam": "ChristenUnie, afdeling Resultaat AB2023 De Stichtse Rijnlanden.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "94876288",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_DeStichtseRijnlanden.eml.xml",
-     "zetels": 1
-    }
-   ]
-  },
-  {
-   "kvk_nummer": "95803161",
-   "naam": "ChristenUnie, afdeling Resultaat AB2023 Drents Overijsselse Delta.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "94876288",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_DrentsOverijsselseDelta.eml.xml",
-     "zetels": 2
-    }
-   ]
-  },
-  {
-   "kvk_nummer": "98505285",
-   "naam": "ChristenUnie, afdeling Resultaat AB2023 Fryslan.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "94876288",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_Fryslan.eml.xml",
-     "zetels": 1
-    }
-   ]
-  },
-  {
-   "kvk_nummer": "96955703",
-   "naam": "ChristenUnie, afdeling Resultaat AB2023 Hollandse Delta.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "94876288",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_HollandseDelta.eml.xml",
-     "zetels": 1
-    }
-   ]
-  },
-  {
-   "kvk_nummer": "98819430",
-   "naam": "ChristenUnie, afdeling Resultaat AB2023 Hunzeen Aas.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "94876288",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_HunzeenAas.eml.xml",
-     "zetels": 1
-    }
-   ]
-  },
-  {
-   "kvk_nummer": "93984683",
-   "naam": "ChristenUnie, afdeling Resultaat AB2023 Noorderzijlvest.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "94876288",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_Noorderzijlvest.eml.xml",
-     "zetels": 1
-    }
-   ]
-  },
-  {
-   "kvk_nummer": "96459876",
-   "naam": "ChristenUnie, afdeling Resultaat AB2023 Rivierenland.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "94876288",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_Rivierenland.eml.xml",
-     "zetels": 1
-    }
-   ]
-  },
-  {
-   "kvk_nummer": "94655549",
-   "naam": "ChristenUnie, afdeling Resultaat AB2023 Scheldestromen.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "94876288",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_Scheldestromen.eml.xml",
-     "zetels": 1
-    }
-   ]
-  },
-  {
-   "kvk_nummer": "90136547",
-   "naam": "ChristenUnie, afdeling Resultaat AB2023 Valleien Veluwe.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "94876288",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_ValleienVeluwe.eml.xml",
-     "zetels": 3
-    }
-   ]
-  },
-  {
-   "kvk_nummer": "95266249",
-   "naam": "ChristenUnie, afdeling Resultaat AB2023 Vechtstromen.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "94876288",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_Vechtstromen.eml.xml",
-     "zetels": 1
-    }
-   ]
-  },
-  {
    "kvk_nummer": "91744200",
    "naam": "ChristenUnie, afdeling Rheden",
    "organisatiemodel": "DECENTRAAL",
@@ -15188,6 +15132,20 @@
    ]
   },
   {
+   "kvk_nummer": "96459876",
+   "naam": "ChristenUnie, afdeling Rivierenland",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "94876288",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_Rivierenland.eml.xml",
+     "zetels": 1
+    }
+   ]
+  },
+  {
    "kvk_nummer": "97517991",
    "naam": "ChristenUnie, afdeling Rotterdam",
    "organisatiemodel": "DECENTRAAL",
@@ -15197,6 +15155,20 @@
     {
      "orgaan": "GEMEENTERAAD",
      "gebied_code": "GM0599",
+     "zetels": 1
+    }
+   ]
+  },
+  {
+   "kvk_nummer": "94655549",
+   "naam": "ChristenUnie, afdeling Scheldestromen",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "94876288",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_Scheldestromen.eml.xml",
      "zetels": 1
     }
    ]
@@ -15440,6 +15412,34 @@
    ]
   },
   {
+   "kvk_nummer": "90136547",
+   "naam": "ChristenUnie, afdeling Vallei en Veluwe",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "94876288",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_ValleienVeluwe.eml.xml",
+     "zetels": 3
+    }
+   ]
+  },
+  {
+   "kvk_nummer": "95266249",
+   "naam": "ChristenUnie, afdeling Vechtstromen",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "94876288",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_Vechtstromen.eml.xml",
+     "zetels": 1
+    }
+   ]
+  },
+  {
    "kvk_nummer": "92432310",
    "naam": "ChristenUnie, afdeling Veendam",
    "organisatiemodel": "DECENTRAAL",
@@ -15637,7 +15637,7 @@
   },
   {
    "kvk_nummer": "96584671",
-   "naam": "ChristenUnie, afdeling ZuidHolland",
+   "naam": "ChristenUnie, afdeling Zuid-Holland",
    "organisatiemodel": "DECENTRAAL",
    "kamerzetels": 0,
    "moederpartij_kvk": "94876288",
@@ -27410,6 +27410,34 @@
    ]
   },
   {
+   "kvk_nummer": "93544650",
+   "naam": "Staatkundig Gereformeerde Partij (SGP), afdeling De Stichtse Rijnlanden",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "98229479",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_DeStichtseRijnlanden.eml.xml",
+     "zetels": 1
+    }
+   ]
+  },
+  {
+   "kvk_nummer": "95926055",
+   "naam": "Staatkundig Gereformeerde Partij (SGP), afdeling Drents Overijsselse Delta",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "98229479",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_DrentsOverijsselseDelta.eml.xml",
+     "zetels": 1
+    }
+   ]
+  },
+  {
    "kvk_nummer": "98397798",
    "naam": "Staatkundig Gereformeerde Partij (SGP), afdeling Ede",
    "organisatiemodel": "DECENTRAAL",
@@ -27560,6 +27588,20 @@
      "orgaan": "GEMEENTERAAD",
      "gebied_code": "GM1963",
      "zetels": 5
+    }
+   ]
+  },
+  {
+   "kvk_nummer": "97523934",
+   "naam": "Staatkundig Gereformeerde Partij (SGP), afdeling Hollandse Delta",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "98229479",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_HollandseDelta.eml.xml",
+     "zetels": 2
     }
    ]
   },
@@ -27886,90 +27928,6 @@
    ]
   },
   {
-   "kvk_nummer": "93544650",
-   "naam": "Staatkundig Gereformeerde Partij (SGP), afdeling Resultaat AB2023 De Stichtse Rijnlanden.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "98229479",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_DeStichtseRijnlanden.eml.xml",
-     "zetels": 1
-    }
-   ]
-  },
-  {
-   "kvk_nummer": "95926055",
-   "naam": "Staatkundig Gereformeerde Partij (SGP), afdeling Resultaat AB2023 Drents Overijsselse Delta.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "98229479",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_DrentsOverijsselseDelta.eml.xml",
-     "zetels": 1
-    }
-   ]
-  },
-  {
-   "kvk_nummer": "97523934",
-   "naam": "Staatkundig Gereformeerde Partij (SGP), afdeling Resultaat AB2023 Hollandse Delta.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "98229479",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_HollandseDelta.eml.xml",
-     "zetels": 2
-    }
-   ]
-  },
-  {
-   "kvk_nummer": "90628653",
-   "naam": "Staatkundig Gereformeerde Partij (SGP), afdeling Resultaat AB2023 Rivierenland.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "98229479",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_Rivierenland.eml.xml",
-     "zetels": 2
-    }
-   ]
-  },
-  {
-   "kvk_nummer": "90163117",
-   "naam": "Staatkundig Gereformeerde Partij (SGP), afdeling Resultaat AB2023 Scheldestromen.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "98229479",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_Scheldestromen.eml.xml",
-     "zetels": 4
-    }
-   ]
-  },
-  {
-   "kvk_nummer": "97209035",
-   "naam": "Staatkundig Gereformeerde Partij (SGP), afdeling Resultaat AB2023 Valleien Veluwe.eml.xml",
-   "organisatiemodel": "DECENTRAAL",
-   "kamerzetels": 0,
-   "moederpartij_kvk": "98229479",
-   "decentrale_uitslagen": [
-    {
-     "orgaan": "WATERSCHAP",
-     "gebied_code": "WS_Resultaat_AB2023_ValleienVeluwe.eml.xml",
-     "zetels": 3
-    }
-   ]
-  },
-  {
    "kvk_nummer": "95593933",
    "naam": "Staatkundig Gereformeerde Partij (SGP), afdeling Rhenen",
    "organisatiemodel": "DECENTRAAL",
@@ -28008,6 +27966,34 @@
      "orgaan": "GEMEENTERAAD",
      "gebied_code": "GM1742",
      "zetels": 8
+    }
+   ]
+  },
+  {
+   "kvk_nummer": "90628653",
+   "naam": "Staatkundig Gereformeerde Partij (SGP), afdeling Rivierenland",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "98229479",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_Rivierenland.eml.xml",
+     "zetels": 2
+    }
+   ]
+  },
+  {
+   "kvk_nummer": "90163117",
+   "naam": "Staatkundig Gereformeerde Partij (SGP), afdeling Scheldestromen",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "98229479",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_Scheldestromen.eml.xml",
+     "zetels": 4
     }
    ]
   },
@@ -28162,6 +28148,20 @@
      "orgaan": "GEMEENTERAAD",
      "gebied_code": "GM1581",
      "zetels": 2
+    }
+   ]
+  },
+  {
+   "kvk_nummer": "97209035",
+   "naam": "Staatkundig Gereformeerde Partij (SGP), afdeling Vallei en Veluwe",
+   "organisatiemodel": "DECENTRAAL",
+   "kamerzetels": 0,
+   "moederpartij_kvk": "98229479",
+   "decentrale_uitslagen": [
+    {
+     "orgaan": "WATERSCHAP",
+     "gebied_code": "WS_Resultaat_AB2023_ValleienVeluwe.eml.xml",
+     "zetels": 3
     }
    ]
   },
@@ -28335,7 +28335,7 @@
   },
   {
    "kvk_nummer": "93489535",
-   "naam": "Staatkundig Gereformeerde Partij (SGP), afdeling ZuidHolland",
+   "naam": "Staatkundig Gereformeerde Partij (SGP), afdeling Zuid-Holland",
    "organisatiemodel": "DECENTRAAL",
    "kamerzetels": 0,
    "moederpartij_kvk": "98229479",
@@ -30720,6 +30720,12 @@
    "inwoneraantal": 26057
   },
   {
+   "orgaan": "WATERSCHAP",
+   "code": "WS_Resultaat_AB2023_AaenMaas.eml.xml",
+   "naam": "Aa en Maas",
+   "inwoneraantal": 0
+  },
+  {
    "orgaan": "GEMEENTERAAD",
    "code": "GM0358",
    "naam": "Aalsmeer",
@@ -30796,6 +30802,12 @@
    "code": "GM0307",
    "naam": "Amersfoort",
    "inwoneraantal": 163766
+  },
+  {
+   "orgaan": "WATERSCHAP",
+   "code": "WS_Resultaat_AB2023_AmstelGooienVecht.eml.xml",
+   "naam": "Amstel, Gooi en Vecht",
+   "inwoneraantal": 0
   },
   {
    "orgaan": "GEMEENTERAAD",
@@ -30996,6 +31008,12 @@
    "inwoneraantal": 34314
   },
   {
+   "orgaan": "WATERSCHAP",
+   "code": "WS_Resultaat_AB2023_BrabantseDelta.eml.xml",
+   "naam": "Brabantse Delta",
+   "inwoneraantal": 0
+  },
+  {
    "orgaan": "GEMEENTERAAD",
    "code": "GM0758",
    "naam": "Breda",
@@ -31086,6 +31104,12 @@
    "inwoneraantal": 43673
   },
   {
+   "orgaan": "WATERSCHAP",
+   "code": "WS_Resultaat_AB2023_DeDommel.eml.xml",
+   "naam": "De Dommel",
+   "inwoneraantal": 0
+  },
+  {
    "orgaan": "GEMEENTERAAD",
    "code": "GM1940",
    "naam": "De Fryske Marren",
@@ -31098,10 +31122,22 @@
    "inwoneraantal": 45739
   },
   {
+   "orgaan": "WATERSCHAP",
+   "code": "WS_Resultaat_AB2023_DeStichtseRijnlanden.eml.xml",
+   "naam": "De Stichtse Rijnlanden",
+   "inwoneraantal": 0
+  },
+  {
    "orgaan": "GEMEENTERAAD",
    "code": "GM1690",
    "naam": "De Wolden",
    "inwoneraantal": 24826
+  },
+  {
+   "orgaan": "WATERSCHAP",
+   "code": "WS_Resultaat_AB2023_Delfland.eml.xml",
+   "naam": "Delfland",
+   "inwoneraantal": 0
   },
   {
    "orgaan": "GEMEENTERAAD",
@@ -31180,6 +31216,12 @@
    "code": "PV22",
    "naam": "Drenthe",
    "inwoneraantal": 508054
+  },
+  {
+   "orgaan": "WATERSCHAP",
+   "code": "WS_Resultaat_AB2023_DrentsOverijsselseDelta.eml.xml",
+   "naam": "Drents Overijsselse Delta",
+   "inwoneraantal": 0
   },
   {
    "orgaan": "GEMEENTERAAD",
@@ -31304,8 +31346,14 @@
   {
    "orgaan": "PROVINCIALE_STATEN",
    "code": "PV21",
-   "naam": "Fryslan",
+   "naam": "Fryslân",
    "inwoneraantal": 665276
+  },
+  {
+   "orgaan": "WATERSCHAP",
+   "code": "WS_Resultaat_AB2023_Fryslan.eml.xml",
+   "naam": "Fryslân",
+   "inwoneraantal": 0
   },
   {
    "orgaan": "GEMEENTERAAD",
@@ -31566,6 +31614,18 @@
    "inwoneraantal": 50619
   },
   {
+   "orgaan": "WATERSCHAP",
+   "code": "WS_Resultaat_AB2023_HollandsNoorderkwartier.eml.xml",
+   "naam": "Hollands Noorderkwartier",
+   "inwoneraantal": 0
+  },
+  {
+   "orgaan": "WATERSCHAP",
+   "code": "WS_Resultaat_AB2023_HollandseDelta.eml.xml",
+   "naam": "Hollandse Delta",
+   "inwoneraantal": 0
+  },
+  {
    "orgaan": "GEMEENTERAAD",
    "code": "GM0118",
    "naam": "Hoogeveen",
@@ -31600,6 +31660,12 @@
    "code": "GM0677",
    "naam": "Hulst",
    "inwoneraantal": 27375
+  },
+  {
+   "orgaan": "WATERSCHAP",
+   "code": "WS_Resultaat_AB2023_HunzeenAas.eml.xml",
+   "naam": "Hunze en Aa's",
+   "inwoneraantal": 0
   },
   {
    "orgaan": "GEMEENTERAAD",
@@ -31738,6 +31804,12 @@
    "code": "PV31",
    "naam": "Limburg",
    "inwoneraantal": 1138362
+  },
+  {
+   "orgaan": "WATERSCHAP",
+   "code": "WS_Resultaat_AB2023_Limburg.eml.xml",
+   "naam": "Limburg",
+   "inwoneraantal": 0
   },
   {
    "orgaan": "GEMEENTERAAD",
@@ -31940,13 +32012,13 @@
   {
    "orgaan": "PROVINCIALE_STATEN",
    "code": "PV_NoordBrabant",
-   "naam": "NoordBrabant",
+   "naam": "Noord-Brabant",
    "inwoneraantal": 0
   },
   {
    "orgaan": "PROVINCIALE_STATEN",
    "code": "PV_NoordHolland",
-   "naam": "NoordHolland",
+   "naam": "Noord-Holland",
    "inwoneraantal": 0
   },
   {
@@ -31954,6 +32026,12 @@
    "code": "GM1699",
    "naam": "Noordenveld",
    "inwoneraantal": 31737
+  },
+  {
+   "orgaan": "WATERSCHAP",
+   "code": "WS_Resultaat_AB2023_Noorderzijlvest.eml.xml",
+   "naam": "Noorderzijlvest",
+   "inwoneraantal": 0
   },
   {
    "orgaan": "GEMEENTERAAD",
@@ -32160,132 +32238,6 @@
    "inwoneraantal": 5905
   },
   {
-   "orgaan": "WATERSCHAP",
-   "code": "WS_Resultaat_AB2023_AaenMaas.eml.xml",
-   "naam": "Resultaat AB2023 Aaen Maas.eml.xml",
-   "inwoneraantal": 0
-  },
-  {
-   "orgaan": "WATERSCHAP",
-   "code": "WS_Resultaat_AB2023_AmstelGooienVecht.eml.xml",
-   "naam": "Resultaat AB2023 Amstel Gooien Vecht.eml.xml",
-   "inwoneraantal": 0
-  },
-  {
-   "orgaan": "WATERSCHAP",
-   "code": "WS_Resultaat_AB2023_BrabantseDelta.eml.xml",
-   "naam": "Resultaat AB2023 Brabantse Delta.eml.xml",
-   "inwoneraantal": 0
-  },
-  {
-   "orgaan": "WATERSCHAP",
-   "code": "WS_Resultaat_AB2023_DeDommel.eml.xml",
-   "naam": "Resultaat AB2023 De Dommel.eml.xml",
-   "inwoneraantal": 0
-  },
-  {
-   "orgaan": "WATERSCHAP",
-   "code": "WS_Resultaat_AB2023_DeStichtseRijnlanden.eml.xml",
-   "naam": "Resultaat AB2023 De Stichtse Rijnlanden.eml.xml",
-   "inwoneraantal": 0
-  },
-  {
-   "orgaan": "WATERSCHAP",
-   "code": "WS_Resultaat_AB2023_Delfland.eml.xml",
-   "naam": "Resultaat AB2023 Delfland.eml.xml",
-   "inwoneraantal": 0
-  },
-  {
-   "orgaan": "WATERSCHAP",
-   "code": "WS_Resultaat_AB2023_DrentsOverijsselseDelta.eml.xml",
-   "naam": "Resultaat AB2023 Drents Overijsselse Delta.eml.xml",
-   "inwoneraantal": 0
-  },
-  {
-   "orgaan": "WATERSCHAP",
-   "code": "WS_Resultaat_AB2023_Fryslan.eml.xml",
-   "naam": "Resultaat AB2023 Fryslan.eml.xml",
-   "inwoneraantal": 0
-  },
-  {
-   "orgaan": "WATERSCHAP",
-   "code": "WS_Resultaat_AB2023_HollandsNoorderkwartier.eml.xml",
-   "naam": "Resultaat AB2023 Hollands Noorderkwartier.eml.xml",
-   "inwoneraantal": 0
-  },
-  {
-   "orgaan": "WATERSCHAP",
-   "code": "WS_Resultaat_AB2023_HollandseDelta.eml.xml",
-   "naam": "Resultaat AB2023 Hollandse Delta.eml.xml",
-   "inwoneraantal": 0
-  },
-  {
-   "orgaan": "WATERSCHAP",
-   "code": "WS_Resultaat_AB2023_HunzeenAas.eml.xml",
-   "naam": "Resultaat AB2023 Hunzeen Aas.eml.xml",
-   "inwoneraantal": 0
-  },
-  {
-   "orgaan": "WATERSCHAP",
-   "code": "WS_Resultaat_AB2023_Limburg.eml.xml",
-   "naam": "Resultaat AB2023 Limburg.eml.xml",
-   "inwoneraantal": 0
-  },
-  {
-   "orgaan": "WATERSCHAP",
-   "code": "WS_Resultaat_AB2023_Noorderzijlvest.eml.xml",
-   "naam": "Resultaat AB2023 Noorderzijlvest.eml.xml",
-   "inwoneraantal": 0
-  },
-  {
-   "orgaan": "WATERSCHAP",
-   "code": "WS_Resultaat_AB2023_RijnenIJssel.eml.xml",
-   "naam": "Resultaat AB2023 Rijnen IJssel.eml.xml",
-   "inwoneraantal": 0
-  },
-  {
-   "orgaan": "WATERSCHAP",
-   "code": "WS_Resultaat_AB2023_Rijnland.eml.xml",
-   "naam": "Resultaat AB2023 Rijnland.eml.xml",
-   "inwoneraantal": 0
-  },
-  {
-   "orgaan": "WATERSCHAP",
-   "code": "WS_Resultaat_AB2023_Rivierenland.eml.xml",
-   "naam": "Resultaat AB2023 Rivierenland.eml.xml",
-   "inwoneraantal": 0
-  },
-  {
-   "orgaan": "WATERSCHAP",
-   "code": "WS_Resultaat_AB2023_Scheldestromen.eml.xml",
-   "naam": "Resultaat AB2023 Scheldestromen.eml.xml",
-   "inwoneraantal": 0
-  },
-  {
-   "orgaan": "WATERSCHAP",
-   "code": "WS_Resultaat_AB2023_SchielandendeKrimpenerwaard.eml.xml",
-   "naam": "Resultaat AB2023 Schielandende Krimpenerwaard.eml.xml",
-   "inwoneraantal": 0
-  },
-  {
-   "orgaan": "WATERSCHAP",
-   "code": "WS_Resultaat_AB2023_ValleienVeluwe.eml.xml",
-   "naam": "Resultaat AB2023 Valleien Veluwe.eml.xml",
-   "inwoneraantal": 0
-  },
-  {
-   "orgaan": "WATERSCHAP",
-   "code": "WS_Resultaat_AB2023_Vechtstromen.eml.xml",
-   "naam": "Resultaat AB2023 Vechtstromen.eml.xml",
-   "inwoneraantal": 0
-  },
-  {
-   "orgaan": "WATERSCHAP",
-   "code": "WS_Resultaat_AB2023_Zuiderzeeland.eml.xml",
-   "naam": "Resultaat AB2023 Zuiderzeeland.eml.xml",
-   "inwoneraantal": 0
-  },
-  {
    "orgaan": "GEMEENTERAAD",
    "code": "GM1667",
    "naam": "Reusel-De Mierden",
@@ -32310,6 +32262,18 @@
    "inwoneraantal": 48070
   },
   {
+   "orgaan": "WATERSCHAP",
+   "code": "WS_Resultaat_AB2023_RijnenIJssel.eml.xml",
+   "naam": "Rijn en IJssel",
+   "inwoneraantal": 0
+  },
+  {
+   "orgaan": "WATERSCHAP",
+   "code": "WS_Resultaat_AB2023_Rijnland.eml.xml",
+   "naam": "Rijnland",
+   "inwoneraantal": 0
+  },
+  {
    "orgaan": "GEMEENTERAAD",
    "code": "GM1742",
    "naam": "Rijssen-Holten",
@@ -32320,6 +32284,12 @@
    "code": "GM0603",
    "naam": "Rijswijk",
    "inwoneraantal": 61874
+  },
+  {
+   "orgaan": "WATERSCHAP",
+   "code": "WS_Resultaat_AB2023_Rivierenland.eml.xml",
+   "naam": "Rivierenland",
+   "inwoneraantal": 0
   },
   {
    "orgaan": "GEMEENTERAAD",
@@ -32370,6 +32340,12 @@
    "inwoneraantal": 48772
   },
   {
+   "orgaan": "WATERSCHAP",
+   "code": "WS_Resultaat_AB2023_Scheldestromen.eml.xml",
+   "naam": "Scheldestromen",
+   "inwoneraantal": 0
+  },
+  {
    "orgaan": "GEMEENTERAAD",
    "code": "GM0279",
    "naam": "Scherpenzeel",
@@ -32380,6 +32356,12 @@
    "code": "GM0606",
    "naam": "Schiedam",
    "inwoneraantal": 82055
+  },
+  {
+   "orgaan": "WATERSCHAP",
+   "code": "WS_Resultaat_AB2023_SchielandendeKrimpenerwaard.eml.xml",
+   "naam": "Schieland en de Krimpenerwaard",
+   "inwoneraantal": 0
   },
   {
    "orgaan": "GEMEENTERAAD",
@@ -32620,6 +32602,18 @@
    "code": "GM0858",
    "naam": "Valkenswaard",
    "inwoneraantal": 31912
+  },
+  {
+   "orgaan": "WATERSCHAP",
+   "code": "WS_Resultaat_AB2023_ValleienVeluwe.eml.xml",
+   "naam": "Vallei en Veluwe",
+   "inwoneraantal": 0
+  },
+  {
+   "orgaan": "WATERSCHAP",
+   "code": "WS_Resultaat_AB2023_Vechtstromen.eml.xml",
+   "naam": "Vechtstromen",
+   "inwoneraantal": 0
   },
   {
    "orgaan": "GEMEENTERAAD",
@@ -32918,7 +32912,13 @@
   {
    "orgaan": "PROVINCIALE_STATEN",
    "code": "PV_ZuidHolland",
-   "naam": "ZuidHolland",
+   "naam": "Zuid-Holland",
+   "inwoneraantal": 0
+  },
+  {
+   "orgaan": "WATERSCHAP",
+   "code": "WS_Resultaat_AB2023_Zuiderzeeland.eml.xml",
+   "naam": "Zuiderzeeland",
    "inwoneraantal": 0
   },
   {
