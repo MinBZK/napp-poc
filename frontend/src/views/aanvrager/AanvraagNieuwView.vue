@@ -541,24 +541,25 @@ watch(() => session.aanvrager, laadRegistratie);
         <template v-else-if="proef">
           <nldd-box>
             <nldd-container padding="16" gap="8">
-              <nldd-text-cell
-                overline="Indicatieve uitkomst volgens de wet"
-                :text="proef.subsidie_toegekend ? euro(proef.subsidiebedrag) : 'Afwijzing'"
-                :supporting-text="
-                  proef.subsidie_toegekend
+              <nldd-title size="4">
+                <span slot="overline">Indicatieve uitkomst volgens de wet</span>
+                <h4>{{ proef.subsidie_toegekend ? euro(proef.subsidiebedrag) : 'Afwijzing' }}</h4>
+              </nldd-title>
+              <nldd-rich-text>
+                <p>
+                  {{ proef.subsidie_toegekend
                     ? `${proef.onderdelen_toegekend} van ${onderdelen(proef.onderdelen_totaal)} toegekend · voorschot 80%: ${euro(proef.voorschot_bedrag)} · dit is geen besluit`
-                    : `${proef.onderdelen_toegekend} van ${onderdelen(proef.onderdelen_totaal)} toegekend · dit is geen besluit`
-                "
-                size="md"
-              ></nldd-text-cell>
+                    : `${proef.onderdelen_toegekend} van ${onderdelen(proef.onderdelen_totaal)} toegekend · dit is geen besluit` }}
+                </p>
+              </nldd-rich-text>
               <!-- Bij afgewezen onderdelen legt de motivering uit welke en
                    waarom -- dezelfde tekst die straks in het besluit staat. -->
-              <nldd-text-cell
-                v-if="proef.motivering && proef.onderdelen_toegekend < proef.onderdelen_totaal"
-                :text="proef.motivering"
-                color="secondary"
-                size="sm"
-              ></nldd-text-cell>
+              <template v-if="proef.motivering && proef.onderdelen_toegekend < proef.onderdelen_totaal">
+                <nldd-divider></nldd-divider>
+                <nldd-rich-text>
+                  <p>{{ proef.motivering }}</p>
+                </nldd-rich-text>
+              </template>
             </nldd-container>
           </nldd-box>
           <nldd-spacer size="16"></nldd-spacer>
