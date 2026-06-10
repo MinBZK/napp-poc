@@ -208,7 +208,7 @@ watch(() => session.aanvrager, laadRegistratie);
         <template v-for="groep in zichtbareGroepen" :key="groep.titel">
           <nldd-title size="4">
             <h3>{{ groep.titel }}</h3>
-            <div slot="actions">
+            <div v-if="groepLeden(groep).length > 1" slot="actions">
               <nldd-button-group orientation="horizontal">
                 <nldd-button
                   size="sm"
