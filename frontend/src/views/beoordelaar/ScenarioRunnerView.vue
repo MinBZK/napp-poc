@@ -141,7 +141,7 @@ onMounted(run);
       slot="header"
       subtitle="Beoordelingsomgeving"
       portal="beoordelaar"
-      :items="[{ text: 'Werkvoorraad', to: '/' }, { text: 'Scenario’s', to: '/scenarios' }]"
+      :items="[{ text: 'Werkvoorraad', to: '/' }, { text: 'Partijregister', to: '/partijregister' }, { text: 'Scenario’s', to: '/scenarios' }]"
     />
 
     <nldd-simple-section width="860px">

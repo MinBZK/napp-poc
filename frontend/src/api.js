@@ -30,6 +30,19 @@ export function apiPost(path, data) {
   }).then(handle);
 }
 
+export function apiPut(path, data) {
+  return fetch(path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+    credentials: 'include',
+  }).then(handle);
+}
+
+export function apiDelete(path) {
+  return fetch(path, { method: 'DELETE', credentials: 'include' }).then(handle);
+}
+
 export const api = {
   me: () => apiGet('/api/me'),
   eherkenningLogin: (kvkNummer) =>
@@ -50,4 +63,16 @@ export const api = {
   betaalopdrachten: () => apiGet('/api/betaalopdrachten'),
   register: () => apiGet('/api/register'),
   statistieken: () => apiGet('/api/register/statistieken'),
+  // Partijregister-beheer (beoordelaar-only).
+  beheerPartijen: ({ zoek = '', offset = 0, limit = 25 } = {}) =>
+    apiGet(`/api/beheer/partijen?${new URLSearchParams({ zoek, offset, limit })}`),
+  beheerPartij: (kvk) => apiGet(`/api/beheer/partijen/${kvk}`),
+  beheerPartijRegistreren: (payload) => apiPost('/api/beheer/partijen', payload),
+  beheerPartijWijzigen: (kvk, payload) => apiPut(`/api/beheer/partijen/${kvk}`, payload),
+  beheerUitslagToevoegen: (kvk, payload) =>
+    apiPost(`/api/beheer/partijen/${kvk}/uitslagen`, payload),
+  beheerUitslagVerwijderen: (kvk, orgaan, gebiedCode) =>
+    apiDelete(`/api/beheer/partijen/${kvk}/uitslagen/${orgaan}/${gebiedCode}`),
+  beheerGebieden: (orgaan) =>
+    apiGet(`/api/beheer/gebieden?${new URLSearchParams(orgaan ? { orgaan } : {})}`),
 };
