@@ -307,8 +307,12 @@ mod tests {
     #[tokio::test]
     async fn valideer_volledig_is_always_ok() {
         let pool = test_pool().await;
-        assert!(valideer(&pool, CENTRAAL, &Machtiging::Volledig).await.is_ok());
-        assert!(valideer(&pool, ONBEKEND, &Machtiging::Volledig).await.is_ok());
+        assert!(valideer(&pool, CENTRAAL, &Machtiging::Volledig)
+            .await
+            .is_ok());
+        assert!(valideer(&pool, ONBEKEND, &Machtiging::Volledig)
+            .await
+            .is_ok());
     }
 
     #[tokio::test]

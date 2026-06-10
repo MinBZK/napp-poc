@@ -66,7 +66,10 @@ impl NappWorld {
     /// request them as primary outputs.
     pub fn execute_besluit(&mut self) {
         self.apply_besluit_defaults();
-        self.execute("wet_op_de_politieke_partijen", &["subsidie_toegekend", "subsidiebedrag"]);
+        self.execute(
+            "wet_op_de_politieke_partijen",
+            &["subsidie_toegekend", "subsidiebedrag"],
+        );
     }
 
     /// Article 15 requires every parameter; scenarios that don't exercise

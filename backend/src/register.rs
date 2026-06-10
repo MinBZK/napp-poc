@@ -517,10 +517,7 @@ pub async fn delete_uitslag(
 
 /// Gebieden for the beheer UI (uitslag-toevoegen form), optionally filtered
 /// by orgaan, sorted by name.
-pub async fn list_gebieden(
-    pool: &SqlitePool,
-    orgaan: Option<&str>,
-) -> anyhow::Result<Vec<Gebied>> {
+pub async fn list_gebieden(pool: &SqlitePool, orgaan: Option<&str>) -> anyhow::Result<Vec<Gebied>> {
     let rows = match orgaan {
         Some(orgaan) => {
             sqlx::query(
