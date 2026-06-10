@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import PortalHeader from '../../components/PortalHeader.vue';
 import NBanner from '../../components/NBanner.vue';
+import ClaimAanduiding from '../../components/ClaimAanduiding.vue';
 import { api } from '../../api.js';
 import { session } from '../../session.js';
 import { euro, datum, onderdelen } from '../../format.js';
@@ -248,13 +249,13 @@ watch(() => session.aanvrager, laadRegistratie);
           <nldd-spacer size="16"></nldd-spacer>
         </template>
 
-        <NBanner
-          v-if="registratie && !registratie.partij"
-          variant="warning"
-          text="Geen registratie gevonden"
-          supporting-text="Uw organisatie staat niet in het partijregister van de Napp. U kunt een aanvraag indienen, maar zonder geregistreerde zetels zal de wet haar afwijzen."
-        />
-        <nldd-spacer v-if="registratie && !registratie.partij" size="16"></nldd-spacer>
+        <!-- Niet in het register: claim-flow (vervangt de kale banner).
+             Het claim-blok toont de zoeklijst met ongekoppelde aanduidingen,
+             of de status van de eigen claim. -->
+        <template v-if="registratie && !registratie.partij">
+          <ClaimAanduiding />
+          <nldd-spacer size="24"></nldd-spacer>
+        </template>
 
         <template v-for="groep in zichtbareGroepen" :key="groep.titel">
           <nldd-title size="4">

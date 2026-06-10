@@ -57,6 +57,12 @@ export const api = {
   eherkenningLogout: () => apiPost('/api/eherkenning/logout'),
   mijnRegistratie: () => apiGet('/api/mijn-registratie'),
   registerDemo: () => apiGet('/api/register/demo'),
+  // Claim-flow: een rechtspersoon koppelt zichzelf aan een ongekoppelde
+  // aanduiding uit de verkiezingsuitslag.
+  claimAanduidingen: (zoek = '') =>
+    apiGet(`/api/claim/aanduidingen?zoek=${encodeURIComponent(zoek)}`),
+  claimIndienen: (doelKvk) => apiPost('/api/claim', { doel_kvk: doelKvk }),
+  mijnClaim: () => apiGet('/api/mijn-claim'),
   ssoMockLogin: (naam) => apiPost('/api/sso/mock-login', { naam }),
   aanvragen: () => apiGet('/api/aanvragen'),
   aanvraag: (id) => apiGet(`/api/aanvragen/${id}`),
@@ -75,4 +81,7 @@ export const api = {
     apiGet(`/api/beheer/partijen?${new URLSearchParams({ zoek, offset, limit })}`),
   beheerPartij: (kvk) => apiGet(`/api/beheer/partijen/${kvk}`),
   beheerPartijWijzigen: (kvk, payload) => apiPut(`/api/beheer/partijen/${kvk}`, payload),
+  beheerClaims: () => apiGet('/api/beheer/claims'),
+  beheerClaimBevestigen: (id) => apiPost(`/api/beheer/claims/${id}/bevestig`),
+  beheerClaimAfwijzen: (id, reden) => apiPost(`/api/beheer/claims/${id}/afwijzen`, { reden }),
 };

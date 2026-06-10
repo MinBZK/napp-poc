@@ -127,6 +127,7 @@ async fn partij_detail(
         "kamerzetels": partij.kamerzetels,
         "moederpartij_kvk": partij.moederpartij_kvk,
         "moederpartij_naam": moederpartij_naam,
+        "status": partij.status,
         "uitslagen": uitslagen,
     })))
 }
