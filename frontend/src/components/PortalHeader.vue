@@ -9,6 +9,7 @@ import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api } from '../api.js';
 import { session, refreshSession } from '../session.js';
+import PocBanner from './PocBanner.vue';
 
 // Functionele sitenaam onder het woordmerk, per portaal vast; afgeleid
 // van de portal-prop zodat hij nooit per pagina kan verschillen.
@@ -86,6 +87,7 @@ function onSelect(event, item) {
 </script>
 
 <template>
+  <PocBanner />
   <nldd-skip-link text="Direct naar de inhoud">
     <!-- Rijkshuisstijl: het woordmerk naast het beeldmerk is de officiële
          organisatienaam, op elk portaal identiek; de functionele sitenaam
