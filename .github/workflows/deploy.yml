@@ -60,5 +60,5 @@ jobs:
           api-key: ${{ secrets.RIG_API_KEY }}
           project-id: ${{ vars.ZAD_PROJECT_ID }}
           deployment-name: productie
-          component: app
+          component: napp
           image: ${{ env.IMAGE }}:sha-${{ needs.build.outputs.short-sha }}

@@ -59,7 +59,7 @@ path-dependency; pin een ref met `--build-arg REGELRECHT_REF=<tag-of-sha>`.
 `.github/workflows/deploy.yml` bouwt en pusht het image naar
 `ghcr.io/minbzk/napp-poc` bij elke push naar main, en deployt naar ZAD zodra
 de repository variable `ZAD_PROJECT_ID` en het secret `RIG_API_KEY` gezet
-zijn (component `app`, deployment `productie`).
+zijn (component `napp`, deployment `productie`).
 
 Omgevingsvariabelen (defaults in het image):
 
