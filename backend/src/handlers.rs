@@ -859,9 +859,9 @@ pub async fn stel_besluit_vast(
         .await
         .map_err(internal_error)?;
         let status = if toets.uitbetaling_aangehouden {
-            "AANGEHOUDEN"
+            db::BETAAL_AANGEHOUDEN
         } else {
-            "AANGEMAAKT"
+            db::BETAAL_AANGEMAAKT
         };
         let opdracht_id = Uuid::new_v4().to_string();
         db::insert_betaalopdracht(
@@ -963,6 +963,14 @@ pub async fn bekendmaking(
     )
     .await
     .map_err(internal_error)?;
+    // Met de bekendmaking gaat de betalingstermijn van het voorschot lopen
+    // (AWB 4:87: binnen zes weken). De betaalopdracht draagt die termijn.
+    let betaaltermijn = engine::evaluate_betaaltermijn(state.corpus.clone(), vandaag.clone())
+        .await
+        .map_err(internal_error)?;
+    db::set_betaaltermijn(&state.pool, &besluit.id, &betaaltermijn)
+        .await
+        .map_err(internal_error)?;
     db::set_aanvraag_status(&state.pool, &id, engine::STAGE_BEZWAAR)
         .await
         .map_err(internal_error)?;
@@ -989,6 +997,48 @@ pub async fn list_betaalopdrachten(
         .await
         .map_err(internal_error)?;
     Ok(Json(json!(opdrachten)))
+}
+
+/// POST /api/betaalopdrachten/{id}/uitbetalen — verstuur een aangemaakte
+/// opdracht naar het (gesimuleerde) betaalsysteem. De uitbetaling is een
+/// feitelijke handeling, geen rechtshandeling: het recht op het voorschot
+/// volgt al uit het besluit (art. 16/17 Wpp) en de betalingstermijn uit
+/// AWB 4:87. Een aangehouden opdracht kan niet worden verstuurd: art. 27
+/// houdt de uitbetaling aan zolang geen rekening van de rechtspersoon
+/// bekend is.
+pub async fn betaal_uit(
+    State(state): State<AppState>,
+    session: Session,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    if session_beoordelaar(&session).await.is_none() {
+        return Err(forbidden());
+    }
+    let Some(opdracht) = db::get_betaalopdracht(&state.pool, &id)
+        .await
+        .map_err(internal_error)?
+    else {
+        return Err(not_found());
+    };
+    if opdracht.status == db::BETAAL_AANGEHOUDEN {
+        return Err(bad_request(
+            "Deze betaalopdracht is aangehouden: er is geen rekening van de rechtspersoon \
+             bekend (artikel 27 Wpp). Zodra het bestuur een rekening opgeeft, wordt de \
+             opdracht automatisch klaargezet.",
+        ));
+    }
+    if !db::markeer_uitbetaald(&state.pool, &id)
+        .await
+        .map_err(internal_error)?
+    {
+        return Err(bad_request("Deze betaalopdracht is al uitbetaald."));
+    }
+    tracing::info!(opdracht = %id, bedrag = opdracht.bedrag, "voorschot uitbetaald (mock betaalsysteem)");
+    let opdracht = db::get_betaalopdracht(&state.pool, &id)
+        .await
+        .map_err(internal_error)?
+        .ok_or_else(not_found)?;
+    Ok(Json(json!(opdracht)))
 }
 
 // ---------------------------------------------------------------------------

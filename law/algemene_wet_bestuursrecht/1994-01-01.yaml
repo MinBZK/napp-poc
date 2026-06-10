@@ -153,3 +153,31 @@ articles:
               operation: DATE_ADD
               date: $bekendmaking_datum
               weeks: $bezwaartermijn_weken
+
+  # ------------------------------------------------------------------
+  # Artikel 4:87 — Betalingstermijn bestuursrechtelijke geldschulden
+  # Het voorschot op de subsidie is een geldschuld uit een beschikking;
+  # de betaling moet binnen zes weken na de bekendmaking plaatsvinden.
+  # ------------------------------------------------------------------
+  - number: '4:87'
+    text: |-
+      Betaling geschiedt binnen zes weken nadat de beschikking op de
+      voorgeschreven wijze is bekendgemaakt, tenzij de beschikking een
+      later tijdstip vermeldt.
+    url: https://wetten.overheid.nl/BWBR0005537/#Hoofdstuk4_Titeldeel4.4_Afdeling4.4.1_Artikel4:87
+    machine_readable:
+      execution:
+        parameters:
+          - name: bekendmaking_datum
+            type: date
+            required: true
+            description: Datum waarop de beschikking is bekendgemaakt
+        output:
+          - name: betaaltermijn_einddatum
+            type: date
+        actions:
+          - output: betaaltermijn_einddatum
+            value:
+              operation: DATE_ADD
+              date: $bekendmaking_datum
+              weeks: 6

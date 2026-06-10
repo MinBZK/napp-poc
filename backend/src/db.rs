@@ -53,6 +53,10 @@ pub async fn init(pool: &SqlitePool) -> anyhow::Result<()> {
             iban TEXT NULL,
             tenaamstelling TEXT NULL,
             status TEXT NOT NULL DEFAULT 'AANGEMAAKT',
+            -- Uiterste betaaldatum (AWB 4:87: zes weken na bekendmaking),
+            -- gezet bij de bekendmaking van het besluit.
+            betaaltermijn_einddatum TEXT NULL,
+            uitgevoerd_at TEXT NULL,
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
         -- Partijregister (registratietaak van de Napp), beheerd in de
@@ -113,11 +117,15 @@ pub async fn init(pool: &SqlitePool) -> anyhow::Result<()> {
     )
     .execute(pool)
     .await?;
-    // Migratie voor bestaande databases van vóór de bewijs-kolom; faalt
-    // (genegeerd) wanneer de kolom al bestaat.
-    let _ = sqlx::query("ALTER TABLE besluiten ADD COLUMN bewijs TEXT")
-        .execute(pool)
-        .await;
+    // Migraties voor bestaande databases; falen (genegeerd) wanneer de
+    // kolom al bestaat.
+    for migratie in [
+        "ALTER TABLE besluiten ADD COLUMN bewijs TEXT",
+        "ALTER TABLE betaalopdrachten ADD COLUMN betaaltermijn_einddatum TEXT",
+        "ALTER TABLE betaalopdrachten ADD COLUMN uitgevoerd_at TEXT",
+    ] {
+        let _ = sqlx::query(migratie).execute(pool).await;
+    }
     Ok(())
 }
 
@@ -200,6 +208,13 @@ pub struct Besluit {
     pub bewijs: Option<serde_json::Value>,
 }
 
+// Betaalopdracht-statussen. AANGEHOUDEN volgt uit art. 27 Wpp (geen
+// rekening bekend); de overige zijn procesfasen richting het
+// (gesimuleerde) betaalsysteem.
+pub const BETAAL_AANGEMAAKT: &str = "AANGEMAAKT";
+pub const BETAAL_AANGEHOUDEN: &str = "AANGEHOUDEN";
+pub const BETAAL_UITBETAALD: &str = "UITBETAALD";
+
 #[derive(Debug, Serialize)]
 pub struct Betaalopdracht {
     pub id: String,
@@ -211,6 +226,10 @@ pub struct Betaalopdracht {
     pub iban: Option<String>,
     pub tenaamstelling: Option<String>,
     pub status: String,
+    /// Uiterste betaaldatum (AWB 4:87), gezet bij de bekendmaking.
+    pub betaaltermijn_einddatum: Option<String>,
+    /// Moment van (gesimuleerde) uitbetaling.
+    pub uitgevoerd_at: Option<String>,
     pub created_at: String,
 }
 
@@ -508,23 +527,109 @@ pub async fn insert_betaalopdracht(
     Ok(())
 }
 
+fn row_to_betaalopdracht(row: &sqlx::sqlite::SqliteRow) -> Betaalopdracht {
+    Betaalopdracht {
+        id: row.get("id"),
+        besluit_id: row.get("besluit_id"),
+        partij_naam: row.get("partij_naam"),
+        bedrag: row.get("bedrag"),
+        iban: row.get("iban"),
+        tenaamstelling: row.get("tenaamstelling"),
+        status: row.get("status"),
+        betaaltermijn_einddatum: row.get("betaaltermijn_einddatum"),
+        uitgevoerd_at: row.get("uitgevoerd_at"),
+        created_at: row.get("created_at"),
+    }
+}
+
 pub async fn list_betaalopdrachten(pool: &SqlitePool) -> anyhow::Result<Vec<Betaalopdracht>> {
     let rows = sqlx::query("SELECT * FROM betaalopdrachten ORDER BY created_at DESC")
         .fetch_all(pool)
         .await?;
-    Ok(rows
-        .iter()
-        .map(|row| Betaalopdracht {
-            id: row.get("id"),
-            besluit_id: row.get("besluit_id"),
-            partij_naam: row.get("partij_naam"),
-            bedrag: row.get("bedrag"),
-            iban: row.get("iban"),
-            tenaamstelling: row.get("tenaamstelling"),
-            status: row.get("status"),
-            created_at: row.get("created_at"),
-        })
-        .collect())
+    Ok(rows.iter().map(row_to_betaalopdracht).collect())
+}
+
+pub async fn get_betaalopdracht(
+    pool: &SqlitePool,
+    id: &str,
+) -> anyhow::Result<Option<Betaalopdracht>> {
+    let row = sqlx::query("SELECT * FROM betaalopdrachten WHERE id = ?")
+        .bind(id)
+        .fetch_optional(pool)
+        .await?;
+    Ok(row.as_ref().map(row_to_betaalopdracht))
+}
+
+/// Aangehouden betaalopdrachten van een rechtspersoon, via het besluit en
+/// de aanvraag (de betaalopdracht zelf kent geen KvK-nummer).
+pub async fn aangehouden_betaalopdrachten(
+    pool: &SqlitePool,
+    kvk: &str,
+) -> anyhow::Result<Vec<String>> {
+    let ids = sqlx::query_scalar(
+        "SELECT bo.id FROM betaalopdrachten bo
+         JOIN besluiten b ON bo.besluit_id = b.id
+         JOIN aanvragen a ON b.aanvraag_id = a.id
+         WHERE a.kvk_nummer = ? AND bo.status = ?",
+    )
+    .bind(kvk)
+    .bind(BETAAL_AANGEHOUDEN)
+    .fetch_all(pool)
+    .await?;
+    Ok(ids)
+}
+
+/// Activeer een aangehouden betaalopdracht nadat art. 27 de aanhouding
+/// heeft opgeheven: rekening erbij, status AANGEMAAKT.
+pub async fn activeer_betaalopdracht(
+    pool: &SqlitePool,
+    id: &str,
+    iban: &str,
+    tenaamstelling: &str,
+) -> anyhow::Result<()> {
+    sqlx::query(
+        "UPDATE betaalopdrachten SET status = ?, iban = ?, tenaamstelling = ?
+         WHERE id = ? AND status = ?",
+    )
+    .bind(BETAAL_AANGEMAAKT)
+    .bind(iban)
+    .bind(tenaamstelling)
+    .bind(id)
+    .bind(BETAAL_AANGEHOUDEN)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// Zet de uiterste betaaldatum (AWB 4:87) op de betaalopdrachten van een
+/// besluit, bij de bekendmaking.
+pub async fn set_betaaltermijn(
+    pool: &SqlitePool,
+    besluit_id: &str,
+    einddatum: &str,
+) -> anyhow::Result<()> {
+    sqlx::query("UPDATE betaalopdrachten SET betaaltermijn_einddatum = ? WHERE besluit_id = ?")
+        .bind(einddatum)
+        .bind(besluit_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+/// Markeer een aangemaakte betaalopdracht als (gesimuleerd) uitbetaald.
+/// Geeft false terug wanneer de opdracht niet (meer) in de status
+/// AANGEMAAKT staat.
+pub async fn markeer_uitbetaald(pool: &SqlitePool, id: &str) -> anyhow::Result<bool> {
+    let result = sqlx::query(
+        "UPDATE betaalopdrachten SET status = ?, uitgevoerd_at = datetime('now')
+         WHERE id = ? AND status = ?",
+    )
+    .bind(BETAAL_UITBETAALD)
+    .bind(id)
+    .bind(BETAAL_AANGEMAAKT)
+    .execute(pool)
+    .await?;
+    Ok(result.rows_affected() > 0)
 }
 
 /// Openbaar register: alleen bekendgemaakte besluiten.

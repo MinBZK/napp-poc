@@ -236,10 +236,30 @@ pub async fn put_mijn_rekening(
         .await
         .map_err(internal_error)?;
     tracing::info!(kvk = %kvk, "rekening van de rechtspersoon vastgelegd (IBAN-naam-controle gesimuleerd)");
+
+    // Het feit "rekening bekend" is veranderd; art. 27 heft daarmee de
+    // aanhouding op (de toets hierboven gaf al uitbetaling_aangehouden =
+    // false voor deze rekening). Aangehouden betaalopdrachten worden
+    // alsnog klaargezet voor het betaalsysteem.
+    let mut geactiveerd = 0;
+    if !toets.uitbetaling_aangehouden {
+        for opdracht_id in crate::db::aangehouden_betaalopdrachten(&state.pool, &kvk)
+            .await
+            .map_err(internal_error)?
+        {
+            crate::db::activeer_betaalopdracht(&state.pool, &opdracht_id, &iban, &tenaamstelling)
+                .await
+                .map_err(internal_error)?;
+            geactiveerd += 1;
+            tracing::info!(opdracht = %opdracht_id, "aangehouden betaalopdracht geactiveerd (art. 27 Wpp)");
+        }
+    }
+
     Ok(Json(json!({
         "iban": iban,
         "tenaamstelling": tenaamstelling,
         "in_register": true,
+        "geactiveerde_betaalopdrachten": geactiveerd,
     })))
 }
 

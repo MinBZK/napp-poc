@@ -75,12 +75,17 @@ async function bewaarRekening() {
   rekeningFout.value = '';
   rekeningBezig.value = true;
   try {
-    rekening.value = await api.mijnRekeningWijzigen({
+    const resultaat = await api.mijnRekeningWijzigen({
       iban: rekeningForm.value.iban.trim(),
       tenaamstelling: rekeningForm.value.tenaamstelling.trim(),
     });
+    rekening.value = resultaat;
     rekeningOpen.value = false;
-    rekeningMelding.value = 'Het rekeningnummer voor uitbetaling is vastgelegd.';
+    const n = resultaat.geactiveerde_betaalopdrachten ?? 0;
+    rekeningMelding.value =
+      n > 0
+        ? `Het rekeningnummer is vastgelegd. ${n === 1 ? 'Eén aangehouden betaalopdracht is' : `${n} aangehouden betaalopdrachten zijn`} alsnog klaargezet voor uitbetaling (artikel 27 Wpp).`
+        : 'Het rekeningnummer voor uitbetaling is vastgelegd.';
   } catch (e) {
     rekeningFout.value = e.message;
   } finally {

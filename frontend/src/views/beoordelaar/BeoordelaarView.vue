@@ -57,6 +57,36 @@ async function laad() {
   betaalopdrachten.value = await api.betaalopdrachten();
 }
 
+// Uitbetalen: feitelijke handeling richting het (gesimuleerde)
+// betaalsysteem; het recht op het voorschot volgt al uit het besluit.
+const betaalFout = ref('');
+const betaalBezig = ref('');
+
+async function betaalUit(opdracht) {
+  betaalFout.value = '';
+  betaalBezig.value = opdracht.id;
+  try {
+    await api.betaalopdrachtUitbetalen(opdracht.id);
+    await laad();
+  } catch (e) {
+    betaalFout.value = e.message;
+  } finally {
+    betaalBezig.value = '';
+  }
+}
+
+const BETAAL_LABELS = {
+  AANGEMAAKT: 'Aangemaakt',
+  AANGEHOUDEN: 'Aangehouden',
+  UITBETAALD: 'Uitbetaald',
+};
+
+function betaalKleur(status) {
+  if (status === 'AANGEHOUDEN') return 'warning';
+  if (status === 'UITBETAALD') return 'success';
+  return 'accent';
+}
+
 onMounted(laad);
 watch(() => session.beoordelaar, laad);
 </script>
@@ -184,9 +214,13 @@ watch(() => session.beoordelaar, laad);
         </template>
 
         <template v-else>
+          <template v-if="betaalFout">
+            <NBanner variant="critical" :text="betaalFout" />
+            <nldd-spacer size="12"></nldd-spacer>
+          </template>
           <nldd-table
             v-if="betaalopdrachten.length"
-            columns="minmax(180px,1fr) 130px 200px minmax(160px,1fr) 140px 170px"
+            columns="minmax(170px,1fr) 120px 190px minmax(150px,1fr) 130px 130px 150px"
             accessible-label="Betaalopdrachten"
           >
             <nldd-table-row slot="header">
@@ -195,7 +229,8 @@ watch(() => session.beoordelaar, laad);
               <nldd-text-cell text="IBAN"></nldd-text-cell>
               <nldd-text-cell text="Tenaamstelling"></nldd-text-cell>
               <nldd-text-cell text="Status"></nldd-text-cell>
-              <nldd-text-cell text="Aangemaakt"></nldd-text-cell>
+              <nldd-text-cell text="Betalen vóór (AWB 4:87)"></nldd-text-cell>
+              <nldd-text-cell text=""></nldd-text-cell>
             </nldd-table-row>
             <nldd-table-row v-for="opdracht in betaalopdrachten" :key="opdracht.id">
               <nldd-text-cell :text="opdracht.partij_naam"></nldd-text-cell>
@@ -210,17 +245,33 @@ watch(() => session.beoordelaar, laad);
               ></nldd-text-cell>
               <nldd-cell>
                 <nldd-tag
-                  :color="opdracht.status === 'AANGEHOUDEN' ? 'warning' : 'accent'"
-                  :text="
-                    opdracht.status === 'AANGEMAAKT'
-                      ? 'Aangemaakt'
-                      : opdracht.status === 'AANGEHOUDEN'
-                        ? 'Aangehouden'
-                        : opdracht.status
-                  "
+                  :color="betaalKleur(opdracht.status)"
+                  :text="BETAAL_LABELS[opdracht.status] ?? opdracht.status"
                 ></nldd-tag>
               </nldd-cell>
-              <nldd-text-cell :text="opdracht.created_at" color="secondary"></nldd-text-cell>
+              <nldd-text-cell
+                :text="opdracht.betaaltermijn_einddatum ? datum(opdracht.betaaltermijn_einddatum) : '—'"
+                :color="opdracht.betaaltermijn_einddatum ? undefined : 'secondary'"
+              ></nldd-text-cell>
+              <nldd-cell v-if="opdracht.status === 'AANGEMAAKT'">
+                <nldd-button
+                  variant="secondary"
+                  size="sm"
+                  text="Uitbetalen"
+                  :disabled="betaalBezig === opdracht.id || undefined"
+                  @click="betaalUit(opdracht)"
+                ></nldd-button>
+              </nldd-cell>
+              <nldd-text-cell
+                v-else-if="opdracht.status === 'UITBETAALD'"
+                :text="opdracht.uitgevoerd_at ?? ''"
+                color="secondary"
+              ></nldd-text-cell>
+              <nldd-text-cell
+                v-else
+                text="Wacht op rekening van de rechtspersoon (art. 27)"
+                color="secondary"
+              ></nldd-text-cell>
             </nldd-table-row>
           </nldd-table>
           <nldd-inline-dialog

@@ -42,12 +42,16 @@ async function bewaarRekening() {
   rekeningFout.value = '';
   rekeningBezig.value = true;
   try {
-    await api.mijnRekeningWijzigen({
+    const resultaat = await api.mijnRekeningWijzigen({
       iban: rekeningIban.value.trim(),
       tenaamstelling: rekeningTenaamstelling.value.trim(),
     });
     rekening.value = await api.mijnRekening();
-    rekeningMelding.value = `Rekening ${rekening.value?.iban ?? ''} opgeslagen.`;
+    const n = resultaat.geactiveerde_betaalopdrachten ?? 0;
+    rekeningMelding.value =
+      n > 0
+        ? `Rekening ${rekening.value?.iban ?? ''} opgeslagen. ${n === 1 ? 'Eén aangehouden betaalopdracht is' : `${n} aangehouden betaalopdrachten zijn`} alsnog klaargezet voor uitbetaling.`
+        : `Rekening ${rekening.value?.iban ?? ''} opgeslagen.`;
   } catch (e) {
     rekeningFout.value = e.message;
   } finally {

@@ -76,6 +76,7 @@ export const api = {
   stelBesluitVast: (id) => apiPost(`/api/aanvragen/${id}/besluit`),
   bekendmaking: (id) => apiPost(`/api/aanvragen/${id}/bekendmaking`),
   betaalopdrachten: () => apiGet('/api/betaalopdrachten'),
+  betaalopdrachtUitbetalen: (id) => apiPost(`/api/betaalopdrachten/${id}/uitbetalen`),
   register: () => apiGet('/api/register'),
   statistieken: () => apiGet('/api/register/statistieken'),
   // Partijregister-beheer (beoordelaar-only).

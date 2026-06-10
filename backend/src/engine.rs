@@ -78,6 +78,7 @@ const CONTRACT: &[(&str, &[&str])] = &[
             "bezwaartermijn_weken",
             "bezwaartermijn_startdatum",
             "bezwaartermijn_einddatum",
+            "betaaltermijn_einddatum",
         ],
     ),
     (ATW_ID, &["verlengde_einddatum"]),
@@ -967,6 +968,34 @@ pub async fn evaluate_registratie_eisen(
                 voldoet_eis_rechtsvorm: req_bool(&result.outputs, "voldoet_eis_rechtsvorm")?,
                 voldoet_eis_naam: req_bool(&result.outputs, "voldoet_eis_naam")?,
             })
+        })
+    })
+    .await?
+}
+
+/// De uiterste betaaldatum van het voorschot (AWB 4:87: betaling binnen
+/// zes weken na bekendmaking van de beschikking). De betaalopdracht draagt
+/// deze termijn; de uitbetaling zelf is een feitelijke handeling.
+pub async fn evaluate_betaaltermijn(
+    corpus: Arc<LawCorpus>,
+    bekendmaking_datum: String,
+) -> anyhow::Result<String> {
+    tokio::task::spawn_blocking(move || {
+        with_service(&corpus, |service| {
+            let mut params = BTreeMap::new();
+            params.insert(
+                "bekendmaking_datum".to_string(),
+                Value::String(bekendmaking_datum.clone()),
+            );
+            let result = service
+                .evaluate_law(
+                    AWB_ID,
+                    &["betaaltermijn_einddatum"],
+                    params,
+                    &bekendmaking_datum,
+                )
+                .map_err(|e| anyhow::anyhow!("betaaltermijn berekenen mislukt: {e}"))?;
+            req_date(&result.outputs, "betaaltermijn_einddatum")
         })
     })
     .await?

@@ -130,6 +130,10 @@ async fn main() -> anyhow::Result<()> {
             "/api/betaalopdrachten",
             get(handlers::list_betaalopdrachten),
         )
+        .route(
+            "/api/betaalopdrachten/{id}/uitbetalen",
+            post(handlers::betaal_uit),
+        )
         .route("/api/register", get(handlers::register))
         .route("/api/register/statistieken", get(handlers::statistieken))
         // Partijregister-beheer (beoordelaar-only, zie beheer.rs). De
