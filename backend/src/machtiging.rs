@@ -106,7 +106,9 @@ pub async fn valideer(
     let partij = register::partij_by_kvk(pool, kvk)
         .await
         .map_err(ValidatieFout::Intern)?;
-    let Some(partij) = partij else {
+    // ONGEKOPPELD = rechtspersoon onbekend: behandelen als niet
+    // geregistreerd, dus geen afdelingsmachtigingen.
+    let Some(partij) = partij.filter(|p| !p.is_ongekoppeld()) else {
         return Err(ValidatieFout::Ongeldig(
             "Voor dit KVK-nummer zijn geen afdelingsmachtigingen beschikbaar.".to_string(),
         ));
@@ -143,7 +145,8 @@ pub async fn profielen_voor(
     let Some(partij) = register::partij_by_kvk(pool, kvk).await? else {
         return Ok(profielen);
     };
-    if partij.organisatiemodel != "CENTRAAL" {
+    // ONGEKOPPELD record: rechtspersoon onbekend, geen machtigingsprofielen.
+    if partij.is_ongekoppeld() || partij.organisatiemodel != "CENTRAAL" {
         return Ok(profielen);
     }
     for u in register::uitslagen_met_gebied(pool, kvk).await? {
@@ -170,9 +173,11 @@ pub async fn machtigingen(
     Query(q): Query<MachtigingenQuery>,
 ) -> Result<Json<serde_json::Value>, crate::handlers::ApiError> {
     let kvk = q.kvk.trim();
+    // ONGEKOPPELD: de partijnaam hoort niet bij dit (placeholder)nummer.
     let partij = register::partij_by_kvk(&state.pool, kvk)
         .await
-        .map_err(crate::handlers::internal_error)?;
+        .map_err(crate::handlers::internal_error)?
+        .filter(|p| !p.is_ongekoppeld());
     let profielen = profielen_voor(&state.pool, kvk)
         .await
         .map_err(crate::handlers::internal_error)?;

@@ -106,6 +106,21 @@ ALIASSEN = {
     "Partij van de Arbeid (P.v.d.A.)": "GROENLINKS / Partij van de Arbeid (PvdA)",
 }
 
+# Demo-aanname voor de claim-flow: drie aanduidingen uit de uitslag waarvan
+# de rechtspersoon nog niet bekend is bij de Napp (status ONGEKOPPELD). De
+# partij claimt haar aanduiding bij de eerste aanvraag; tot die tijd is het
+# KvK-nummer in het register een placeholder. Keuze: drie herkenbare lokale
+# partijen zonder bestaande demo-rol, uit drie verschillende gemeenten, elk
+# ruim boven de twee raadszetels (GR2026):
+# - Leefbaar Capelle (Capelle aan den IJssel, 15 zetels)
+# - Wakker Emmen (Emmen, 14 zetels)
+# - EVB (Echt voor Barendrecht) (Barendrecht, 14 zetels)
+ONGEKOPPELDE_AANDUIDINGEN = {
+    "Leefbaar Capelle",
+    "Wakker Emmen",
+    "EVB (Echt voor Barendrecht)",
+}
+
 CACHE = Path("/tmp/napp_bronnen")
 UIT = Path(__file__).resolve().parent.parent / "backend" / "data" / "partijregister.json"
 
@@ -315,6 +330,10 @@ def main() -> None:
                     "moederpartij_kvk": None,
                     "decentrale_uitslagen": [],
                 }
+                if lijstnaam in ONGEKOPPELDE_AANDUIDINGEN:
+                    # Rechtspersoon nog onbekend: het KvK-nummer is een
+                    # placeholder tot de partij haar aanduiding claimt.
+                    partijen[kvk]["status"] = "ONGEKOPPELD"
             partijen[kvk]["decentrale_uitslagen"].append(uitslag)
 
     orgaan_van_code: dict[str, str] = {}
@@ -334,7 +353,9 @@ def main() -> None:
     def voorbeeld(p, profiel):
         return {"kvk_nummer": p["kvk_nummer"], "naam": p["naam"], "profiel": profiel}
 
-    alle = list(partijen.values())
+    # ONGEKOPPELDE aanduidingen kunnen geen demo-login zijn: hun KvK-nummer
+    # is een placeholder; de claim-flow heeft een eigen demo-voorbeeld.
+    alle = [p for p in partijen.values() if p.get("status") != "ONGEKOPPELD"]
     landelijke = [p for p in alle if p["kamerzetels"] > 0]
     lokale_gr = [
         p for p in alle
@@ -398,6 +419,14 @@ def main() -> None:
         voorbeeld(kleinste_lokaal, "lokale partij met een raadszetel"),
         voorbeeld(waterschap, "waterschapspartij"),
         voorbeeld(grootste_eiland, "grootste eilandspartij (eilandsraad Bonaire, Caribisch Nederland)"),
+        # Claim-flow-demo: dit KvK-nummer staat bewust NIET in het register.
+        # De rechtspersoon logt in, claimt een ongekoppelde aanduiding uit de
+        # uitslag en wacht op bevestiging door een Napp-beoordelaar.
+        {
+            "kvk_nummer": "90000001",
+            "naam": "Nieuwe rechtspersoon zonder koppeling",
+            "profiel": "demonstreert de claim-flow: koppel deze rechtspersoon aan een ongekoppelde aanduiding uit de verkiezingsuitslag",
+        },
     ]
     # dedupliceer (criteria kunnen samenvallen) met behoud van volgorde
     gezien = set()

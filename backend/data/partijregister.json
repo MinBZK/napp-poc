@@ -17075,7 +17075,8 @@
      "gebied_code": "GM0489",
      "zetels": 14
     }
-   ]
+   ],
+   "status": "ONGEKOPPELD"
   },
   {
    "kvk_nummer": "98831129",
@@ -21261,7 +21262,8 @@
      "gebied_code": "GM0502",
      "zetels": 15
     }
-   ]
+   ],
+   "status": "ONGEKOPPELD"
   },
   {
    "kvk_nummer": "98935652",
@@ -29773,7 +29775,8 @@
      "gebied_code": "GM0114",
      "zetels": 14
     }
-   ]
+   ],
+   "status": "ONGEKOPPELD"
   },
   {
    "kvk_nummer": "92059758",
@@ -33008,6 +33011,11 @@
    "kvk_nummer": "97373758",
    "naam": "DEMOKRAT",
    "profiel": "grootste eilandspartij (eilandsraad Bonaire, Caribisch Nederland)"
+  },
+  {
+   "kvk_nummer": "90000001",
+   "naam": "Nieuwe rechtspersoon zonder koppeling",
+   "profiel": "demonstreert de claim-flow: koppel deze rechtspersoon aan een ongekoppelde aanduiding uit de verkiezingsuitslag"
   }
  ]
 }

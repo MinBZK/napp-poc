@@ -4,8 +4,10 @@
 //! beoordelaars wanneer geconfigureerd, gemockte eHerkenning voor aanvragers.
 
 mod beheer;
+mod claim;
 mod db;
 mod engine;
+mod handelsregister;
 mod handlers;
 mod machtiging;
 mod register;
@@ -94,6 +96,11 @@ async fn main() -> anyhow::Result<()> {
             "/api/mijn-rekening",
             get(rekening::get_mijn_rekening).put(rekening::put_mijn_rekening),
         )
+        // Claim-flow: een rechtspersoon koppelt zichzelf aan een
+        // ONGEKOPPELDE aanduiding uit de uitslag (zie claim.rs).
+        .route("/api/claim/aanduidingen", get(claim::list_aanduidingen))
+        .route("/api/claim", post(claim::create_claim))
+        .route("/api/mijn-claim", get(claim::mijn_claim))
         .route("/api/register/demo", get(handlers::register_demo))
         .route("/api/aanvragen", post(handlers::create_aanvraag))
         .route("/api/aanvragen/proef", post(handlers::proef_aanspraken))
@@ -126,6 +133,15 @@ async fn main() -> anyhow::Result<()> {
         .route(
             "/api/beheer/partijen/{kvk}",
             get(beheer::get_partij).put(beheer::update_partij),
+        )
+        .route("/api/beheer/claims", get(claim::beheer_list_claims))
+        .route(
+            "/api/beheer/claims/{id}/bevestig",
+            post(claim::bevestig_claim),
+        )
+        .route(
+            "/api/beheer/claims/{id}/afwijzen",
+            post(claim::wijs_claim_af),
         );
 
     // Mock-SSO-login alleen registreren wanneer echte OIDC uit staat.

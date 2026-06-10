@@ -27,6 +27,17 @@ use serde::{Deserialize, Serialize};
 use sqlx::{Row, SqlitePool};
 use std::sync::OnceLock;
 
+/// Status of a register record: GEVERIFIEERD when the legal entity behind
+/// the aanduiding is known and checked; ONGEKOPPELD when the aanduiding
+/// comes straight from the election result and the legal entity is still
+/// unknown (kvk_nummer is then a synthetic placeholder from the source).
+pub const STATUS_GEVERIFIEERD: &str = "GEVERIFIEERD";
+pub const STATUS_ONGEKOPPELD: &str = "ONGEKOPPELD";
+
+fn default_status() -> String {
+    STATUS_GEVERIFIEERD.to_string()
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Partij {
     pub kvk_nummer: String,
@@ -45,7 +56,17 @@ pub struct Partij {
     pub iban: Option<String>,
     #[serde(default)]
     pub iban_tenaamstelling: Option<String>,
+    /// GEVERIFIEERD | ONGEKOPPELD (zie de constanten hierboven).
+    #[serde(default = "default_status")]
+    pub status: String,
     pub decentrale_uitslagen: Vec<Uitslag>,
+}
+
+impl Partij {
+    /// Whether the legal entity behind this record is still unknown.
+    pub fn is_ongekoppeld(&self) -> bool {
+        self.status == STATUS_ONGEKOPPELD
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -121,14 +142,15 @@ pub async fn seed_if_empty(pool: &SqlitePool) -> anyhow::Result<()> {
     }
     for p in &reg.partijen {
         sqlx::query(
-            "INSERT INTO register_partijen (kvk_nummer, naam, organisatiemodel, kamerzetels, moederpartij_kvk)
-             VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO register_partijen (kvk_nummer, naam, organisatiemodel, kamerzetels, moederpartij_kvk, status)
+             VALUES (?, ?, ?, ?, ?, ?)",
         )
         .bind(&p.kvk_nummer)
         .bind(&p.naam)
         .bind(&p.organisatiemodel)
         .bind(p.kamerzetels)
         .bind(&p.moederpartij_kvk)
+        .bind(&p.status)
         .execute(&mut *tx)
         .await?;
         for u in &p.decentrale_uitslagen {
@@ -187,6 +209,7 @@ pub async fn partij_by_kvk(pool: &SqlitePool, kvk: &str) -> anyhow::Result<Optio
         moederpartij_kvk: row.get("moederpartij_kvk"),
         iban: row.get("iban"),
         iban_tenaamstelling: row.get("iban_tenaamstelling"),
+        status: row.get("status"),
         decentrale_uitslagen: uitslagen
             .iter()
             .map(|r| Uitslag {
@@ -293,6 +316,7 @@ pub struct PartijOverzicht {
     pub organisatiemodel: String,
     pub kamerzetels: i64,
     pub moederpartij_kvk: Option<String>,
+    pub status: String,
     pub aantal_uitslagen: i64,
 }
 
@@ -314,6 +338,7 @@ pub async fn zoek_partijen(
     .await?;
     let rows = sqlx::query(
         "SELECT p.kvk_nummer, p.naam, p.organisatiemodel, p.kamerzetels, p.moederpartij_kvk,
+                p.status,
                 (SELECT COUNT(*) FROM register_uitslagen u WHERE u.kvk_nummer = p.kvk_nummer)
                     AS aantal_uitslagen
          FROM register_partijen p
@@ -336,10 +361,40 @@ pub async fn zoek_partijen(
                 organisatiemodel: r.get("organisatiemodel"),
                 kamerzetels: r.get("kamerzetels"),
                 moederpartij_kvk: r.get("moederpartij_kvk"),
+                status: r.get("status"),
                 aantal_uitslagen: r.get("aantal_uitslagen"),
             })
             .collect(),
     ))
+}
+
+/// ONGEKOPPELDE aanduidingen (legal entity unknown) matching the search
+/// term, alphabetically, capped at `limit`. Used by the claim flow.
+pub async fn zoek_ongekoppelde_partijen(
+    pool: &SqlitePool,
+    zoek: &str,
+    limit: i64,
+) -> anyhow::Result<Vec<Partij>> {
+    let patroon = format!("%{}%", zoek.trim());
+    let rows = sqlx::query(
+        "SELECT kvk_nummer FROM register_partijen
+         WHERE status = ? AND naam LIKE ?
+         ORDER BY naam COLLATE NOCASE, kvk_nummer
+         LIMIT ?",
+    )
+    .bind(STATUS_ONGEKOPPELD)
+    .bind(&patroon)
+    .bind(limit)
+    .fetch_all(pool)
+    .await?;
+    let mut partijen = Vec::with_capacity(rows.len());
+    for row in &rows {
+        let kvk: String = row.get("kvk_nummer");
+        if let Some(p) = partij_by_kvk(pool, &kvk).await? {
+            partijen.push(p);
+        }
+    }
+    Ok(partijen)
 }
 
 pub async fn insert_partij(

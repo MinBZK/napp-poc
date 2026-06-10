@@ -63,6 +63,9 @@ pub async fn init(pool: &SqlitePool) -> anyhow::Result<()> {
         -- verstrekt aan de rechtspersoon; afdelingen van een centraal
         -- georganiseerde partij hebben geen rechtspersoonlijkheid). Eigen
         -- opgave door het tekenbevoegd bestuur, met IBAN-naam-controle.
+        -- status: GEVERIFIEERD (rechtspersoon bekend en getoetst) of
+        -- ONGEKOPPELD (aanduiding uit de uitslag waarvan de rechtspersoon
+        -- nog onbekend is; kvk_nummer is dan een placeholder uit de bron).
         CREATE TABLE IF NOT EXISTS register_partijen (
             kvk_nummer TEXT PRIMARY KEY,
             naam TEXT NOT NULL,
@@ -70,7 +73,8 @@ pub async fn init(pool: &SqlitePool) -> anyhow::Result<()> {
             kamerzetels INTEGER NOT NULL DEFAULT 0,
             moederpartij_kvk TEXT REFERENCES register_partijen(kvk_nummer),
             iban TEXT NULL,
-            iban_tenaamstelling TEXT NULL
+            iban_tenaamstelling TEXT NULL,
+            status TEXT NOT NULL DEFAULT 'GEVERIFIEERD'
         );
         CREATE TABLE IF NOT EXISTS register_uitslagen (
             kvk_nummer TEXT NOT NULL REFERENCES register_partijen(kvk_nummer),
@@ -85,6 +89,22 @@ pub async fn init(pool: &SqlitePool) -> anyhow::Result<()> {
             naam TEXT NOT NULL,
             inwoneraantal INTEGER NOT NULL DEFAULT 0,
             PRIMARY KEY (orgaan, code)
+        );
+        -- Claims: een rechtspersoon (kvk_nummer, via eHerkenning) claimt een
+        -- ONGEKOPPELDE aanduiding (doel_kvk = placeholder-nummer van het
+        -- geclaimde record). hr_toets bevat het opgeslagen resultaat van de
+        -- (gemockte) Handelsregister-raadpleging als JSON.
+        CREATE TABLE IF NOT EXISTS register_claims (
+            id TEXT PRIMARY KEY,
+            kvk_nummer TEXT NOT NULL,
+            doel_kvk TEXT NOT NULL,
+            aanduiding TEXT NOT NULL,
+            hr_toets TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'OPEN',
+            reden_afwijzing TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            beoordeeld_door TEXT,
+            beoordeeld_at TEXT
         );
         "#,
     )

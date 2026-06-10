@@ -18,7 +18,7 @@ use crate::engine;
 use crate::machtiging;
 use crate::state::AppState;
 
-const SESSION_KEY_EH_KVK: &str = "eh_kvk";
+pub(crate) const SESSION_KEY_EH_KVK: &str = "eh_kvk";
 const SESSION_KEY_EH_PARTIJ: &str = "eh_partij";
 
 pub(crate) type ApiError = (StatusCode, Json<serde_json::Value>);
@@ -121,12 +121,14 @@ pub async fn eherkenning_login(
             machtiging::ValidatieFout::Ongeldig(msg) => bad_request(&msg),
             machtiging::ValidatieFout::Intern(e) => internal_error(e),
         })?;
+    // Een ONGEKOPPELD record draagt een placeholder-nummer: de echte
+    // rechtspersoon is onbekend, dus de sessie krijgt de partijnaam niet.
     let naam = match crate::register::partij_by_kvk(&state.pool, &kvk)
         .await
         .map_err(internal_error)?
     {
-        Some(partij) => partij.naam,
-        None => format!("Organisatie {kvk}"),
+        Some(partij) if !partij.is_ongekoppeld() => partij.naam,
+        _ => format!("Organisatie {kvk}"),
     };
     session
         .insert(SESSION_KEY_EH_KVK, kvk.clone())
@@ -164,9 +166,13 @@ pub async fn mijn_registratie(
     };
     let vandaag = Utc::now().format("%Y-%m-%d").to_string();
     let jaar = subsidiejaar_voor(&vandaag);
+    // ONGEKOPPELD telt als niet geregistreerd: de rechtspersoon achter de
+    // aanduiding is onbekend, dus dit placeholder-nummer heeft geen
+    // registratie (en de frontend biedt de claim-flow aan).
     let partij = crate::register::partij_by_kvk(&state.pool, &kvk)
         .await
-        .map_err(internal_error)?;
+        .map_err(internal_error)?
+        .filter(|p| !p.is_ongekoppeld());
     let bezet = db::bezette_componenten(&state.pool, &kvk, jaar)
         .await
         .map_err(internal_error)?;
@@ -214,16 +220,22 @@ async fn aanspraken_voor(
     pool: &sqlx::SqlitePool,
     kvk: &str,
 ) -> anyhow::Result<Vec<db::Component>> {
-    let Some(partij) = crate::register::partij_by_kvk(pool, kvk).await? else {
-        return Ok(vec![db::Component {
-            key: "LANDELIJK".into(),
-            soort: "LANDELIJK".into(),
-            orgaan: None,
-            gebied_code: None,
-            gebied: None,
-            zetels: 0,
-            inwoneraantal: 0,
-        }]);
+    // Expliciete check: een ONGEKOPPELD record geeft géén aanspraken. Het
+    // kvk_nummer is daar een placeholder; wie ermee inlogt is niet de
+    // rechtspersoon achter de aanduiding (die is juist nog onbekend).
+    let partij = match crate::register::partij_by_kvk(pool, kvk).await? {
+        Some(p) if !p.is_ongekoppeld() => p,
+        _ => {
+            return Ok(vec![db::Component {
+                key: "LANDELIJK".into(),
+                soort: "LANDELIJK".into(),
+                orgaan: None,
+                gebied_code: None,
+                gebied: None,
+                zetels: 0,
+                inwoneraantal: 0,
+            }]);
+        }
     };
     let uitslagen = crate::register::uitslagen_met_gebied(pool, kvk).await?;
     let mut componenten = Vec::new();
@@ -867,4 +879,46 @@ pub struct Health {
 
 pub async fn health() -> Json<Health> {
     Json(Health { status: "ok" })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sqlx::sqlite::SqlitePoolOptions;
+
+    /// Een ONGEKOPPELD record geeft géén aanspraken: het placeholder-nummer
+    /// hoort niet bij de (onbekende) rechtspersoon achter de aanduiding.
+    #[tokio::test]
+    async fn aanspraken_voor_ongekoppeld_record_zijn_leeg() {
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .expect("in-memory database");
+        db::init(&pool).await.expect("schema");
+        sqlx::query(
+            "INSERT INTO register_gebieden (orgaan, code, naam, inwoneraantal)
+             VALUES ('GEMEENTERAAD', 'GM0193', 'Zwolle', 133839)",
+        )
+        .execute(&pool)
+        .await
+        .expect("gebied fixture");
+        sqlx::query(
+            "INSERT INTO register_partijen (kvk_nummer, naam, organisatiemodel, kamerzetels, status)
+             VALUES ('98765432', 'Zwolse Stadspartij', 'CENTRAAL', 0, 'ONGEKOPPELD')",
+        )
+        .execute(&pool)
+        .await
+        .expect("ongekoppeld fixture");
+        crate::register::insert_uitslag(&pool, "98765432", "GEMEENTERAAD", "GM0193", 3)
+            .await
+            .expect("uitslag fixture");
+
+        // Zelfde uitkomst als een onbekend nummer: één lege landelijke
+        // component (de wet wijst af), géén decentrale aanspraken.
+        let componenten = aanspraken_voor(&pool, "98765432").await.expect("aanspraken");
+        assert_eq!(componenten.len(), 1);
+        assert_eq!(componenten[0].key, "LANDELIJK");
+        assert_eq!(componenten[0].zetels, 0);
+    }
 }

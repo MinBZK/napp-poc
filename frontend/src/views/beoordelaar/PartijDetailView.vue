@@ -174,6 +174,12 @@ watch(kvk, laad);
 
           <nldd-container layout="wrap" gap="8">
             <nldd-tag
+              v-if="partij.status === 'ONGEKOPPELD'"
+              color="warning"
+              text="Nog niet gekoppeld: rechtspersoon onbekend, KvK-nummer is een placeholder"
+            ></nldd-tag>
+            <nldd-tag
+              v-else
               :color="partij.organisatiemodel === 'CENTRAAL' ? 'accent' : 'neutral'"
               :text="partij.organisatiemodel === 'CENTRAAL' ? 'Centraal georganiseerd' : 'Decentraal georganiseerd'"
             ></nldd-tag>
