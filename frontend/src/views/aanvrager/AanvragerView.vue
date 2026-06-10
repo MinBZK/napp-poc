@@ -25,11 +25,6 @@ const aanvragen = ref([]);
 const laden = ref(false);
 const demoVoorbeelden = ref([]);
 
-const demoTekst =
-  'eHerkenning is gesimuleerd: alleen het KVK-nummer telt. Kies hieronder een ' +
-  'voorbeeldpartij, of voer elk ander nummer in om als ongeregistreerde ' +
-  'organisatie in te loggen.';
-
 const ORGAAN_LABEL = {
   GEMEENTERAAD: 'Gemeenteraad',
   PROVINCIALE_STATEN: 'Provinciale staten',
@@ -158,150 +153,173 @@ watch(() => session.aanvrager, laadAanvragen);
       portal="aanvrager"
     />
 
-    <!-- Niet ingelogd: eHerkenning (gemockt) -->
-    <template v-if="session.loaded && !session.aanvrager && stap === 'machtiging'">
+    <!-- Niet ingelogd: de gesimuleerde eHerkenning-omgeving. In het echt
+         verlaat de gebruiker het portaal (omgeving van de middelenleverancier
+         en het machtigingenregister) en keert daarna terug; dat externe
+         karakter is hier visueel nagebootst. -->
+    <template v-if="session.loaded && !session.aanvrager">
       <nldd-simple-section width="560px">
-        <nldd-title size="2">
-          <span slot="overline">{{ partijNaam }} · KVK {{ kvk }}</span>
-          <h2>Namens wie logt u in?</h2>
-        </nldd-title>
-        <nldd-spacer size="12"></nldd-spacer>
-        <nldd-rich-text>
-          <p>
-            Deze partij is centraal georganiseerd: afdelingen vallen onder de
-            landelijke rechtspersoon. Afdelingsbestuurders kunnen met een
-            beperkte volmacht namens de partij een deelaanvraag doen.
-          </p>
-        </nldd-rich-text>
-        <nldd-spacer size="24"></nldd-spacer>
-
-        <nldd-list variant="box">
-          <nldd-list-item size="md" type="button" @click="doLogin({ type: 'VOLLEDIG' })">
-            <nldd-title-cell
-              text="De gehele partij"
-              supporting-text="Tekenbevoegd bestuur: alle aanspraken, landelijk en decentraal"
-            ></nldd-title-cell>
-            <nldd-spacer-cell size="8"></nldd-spacer-cell>
-            <nldd-icon-cell icon="chevron-right" size="16"></nldd-icon-cell>
-          </nldd-list-item>
-          <nldd-list-item size="md" type="button" @click="afdelingKiezen = !afdelingKiezen">
-            <nldd-title-cell
-              text="Een afdeling"
-              :supporting-text="`Beperkte machtiging voor één gebied (${beperkteProfielen.length} gebieden)`"
-            ></nldd-title-cell>
-            <nldd-spacer-cell size="8"></nldd-spacer-cell>
-            <nldd-icon-cell
-              :icon="afdelingKiezen ? 'chevron-up' : 'chevron-down'"
-              size="16"
-            ></nldd-icon-cell>
-          </nldd-list-item>
-        </nldd-list>
-
-        <template v-if="afdelingKiezen">
-          <nldd-spacer size="16"></nldd-spacer>
-          <nldd-form-field label="Zoek uw gebied">
-            <nldd-text-field
-              name="zoek-gebied"
-              :value="zoek"
-              placeholder="Bijvoorbeeld: Utrecht"
-              @input="zoek = $event.detail?.value ?? $event.target?.value ?? ''"
-            ></nldd-text-field>
-          </nldd-form-field>
-          <nldd-spacer size="8"></nldd-spacer>
-          <nldd-list v-if="getoondeProfielen.length" variant="box">
-            <nldd-list-item
-              v-for="p in getoondeProfielen"
-              :key="`${p.orgaan}:${p.gebied_code}`"
-              size="sm"
-              type="button"
-              @click="doLogin({ type: 'BEPERKT', gebied_code: p.gebied_code })"
-            >
-              <nldd-text-cell
-                :text="p.gebied_naam"
-                :supporting-text="ORGAAN_LABEL[p.orgaan] ?? p.orgaan"
-              ></nldd-text-cell>
-              <nldd-spacer-cell size="8"></nldd-spacer-cell>
-              <nldd-icon-cell icon="chevron-right" size="16"></nldd-icon-cell>
-            </nldd-list-item>
-          </nldd-list>
-          <nldd-rich-text v-if="restAantal > 0">
-            <p>Nog {{ restAantal }} gebieden. Verfijn uw zoekopdracht.</p>
+        <template v-if="stap === 'kvk'">
+          <nldd-title size="2">
+            <span slot="overline">Voor politieke partijen</span>
+            <h2>Inloggen met eHerkenning</h2>
+          </nldd-title>
+          <nldd-spacer size="12"></nldd-spacer>
+          <nldd-rich-text>
+            <p>
+              Politieke partijen zijn verenigingen of stichtingen en loggen in
+              met eHerkenning namens hun organisatie. U verlaat tijdelijk het
+              subsidieportaal.
+            </p>
           </nldd-rich-text>
-          <nldd-rich-text v-if="!getoondeProfielen.length">
-            <p>Geen gebied gevonden voor &lsquo;{{ zoek }}&rsquo;.</p>
-          </nldd-rich-text>
+          <nldd-spacer size="24"></nldd-spacer>
         </template>
 
-        <nldd-spacer size="24"></nldd-spacer>
-        <nldd-button
-          variant="neutral-transparent"
-          text="Terug"
-          start-icon="arrow-left"
-          :disabled="bezig || undefined"
-          @click="terugNaarKvk"
-        ></nldd-button>
+        <div class="eh-omgeving">
+          <div class="eh-kop">
+            <span class="eh-logo">eHerkenning</span>
+            <span class="eh-tag">gesimuleerde omgeving</span>
+          </div>
+          <div class="eh-dienst">
+            U logt in bij: <strong>Nederlandse autoriteit politieke partijen</strong><br />
+            Dienst: Subsidiezaken politieke partijen · betrouwbaarheidsniveau EH3
+          </div>
 
-        <template v-if="loginFout">
-          <nldd-spacer size="16"></nldd-spacer>
-          <NBanner variant="critical" :text="loginFout" />
-        </template>
-      </nldd-simple-section>
-    </template>
+          <div class="eh-body">
+            <!-- Stap 1: identificatie van de rechtspersoon (mock: KvK-nummer
+                 in plaats van een persoonlijk middel bij een leverancier). -->
+            <template v-if="stap === 'kvk'">
+              <nldd-form novalidate @submit.prevent="login">
+                <nldd-form-field label="KVK-nummer van uw organisatie">
+                  <nldd-text-field
+                    name="kvk"
+                    :value="kvk"
+                    placeholder="12345678"
+                    :invalid="loginFout.includes('KVK') || undefined"
+                    error-message="kvk-fout"
+                    @input="kvk = $event.detail?.value ?? $event.target?.value ?? ''"
+                  ></nldd-text-field>
+                  <nldd-form-field-error-text id="kvk-fout">
+                    Vul een geldig KVK-nummer in (8 cijfers).
+                  </nldd-form-field-error-text>
+                  <nldd-form-field-help-text>
+                    Gesimuleerd: in het echt logt u hier in met uw
+                    persoonlijke eHerkenning-middel; nu telt alleen het
+                    KVK-nummer. Elk ander nummer logt in als ongeregistreerde
+                    organisatie.
+                  </nldd-form-field-help-text>
+                </nldd-form-field>
+                <nldd-form-actions>
+                  <nldd-button
+                    variant="primary"
+                    type="submit"
+                    text="Verder"
+                    start-icon="lock-closed"
+                    :disabled="bezig || undefined"
+                  ></nldd-button>
+                </nldd-form-actions>
+              </nldd-form>
+            </template>
 
-    <template v-else-if="session.loaded && !session.aanvrager">
-      <nldd-simple-section width="560px">
-        <nldd-title size="2">
-          <span slot="overline">Voor politieke partijen</span>
-          <h2>Inloggen met eHerkenning</h2>
-        </nldd-title>
-        <nldd-spacer size="12"></nldd-spacer>
-        <nldd-rich-text>
-          <p>
-            Politieke partijen zijn verenigingen of stichtingen en loggen in met
-            eHerkenning namens hun organisatie.
-          </p>
-        </nldd-rich-text>
-        <nldd-spacer size="16"></nldd-spacer>
-        <NBanner
-          variant="warning"
-          text="Demo-omgeving"
-          :supporting-text="demoTekst"
-        />
-        <nldd-spacer size="24"></nldd-spacer>
-        <nldd-card accessible-label="eHerkenning-login">
-          <nldd-container padding="24">
-            <nldd-form novalidate @submit.prevent="login">
-              <nldd-form-field label="KVK-nummer">
-                <nldd-text-field
-                  name="kvk"
-                  :value="kvk"
-                  placeholder="12345678"
-                  :invalid="loginFout.includes('KVK') || undefined"
-                  error-message="kvk-fout"
-                  @input="kvk = $event.detail?.value ?? $event.target?.value ?? ''"
-                ></nldd-text-field>
-                <nldd-form-field-error-text id="kvk-fout">
-                  Vul een geldig KVK-nummer in (8 cijfers).
-                </nldd-form-field-error-text>
-              </nldd-form-field>
-              <nldd-form-actions>
-                <nldd-button
-                  variant="primary"
-                  type="submit"
-                  text="Inloggen met eHerkenning"
-                  start-icon="lock-closed"
-                  :disabled="bezig || undefined"
-                ></nldd-button>
-              </nldd-form-actions>
-            </nldd-form>
+            <!-- Stap 2: machtigingskeuze. In het echt staat dit in het
+                 machtigingenregister (toegekend door het tekenbevoegd
+                 bestuur); hier kiest u er vrij een voor de demo. -->
+            <template v-else>
+              <nldd-title size="4">
+                <span slot="overline">{{ partijNaam }} · KVK {{ kvk }}</span>
+                <h3>Uw machtigingen voor deze dienst</h3>
+              </nldd-title>
+              <nldd-spacer size="8"></nldd-spacer>
+              <nldd-rich-text>
+                <p>
+                  Deze partij is centraal georganiseerd: afdelingen vallen
+                  onder de landelijke rechtspersoon. In het echt bepaalt het
+                  machtigingenregister welke machtiging u heeft (toegekend
+                  door het tekenbevoegd bestuur, volmacht art. 27 Wpp); in
+                  deze demo kiest u er zelf een.
+                </p>
+              </nldd-rich-text>
+              <nldd-spacer size="16"></nldd-spacer>
+
+              <nldd-list variant="box">
+                <nldd-list-item size="md" type="button" @click="doLogin({ type: 'VOLLEDIG' })">
+                  <nldd-title-cell
+                    text="De gehele partij"
+                    supporting-text="Tekenbevoegd bestuur: alle aanspraken, landelijk en decentraal"
+                  ></nldd-title-cell>
+                  <nldd-spacer-cell size="8"></nldd-spacer-cell>
+                  <nldd-icon-cell icon="chevron-right" size="16"></nldd-icon-cell>
+                </nldd-list-item>
+                <nldd-list-item size="md" type="button" @click="afdelingKiezen = !afdelingKiezen">
+                  <nldd-title-cell
+                    text="Een afdeling"
+                    :supporting-text="`Beperkte machtiging voor één gebied (${beperkteProfielen.length} gebieden)`"
+                  ></nldd-title-cell>
+                  <nldd-spacer-cell size="8"></nldd-spacer-cell>
+                  <nldd-icon-cell
+                    :icon="afdelingKiezen ? 'chevron-up' : 'chevron-down'"
+                    size="16"
+                  ></nldd-icon-cell>
+                </nldd-list-item>
+              </nldd-list>
+
+              <template v-if="afdelingKiezen">
+                <nldd-spacer size="16"></nldd-spacer>
+                <nldd-form-field label="Zoek uw gebied">
+                  <nldd-text-field
+                    name="zoek-gebied"
+                    :value="zoek"
+                    placeholder="Bijvoorbeeld: Utrecht"
+                    @input="zoek = $event.detail?.value ?? $event.target?.value ?? ''"
+                  ></nldd-text-field>
+                </nldd-form-field>
+                <nldd-spacer size="8"></nldd-spacer>
+                <nldd-list v-if="getoondeProfielen.length" variant="box">
+                  <nldd-list-item
+                    v-for="p in getoondeProfielen"
+                    :key="`${p.orgaan}:${p.gebied_code}`"
+                    size="sm"
+                    type="button"
+                    @click="doLogin({ type: 'BEPERKT', gebied_code: p.gebied_code })"
+                  >
+                    <nldd-text-cell
+                      :text="p.gebied_naam"
+                      :supporting-text="ORGAAN_LABEL[p.orgaan] ?? p.orgaan"
+                    ></nldd-text-cell>
+                    <nldd-spacer-cell size="8"></nldd-spacer-cell>
+                    <nldd-icon-cell icon="chevron-right" size="16"></nldd-icon-cell>
+                  </nldd-list-item>
+                </nldd-list>
+                <nldd-rich-text v-if="restAantal > 0">
+                  <p>Nog {{ restAantal }} gebieden. Verfijn uw zoekopdracht.</p>
+                </nldd-rich-text>
+                <nldd-rich-text v-if="!getoondeProfielen.length">
+                  <p>Geen gebied gevonden voor &lsquo;{{ zoek }}&rsquo;.</p>
+                </nldd-rich-text>
+              </template>
+
+              <nldd-spacer size="16"></nldd-spacer>
+              <nldd-button
+                variant="neutral-transparent"
+                text="Terug"
+                start-icon="arrow-left"
+                :disabled="bezig || undefined"
+                @click="terugNaarKvk"
+              ></nldd-button>
+            </template>
+
             <template v-if="loginFout">
               <nldd-spacer size="16"></nldd-spacer>
               <NBanner variant="critical" :text="loginFout" />
             </template>
-          </nldd-container>
-        </nldd-card>
+          </div>
 
-        <template v-if="demoVoorbeelden.length">
+          <div class="eh-voet">
+            Na het inloggen keert u terug naar het subsidieportaal van de Napp.
+          </div>
+        </div>
+
+        <template v-if="stap === 'kvk' && demoVoorbeelden.length">
           <nldd-spacer size="32"></nldd-spacer>
           <nldd-title size="4"><h3>Voorbeeldpartijen (demo)</h3></nldd-title>
           <nldd-spacer size="8"></nldd-spacer>
@@ -395,3 +413,49 @@ watch(() => session.aanvrager, laadAanvragen);
     </template>
   </nldd-page>
 </template>
+
+<style scoped>
+/* Gesimuleerde eHerkenning-omgeving: bewust een vreemde eend in het portaal
+   (eigen merk-kop in eHerkenning-paars), zodat zichtbaar is dat de gebruiker
+   het portaal tijdelijk verlaat. Vaste kleuren: dit bootst een extern merk
+   na en hoort niet mee te kleuren met het portaalthema. */
+.eh-omgeving {
+  border: 1px solid light-dark(var(--primitives-color-neutral-300), var(--primitives-color-neutral-700));
+  border-radius: 8px;
+  overflow: hidden;
+  background: light-dark(#ffffff, var(--primitives-color-neutral-900));
+}
+.eh-kop {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--primitives-space-8);
+  padding: var(--primitives-space-12) var(--primitives-space-16);
+  background: #4a2683;
+  color: #ffffff;
+}
+.eh-logo {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+.eh-tag {
+  font-size: 0.8rem;
+  opacity: 0.85;
+}
+.eh-dienst {
+  padding: var(--primitives-space-12) var(--primitives-space-16);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  background: light-dark(var(--primitives-color-neutral-100), var(--primitives-color-neutral-800));
+  border-bottom: 1px solid light-dark(var(--primitives-color-neutral-300), var(--primitives-color-neutral-700));
+}
+.eh-body {
+  padding: var(--primitives-space-20) var(--primitives-space-16);
+}
+.eh-voet {
+  padding: var(--primitives-space-12) var(--primitives-space-16);
+  font-size: 0.85rem;
+  color: light-dark(var(--primitives-color-neutral-600), var(--primitives-color-neutral-400));
+  border-top: 1px solid light-dark(var(--primitives-color-neutral-300), var(--primitives-color-neutral-700));
+}
+</style>
