@@ -212,7 +212,11 @@ async fn main() -> anyhow::Result<()> {
                 "mock-SSO-login actief naast echte OIDC (demo); zet NAPP_MOCK_SSO=0 om dit uit te schakelen"
             );
         }
-        api = api.route("/api/sso/mock-login", post(handlers::sso_mock_login));
+        api = api
+            .route("/api/sso/mock-login", post(handlers::sso_mock_login))
+            // Demo-gereedschap voor het seedscript: dossiers wissen en het
+            // register herseeden. Bewust geen UI-knop (zie beheer::demo_reset).
+            .route("/api/beheer/demo/reset", post(beheer::demo_reset));
     }
 
     // Secure cookies wanneer OIDC actief is (de omgeving draait dan achter

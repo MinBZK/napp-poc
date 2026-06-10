@@ -184,6 +184,46 @@ pub async fn update_partij(
 }
 
 // ---------------------------------------------------------------------------
+// Demo-reset
+// ---------------------------------------------------------------------------
+
+/// POST /api/beheer/demo/reset — maak alle dossiers leeg en herseed het
+/// partijregister uit de snapshot. Alleen geregistreerd in demo-mode (zelfde
+/// schakelaar als de mock-logins, zie main.rs): dit is gereedschap om de
+/// demo-omgeving herhaalbaar te kunnen vullen, geen productiefunctie.
+pub async fn demo_reset(
+    State(state): State<AppState>,
+    session: Session,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    if session_beoordelaar(&session).await.is_none() {
+        return Err(forbidden());
+    }
+    let mut tx = state.pool.begin().await.map_err(internal_error)?;
+    // Volgorde volgt de foreign keys: eerst de verwijzende tabellen.
+    for tabel in [
+        "bezwaren",
+        "betaalopdrachten",
+        "besluiten",
+        "aanvragen",
+        "register_claims",
+        "register_uitslagen",
+        "register_partijen",
+        "register_gebieden",
+    ] {
+        sqlx::query(&format!("DELETE FROM {tabel}"))
+            .execute(&mut *tx)
+            .await
+            .map_err(internal_error)?;
+    }
+    tx.commit().await.map_err(internal_error)?;
+    register::seed_if_empty(&state.pool)
+        .await
+        .map_err(internal_error)?;
+    tracing::warn!("demo-reset uitgevoerd: dossiers gewist, register herseed uit snapshot");
+    Ok(Json(json!({"status": "gereset"})))
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -262,6 +302,47 @@ mod tests {
 
     fn fout(err: &ApiError) -> String {
         err.1["fout"].as_str().unwrap_or_default().to_string()
+    }
+
+    #[tokio::test]
+    async fn demo_reset_vereist_beoordelaarsessie_en_wist_dossiers() {
+        let state = test_state().await;
+        let err = demo_reset(State(state.clone()), anonymous_session())
+            .await
+            .expect_err("zonder sessie hoort 403");
+        assert_eq!(err.0, StatusCode::FORBIDDEN);
+
+        // Een dossier dat na de reset weg moet zijn.
+        db::insert_aanvraag(
+            &state.pool,
+            "aanvraag-1",
+            "11111111",
+            "Testpartij",
+            2027,
+            "[]",
+            "{}",
+            "BEHANDELING",
+            "2026-06-10",
+            None,
+        )
+        .await
+        .expect("aanvraag fixture");
+
+        demo_reset(State(state.clone()), beoordelaar_session().await)
+            .await
+            .expect("reset met beoordelaarsessie");
+
+        let aanvragen: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM aanvragen")
+            .fetch_one(&state.pool)
+            .await
+            .expect("count");
+        assert_eq!(aanvragen, 0);
+        // Het register is herseed uit de snapshot (niet de testfixtures).
+        let partijen: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM register_partijen")
+            .fetch_one(&state.pool)
+            .await
+            .expect("count");
+        assert!(partijen > 1000, "snapshot-seed verwacht, kreeg {partijen}");
     }
 
     #[tokio::test]
