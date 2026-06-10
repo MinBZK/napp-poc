@@ -38,6 +38,7 @@ const stappen = [
   <nldd-page>
     <PortalHeader
       slot="header"
+      portal="publiek"
       :items="navItems"
       :utility-items="[{ text: 'Inloggen', icon: 'person', key: 'login' }]"
       @utility="naarInloggen"
@@ -58,12 +59,20 @@ const stappen = [
         </p>
       </nldd-rich-text>
       <nldd-spacer size="20"></nldd-spacer>
-      <nldd-button
-        variant="primary"
-        text="Subsidie aanvragen"
-        end-icon="arrow-right"
-        href="/aanvrager/"
-      ></nldd-button>
+      <nldd-button-group orientation="horizontal">
+        <nldd-button
+          variant="primary"
+          text="Subsidie aanvragen"
+          end-icon="arrow-right"
+          href="/aanvrager/"
+        ></nldd-button>
+        <nldd-button
+          variant="secondary"
+          text="Inloggen"
+          start-icon="person"
+          href="/aanvrager/"
+        ></nldd-button>
+      </nldd-button-group>
     </nldd-simple-section>
 
     <nldd-simple-section background="tinted">

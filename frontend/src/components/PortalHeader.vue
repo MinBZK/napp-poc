@@ -15,6 +15,7 @@ import { session, refreshSession } from '../session.js';
 const PORTAL_SUBTITLES = {
   aanvrager: 'Subsidieportaal',
   beoordelaar: 'Beoordelingsomgeving',
+  publiek: 'Publieksportaal',
 };
 
 const props = defineProps({

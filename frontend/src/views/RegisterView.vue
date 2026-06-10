@@ -31,6 +31,7 @@ onMounted(async () => {
   <nldd-page>
     <PortalHeader
       slot="header"
+      portal="publiek"
       :items="navItems"
     />
 
