@@ -28,6 +28,7 @@ const financienOpenbaar = ref(false);
 const fout = ref('');
 const bezig = ref(false);
 const proef = ref(null);
+const proefFout = ref('');
 let proefTimer = null;
 
 // Inline rekening opgeven (alleen tekenbevoegd bestuur, zie rekening.rs).
@@ -185,6 +186,7 @@ async function laadRegistratie() {
 async function herberekenProef() {
   if (!geselecteerd.value.size) {
     proef.value = null;
+    proefFout.value = '';
     return;
   }
   try {
@@ -192,8 +194,10 @@ async function herberekenProef() {
       componenten: [...geselecteerd.value],
       parameters: aanvraagParameters(),
     });
-  } catch {
+    proefFout.value = '';
+  } catch (e) {
     proef.value = null;
+    proefFout.value = e.message;
   }
 }
 
@@ -526,9 +530,17 @@ watch(() => session.aanvrager, laadRegistratie);
           <nldd-spacer size="16"></nldd-spacer>
         </template>
 
-        <template v-if="proef">
+        <template v-if="proefFout">
+          <NBanner
+            variant="critical"
+            text="Indicatieve berekening niet mogelijk"
+            :supporting-text="proefFout"
+          />
+          <nldd-spacer size="16"></nldd-spacer>
+        </template>
+        <template v-else-if="proef">
           <nldd-box>
-            <nldd-container padding="16">
+            <nldd-container padding="16" gap="8">
               <nldd-text-cell
                 overline="Indicatieve uitkomst volgens de wet"
                 :text="proef.subsidie_toegekend ? euro(proef.subsidiebedrag) : 'Afwijzing'"
@@ -538,6 +550,14 @@ watch(() => session.aanvrager, laadRegistratie);
                     : `${proef.onderdelen_toegekend} van ${onderdelen(proef.onderdelen_totaal)} toegekend · dit is geen besluit`
                 "
                 size="md"
+              ></nldd-text-cell>
+              <!-- Bij afgewezen onderdelen legt de motivering uit welke en
+                   waarom -- dezelfde tekst die straks in het besluit staat. -->
+              <nldd-text-cell
+                v-if="proef.motivering && proef.onderdelen_toegekend < proef.onderdelen_totaal"
+                :text="proef.motivering"
+                color="secondary"
+                size="sm"
               ></nldd-text-cell>
             </nldd-container>
           </nldd-box>

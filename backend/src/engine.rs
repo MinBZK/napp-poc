@@ -245,9 +245,9 @@ fn build_motivering(
                 .and_then(|v| v.as_i64())
                 .unwrap_or(0);
             let reden = if u.component.zetels < 1 {
-                "de partij heeft geen zetel in de Eerste of Tweede Kamer"
+                "de partij geen zetel in de Eerste of Tweede Kamer heeft"
             } else if leden < 1000 {
-                "de partij heeft minder dan duizend betalende leden"
+                "de partij minder dan duizend betalende leden heeft"
             } else {
                 "niet aan de voorwaarden van artikel 6 is voldaan"
             };

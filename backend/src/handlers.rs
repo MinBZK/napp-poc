@@ -266,16 +266,26 @@ async fn aanspraken_voor(
     Ok(componenten)
 }
 
+/// Upper bound for self-reported member counts. Generous (the largest Dutch
+/// party has ~100k members), but keeps the engine arithmetic within the safe
+/// integer range: ledenbudget × leden must stay far below 2^53.
+const MAX_LEDEN: i64 = 10_000_000;
+
 /// Eigen opgaven voor de landelijke component: ledental en de aangewezen
 /// neveninstellingen (Wpp art. 3, 4 en 14, onderdelen b-d).
 fn neem_landelijke_opgaven_over(
     bron: &serde_json::Map<String, serde_json::Value>,
     eigen: &mut serde_json::Map<String, serde_json::Value>,
-) {
+) -> Result<(), ApiError> {
     let leden = bron
         .get("aantal_betalende_leden")
         .and_then(|v| v.as_i64())
         .unwrap_or(0);
+    if !(0..=MAX_LEDEN).contains(&leden) {
+        return Err(bad_request(
+            "Het opgegeven ledental is geen aannemelijk aantal (tussen 0 en 10.000.000).",
+        ));
+    }
     eigen.insert("aantal_betalende_leden".to_string(), json!(leden));
     for key in [
         "heeft_wetenschappelijk_instituut",
@@ -289,10 +299,16 @@ fn neem_landelijke_opgaven_over(
         .get("aantal_leden_jongerenorganisatie")
         .and_then(|v| v.as_i64())
         .unwrap_or(0);
+    if !(0..=MAX_LEDEN).contains(&pjo_leden) {
+        return Err(bad_request(
+            "Het opgegeven ledental van de jongerenorganisatie is geen aannemelijk aantal (tussen 0 en 10.000.000).",
+        ));
+    }
     eigen.insert(
         "aantal_leden_jongerenorganisatie".to_string(),
         json!(pjo_leden),
     );
+    Ok(())
 }
 
 /// De noemer van de ledencomponent voor een (proef)berekening: de opgaven
@@ -484,7 +500,7 @@ pub async fn create_aanvraag(
         };
         eigen.insert(key.to_string(), json!(waarde));
     }
-    neem_landelijke_opgaven_over(&body.parameters, &mut eigen);
+    neem_landelijke_opgaven_over(&body.parameters, &mut eigen)?;
 
     let id = Uuid::new_v4().to_string();
     // Wpp art. 17 (lex specialis t.o.v. AWB 4:13): de Napp besluit voor
@@ -549,7 +565,7 @@ pub async fn proef_aanspraken(
         let waarde = body.parameters.get(key).and_then(|v| v.as_bool()).unwrap_or(false);
         eigen.insert(key.to_string(), json!(waarde));
     }
-    neem_landelijke_opgaven_over(&body.parameters, &mut eigen);
+    neem_landelijke_opgaven_over(&body.parameters, &mut eigen)?;
 
     let vandaag = Utc::now().format("%Y-%m-%d").to_string();
     let jaar = subsidiejaar_voor(&vandaag);
@@ -577,6 +593,9 @@ pub async fn proef_aanspraken(
         "subsidiejaar": jaar,
         "onderdelen_toegekend": uitkomst.componenten.iter().filter(|c| c.toegekend).count(),
         "onderdelen_totaal": uitkomst.componenten.len(),
+        // De motivering legt per afgewezen onderdeel uit waarom; zo ziet de
+        // aanvrager in de indicatie ook wát er zou sneuvelen.
+        "motivering": uitkomst.motivering,
     })))
 }
 
