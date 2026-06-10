@@ -90,6 +90,17 @@ const zichtbareGroepen = computed(() => GROEPEN.filter((g) => groepLeden(g).leng
 const aantalGeselecteerd = computed(() => geselecteerd.value.size);
 const landelijkGeselecteerd = computed(() => geselecteerd.value.has('LANDELIJK'));
 
+// Zolang de gebruiker nog niets heeft ingevuld, tonen we geen hard
+// wetsoordeel ("Afwijzing") maar een neutrale uitnodiging.
+const formulierAangeraakt = computed(
+  () =>
+    leden.value > 0 ||
+    geenAnoniemeGiften.value ||
+    geenGiftenNietIngezetenen.value ||
+    meldplichtNageleefd.value ||
+    financienOpenbaar.value,
+);
+
 const verklaringenCompleet = computed(
   () =>
     geenAnoniemeGiften.value &&
@@ -517,23 +528,6 @@ watch(() => session.aanvrager, laadRegistratie);
         </nldd-container>
         <nldd-spacer size="24"></nldd-spacer>
 
-        <template v-if="landelijkGeselecteerd && leden < 1000">
-          <NBanner
-            variant="warning"
-            text="Minder dan duizend leden"
-            supporting-text="Voor de landelijke subsidie zijn minimaal 1.000 betalende leden vereist (artikel 6 Wpp). Met dit ledental wijst de wet het landelijke onderdeel af."
-          />
-          <nldd-spacer size="16"></nldd-spacer>
-        </template>
-        <template v-if="!verklaringenCompleet">
-          <NBanner
-            variant="neutral"
-            text="Let op"
-            supporting-text="Een aanvraag zonder volledige verklaringen wordt door de wet afgewezen. U kunt wel indienen; het besluit volgt uit de wet."
-          />
-          <nldd-spacer size="16"></nldd-spacer>
-        </template>
-
         <template v-if="proefFout">
           <NBanner
             variant="critical"
@@ -542,12 +536,30 @@ watch(() => session.aanvrager, laadRegistratie);
           />
           <nldd-spacer size="16"></nldd-spacer>
         </template>
+        <template v-else-if="proef && !formulierAangeraakt">
+          <nldd-box>
+            <nldd-container padding="16" gap="8">
+              <nldd-title size="4">
+                <span slot="overline">Indicatieve uitkomst volgens de wet</span>
+                <h4>Vul het formulier in</h4>
+              </nldd-title>
+              <nldd-rich-text>
+                <p>
+                  Deze indicatie rekent live mee met wat u invult: zodra u uw
+                  ledental en verklaringen opgeeft, ziet u hier wat de wet
+                  van uw aanvraag vindt, nog vóór u indient.
+                </p>
+              </nldd-rich-text>
+            </nldd-container>
+          </nldd-box>
+          <nldd-spacer size="16"></nldd-spacer>
+        </template>
         <template v-else-if="proef">
           <nldd-box>
             <nldd-container padding="16" gap="8">
               <nldd-title size="4">
                 <span slot="overline">Indicatieve uitkomst volgens de wet</span>
-                <h4>{{ proef.subsidie_toegekend ? euro(proef.subsidiebedrag) : 'Afwijzing' }}</h4>
+                <h4>{{ proef.subsidie_toegekend ? euro(proef.subsidiebedrag) : 'Nog geen toekenning' }}</h4>
               </nldd-title>
               <nldd-rich-text>
                 <p>
