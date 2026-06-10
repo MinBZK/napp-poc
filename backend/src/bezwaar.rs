@@ -287,6 +287,8 @@ pub async fn dien_bezwaar_in(
 #[derive(Debug, Deserialize)]
 pub struct Herstel {
     #[serde(default)]
+    pub naam_indiener: Option<String>,
+    #[serde(default)]
     pub adres_indiener: Option<String>,
     #[serde(default)]
     pub gronden: Option<String>,
@@ -334,12 +336,16 @@ pub async fn herstel_bezwaar(
         .unwrap_or_else(|_| vandaag.clone());
     let binnen_termijn = vandaag <= hersteldeadline;
 
+    let naam = body
+        .naam_indiener
+        .filter(|n| !n.trim().is_empty())
+        .unwrap_or_else(|| bezwaar.naam_indiener.clone());
     let adres = body.adres_indiener.or(bezwaar.adres_indiener.clone());
     let gronden = body.gronden.or(bezwaar.gronden.clone());
     let ondertekend = body.ondertekend.unwrap_or(bezwaar.ondertekend);
 
     let feiten = bezwaar_feiten(
-        &bezwaar.naam_indiener,
+        &naam,
         adres.as_deref(),
         gronden.as_deref(),
         ondertekend,
@@ -361,9 +367,10 @@ pub async fn herstel_bezwaar(
         engine::BEZWAAR_STAGE_BEHANDELING
     };
     sqlx::query(
-        "UPDATE bezwaren SET adres_indiener = ?, gronden = ?, ondertekend = ?, toets = ?,
-         status = ? WHERE id = ?",
+        "UPDATE bezwaren SET naam_indiener = ?, adres_indiener = ?, gronden = ?,
+         ondertekend = ?, toets = ?, status = ? WHERE id = ?",
     )
+    .bind(&naam)
     .bind(&adres)
     .bind(&gronden)
     .bind(ondertekend as i64)

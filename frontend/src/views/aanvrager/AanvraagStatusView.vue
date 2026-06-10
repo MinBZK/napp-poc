@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import PortalHeader from '../../components/PortalHeader.vue';
 import NBanner from '../../components/NBanner.vue';
@@ -82,6 +82,7 @@ async function herstelBezwaar() {
   bezwaarBezig.value = true;
   try {
     await api.herstelBezwaar(item.value.bezwaar.id, {
+      naam_indiener: bezwaarForm.value.naam.trim() || undefined,
       adres_indiener: bezwaarForm.value.adres.trim() || undefined,
       gronden: bezwaarForm.value.gronden.trim() || undefined,
       ondertekend: bezwaarForm.value.ondertekend || undefined,
@@ -99,6 +100,32 @@ const BESLISSING_LABELS = {
   ONGEGROND: 'Ongegrond',
   GEGROND: 'Gegrond',
 };
+
+// Welke 6:5-vereisten ontbreken volgens de wet (outputs van de toets);
+// de herstelbanner benoemt ze, zodat duidelijk is wat aangevuld moet.
+const ontbrekendeVereisten = computed(() => {
+  const o = item.value?.bezwaar?.toets?.outputs ?? {};
+  const eisen = [
+    ['ontbreekt_naam_en_adres', 'naam en adres van de indiener'],
+    ['ontbreken_gronden', 'de gronden van het bezwaar'],
+    ['ontbreekt_ondertekening', 'de ondertekening'],
+  ];
+  return eisen.filter(([k]) => o[k]).map(([, label]) => label);
+});
+
+// Vul het herstelformulier vooraf met wat er al is, zodat alleen het
+// ontbrekende hoeft te worden aangevuld.
+watch(item, (i) => {
+  const b = i?.bezwaar;
+  if (b && b.status === 'HERSTEL') {
+    bezwaarForm.value = {
+      naam: b.naam_indiener ?? '',
+      adres: b.adres_indiener ?? '',
+      gronden: b.gronden ?? '',
+      ondertekend: b.ondertekend ?? false,
+    };
+  }
+});
 </script>
 
 <template>
@@ -236,16 +263,25 @@ const BESLISSING_LABELS = {
               <NBanner
                 variant="warning"
                 text="Uw bezwaarschrift is onvolledig"
-                supporting-text="U krijgt gelegenheid het verzuim te herstellen (artikel 6:6 Awb). Vul de ontbrekende onderdelen aan; anders kan het bezwaar niet-ontvankelijk worden verklaard."
+                :supporting-text="`Er ontbreekt: ${ontbrekendeVereisten.join(', ') || 'een of meer vereisten'} (artikel 6:5 Awb). U krijgt gelegenheid het verzuim te herstellen (artikel 6:6); anders kan het bezwaar niet-ontvankelijk worden verklaard.`"
               />
               <nldd-spacer size="12"></nldd-spacer>
               <nldd-form novalidate @submit.prevent="herstelBezwaar">
-                <nldd-form-field label="Gronden van het bezwaar">
+                <nldd-form-field label="Naam van de indiener">
                   <nldd-text-field
+                    :value="bezwaarForm.naam"
+                    name="naam"
+                    @input="bezwaarForm.naam = veld($event)"
+                  ></nldd-text-field>
+                </nldd-form-field>
+                <nldd-form-field label="Gronden van het bezwaar">
+                  <nldd-multi-line-text-field
                     :value="bezwaarForm.gronden"
                     name="gronden"
+                    rows="4"
+                    resize="auto"
                     @input="bezwaarForm.gronden = veld($event)"
-                  ></nldd-text-field>
+                  ></nldd-multi-line-text-field>
                 </nldd-form-field>
                 <nldd-form-field label="Adres van de indiener">
                   <nldd-text-field
@@ -254,11 +290,18 @@ const BESLISSING_LABELS = {
                     @input="bezwaarForm.adres = veld($event)"
                   ></nldd-text-field>
                 </nldd-form-field>
-                <nldd-checkbox-field
-                  :checked="bezwaarForm.ondertekend || undefined"
-                  label="Ik onderteken dit bezwaarschrift"
-                  @change="bezwaarForm.ondertekend = $event.detail?.checked ?? !bezwaarForm.ondertekend"
-                ></nldd-checkbox-field>
+                <nldd-form-field label="Ondertekening">
+                  <nldd-checkbox-field
+                    :checked="bezwaarForm.ondertekend || undefined"
+                    label="Ik onderteken dit bezwaarschrift"
+                    @change="bezwaarForm.ondertekend = $event.detail?.checked ?? !bezwaarForm.ondertekend"
+                  ></nldd-checkbox-field>
+                  <nldd-form-field-help-text>
+                    Een bezwaarschrift moet ondertekend zijn (artikel 6:5
+                    Awb); in dit portaal ondertekent u digitaal met deze
+                    verklaring.
+                  </nldd-form-field-help-text>
+                </nldd-form-field>
                 <template v-if="bezwaarFout">
                   <nldd-spacer size="8"></nldd-spacer>
                   <NBanner variant="critical" :text="bezwaarFout" />
@@ -318,23 +361,32 @@ const BESLISSING_LABELS = {
                     ></nldd-text-field>
                   </nldd-form-field>
                   <nldd-form-field label="Gronden van het bezwaar">
-                    <nldd-text-field
+                    <nldd-multi-line-text-field
                       :value="bezwaarForm.gronden"
                       name="gronden"
+                      rows="4"
+                      resize="auto"
                       placeholder="Waarom bent u het niet eens met het besluit?"
                       @input="bezwaarForm.gronden = veld($event)"
-                    ></nldd-text-field>
+                    ></nldd-multi-line-text-field>
                     <nldd-form-field-help-text>
                       Het bezwaarschrift moet de gronden bevatten (artikel 6:5
                       Awb). Ontbreekt er iets, dan krijgt u gelegenheid tot
                       herstel (artikel 6:6).
                     </nldd-form-field-help-text>
                   </nldd-form-field>
-                  <nldd-checkbox-field
-                    :checked="bezwaarForm.ondertekend || undefined"
-                    label="Ik onderteken dit bezwaarschrift"
-                    @change="bezwaarForm.ondertekend = $event.detail?.checked ?? !bezwaarForm.ondertekend"
-                  ></nldd-checkbox-field>
+                  <nldd-form-field label="Ondertekening">
+                    <nldd-checkbox-field
+                      :checked="bezwaarForm.ondertekend || undefined"
+                      label="Ik onderteken dit bezwaarschrift"
+                      @change="bezwaarForm.ondertekend = $event.detail?.checked ?? !bezwaarForm.ondertekend"
+                    ></nldd-checkbox-field>
+                    <nldd-form-field-help-text>
+                      Een bezwaarschrift moet ondertekend zijn (artikel 6:5
+                      Awb); in dit portaal ondertekent u digitaal met deze
+                      verklaring.
+                    </nldd-form-field-help-text>
+                  </nldd-form-field>
                   <template v-if="bezwaarFout">
                     <nldd-spacer size="8"></nldd-spacer>
                     <NBanner variant="critical" :text="bezwaarFout" />

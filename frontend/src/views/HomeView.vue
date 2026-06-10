@@ -4,6 +4,12 @@ import PortalHeader from '../components/PortalHeader.vue';
 
 const router = useRouter();
 
+// Inloggen rechtsboven: het aanvragersportaal regelt de (gesimuleerde)
+// eHerkenning-login zelf.
+function naarInloggen(item) {
+  if (item.key === 'login') window.location.href = '/aanvrager/';
+}
+
 const navItems = [
   { text: 'Home', to: '/' },
   { text: 'Openbaar register', to: '/register' },
@@ -34,6 +40,8 @@ const stappen = [
       slot="header"
       subtitle="Nederlandse autoriteit politieke partijen"
       :items="navItems"
+      :utility-items="[{ text: 'Inloggen', icon: 'person', key: 'login' }]"
+      @utility="naarInloggen"
     />
 
     <nldd-simple-section>
