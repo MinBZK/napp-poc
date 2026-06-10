@@ -509,16 +509,7 @@ mod tests {
             .expect("uitslag fixture");
         AppState {
             pool,
-            corpus: Arc::new(LawCorpus {
-                wpp: String::new(),
-                regeling: String::new(),
-                besluit_decentraal: String::new(),
-                awb: String::new(),
-                termijnenwet: String::new(),
-                // De claim-flow toetst aan Kieswet G 1 via de engine; de
-                // tests gebruiken daarvoor de echte wettekst.
-                kieswet: include_str!("../../law/kieswet/1989-09-28.yaml").to_string(),
-            }),
+            corpus: Arc::new(LawCorpus::embedded()),
             procedure: Arc::new(
                 crate::engine::beschikking_procedure(include_str!(
                     "../../law/wet_op_de_politieke_partijen/2026-01-01.yaml"

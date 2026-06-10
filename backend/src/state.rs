@@ -41,8 +41,16 @@ impl OidcAppState for AppState {
     }
 }
 
-/// The law corpus: YAML sources loaded once at startup. The engine itself is
-/// constructed per evaluation (cheap, and keeps the state Send + Sync).
+/// Identificatie van een geladen wetversie, vastgelegd in het bewijs bij
+/// elk besluit zodat later herleidbaar is met welke teksten is gerekend.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct WetVersie {
+    pub id: String,
+    pub valid_from: String,
+}
+
+/// The law corpus: YAML sources loaded once at startup. Evaluations run on a
+/// per-thread cached engine service keyed on this corpus (see engine.rs).
 pub struct LawCorpus {
     pub wpp: String,
     pub regeling: String,
@@ -52,9 +60,50 @@ pub struct LawCorpus {
     /// Subset van de Kieswet (artikel G 1): de registratie-eisen voor een
     /// aanduiding, gebruikt bij de claim-toets in het partijregister.
     pub kieswet: String,
+    /// De versies ($id + valid_from) van de geladen teksten, voor het
+    /// bewijs bij besluiten.
+    pub versies: Vec<WetVersie>,
+}
+
+fn wet_versie(yaml: &str) -> Option<WetVersie> {
+    let doc: serde_yaml_ng::Value = serde_yaml_ng::from_str(yaml).ok()?;
+    Some(WetVersie {
+        id: doc.get("$id")?.as_str()?.to_string(),
+        valid_from: doc.get("valid_from")?.as_str()?.to_string(),
+    })
 }
 
 impl LawCorpus {
+    fn new(
+        wpp: String,
+        regeling: String,
+        besluit_decentraal: String,
+        awb: String,
+        termijnenwet: String,
+        kieswet: String,
+    ) -> Self {
+        let versies = [
+            &wpp,
+            &regeling,
+            &besluit_decentraal,
+            &awb,
+            &termijnenwet,
+            &kieswet,
+        ]
+        .into_iter()
+        .filter_map(|yaml| wet_versie(yaml))
+        .collect();
+        Self {
+            wpp,
+            regeling,
+            besluit_decentraal,
+            awb,
+            termijnenwet,
+            kieswet,
+            versies,
+        }
+    }
+
     pub fn load() -> anyhow::Result<Self> {
         let dir = std::env::var("NAPP_LAW_DIR").unwrap_or_else(|_| "law".to_string());
         let dir = PathBuf::from(dir);
@@ -63,15 +112,29 @@ impl LawCorpus {
             std::fs::read_to_string(&path)
                 .map_err(|e| anyhow::anyhow!("kan wettekst {} niet lezen: {e}", path.display()))
         };
-        Ok(Self {
-            wpp: read("wet_op_de_politieke_partijen/2026-01-01.yaml")?,
-            regeling: read("regeling_subsidiebedragen/2026-01-01.yaml")?,
-            besluit_decentraal: read(
-                "besluit_subsidiering_decentrale_politieke_partijen/2026-01-01.yaml",
-            )?,
-            awb: read("algemene_wet_bestuursrecht/1994-01-01.yaml")?,
-            termijnenwet: read("algemene_termijnenwet/1964-04-01.yaml")?,
-            kieswet: read("kieswet/1989-09-28.yaml")?,
-        })
+        Ok(Self::new(
+            read("wet_op_de_politieke_partijen/2026-01-01.yaml")?,
+            read("regeling_subsidiebedragen/2026-01-01.yaml")?,
+            read("besluit_subsidiering_decentrale_politieke_partijen/2026-01-01.yaml")?,
+            read("algemene_wet_bestuursrecht/1994-01-01.yaml")?,
+            read("algemene_termijnenwet/1964-04-01.yaml")?,
+            read("kieswet/1989-09-28.yaml")?,
+        ))
+    }
+
+    /// De volledige corpus uit de repository, voor tests en fixtures.
+    #[cfg(test)]
+    pub fn embedded() -> Self {
+        Self::new(
+            include_str!("../../law/wet_op_de_politieke_partijen/2026-01-01.yaml").to_string(),
+            include_str!("../../law/regeling_subsidiebedragen/2026-01-01.yaml").to_string(),
+            include_str!(
+                "../../law/besluit_subsidiering_decentrale_politieke_partijen/2026-01-01.yaml"
+            )
+            .to_string(),
+            include_str!("../../law/algemene_wet_bestuursrecht/1994-01-01.yaml").to_string(),
+            include_str!("../../law/algemene_termijnenwet/1964-04-01.yaml").to_string(),
+            include_str!("../../law/kieswet/1989-09-28.yaml").to_string(),
+        )
     }
 }

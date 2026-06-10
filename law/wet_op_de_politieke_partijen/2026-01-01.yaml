@@ -235,35 +235,58 @@ articles:
 
   # ------------------------------------------------------------------
   # Artikel 13 — Eenmalige verstrekking per subsidiejaar
-  # De orchestratie levert het feit (loopt er voor dit onderdeel al een
-  # aanvraag of toekenning in het subsidiejaar, uit de aanvragentabel);
-  # de wet velt het oordeel.
+  # De orchestratie levert per onderdeel de rauwe feiten uit de
+  # aanvragentabel; de wet bepaalt wat blokkeert. Dat een eerdere
+  # afwijzing een nieuwe aanvraag NIET in de weg staat is daarmee een
+  # regel van deze wet, niet van de uitvoering.
   # ------------------------------------------------------------------
   - number: '13'
     text: |-
       De subsidie wordt per kalenderjaar verstrekt. Voor ieder onderdeel
       van de aanvraag (de landelijke subsidie dan wel een decentraal orgaan
       en gebied) wordt per subsidiejaar ten hoogste eenmaal subsidie
-      verstrekt.
+      verstrekt. Een aanvraag voor een onderdeel waarvoor in het
+      subsidiejaar al een aanvraag in behandeling is of subsidie is
+      verstrekt, wordt afgewezen. Een eerdere afwijzing voor het
+      subsidiejaar staat aan een nieuwe aanvraag niet in de weg.
     url: https://www.tweedekamer.nl/kamerstukken/wetsvoorstellen/detail?qry=wetsvoorstel%3A36742
     machine_readable:
       execution:
         parameters:
-          - name: onderdeel_al_aangevraagd_of_toegekend
+          - name: onderdeel_in_behandeling
             type: boolean
             required: true
             description: >-
-              Of voor dit onderdeel in het subsidiejaar al een aanvraag in
-              behandeling is of subsidie is toegekend
+              Of voor dit onderdeel in het subsidiejaar een aanvraag in
+              behandeling is (aanvragentabel, databron)
+          - name: onderdeel_eerder_toegekend
+            type: boolean
+            required: true
+            description: >-
+              Of voor dit onderdeel in het subsidiejaar al subsidie is
+              toegekend (besluitenregister, databron)
+          - name: onderdeel_eerder_afgewezen
+            type: boolean
+            required: true
+            description: >-
+              Of voor dit onderdeel in het subsidiejaar eerder is
+              afgewezen; blokkeert volgens dit artikel niet
         output:
           - name: onderdeel_beschikbaar
             type: boolean
         actions:
+          # Alleen een lopende aanvraag of een eerdere toekenning blokkeert;
+          # een eerdere afwijzing bewust niet.
           - output: onderdeel_beschikbaar
             value:
-              operation: EQUALS
-              subject: $onderdeel_al_aangevraagd_of_toegekend
-              value: false
+              operation: AND
+              conditions:
+                - operation: EQUALS
+                  subject: $onderdeel_in_behandeling
+                  value: false
+                - operation: EQUALS
+                  subject: $onderdeel_eerder_toegekend
+                  value: false
 
   # ------------------------------------------------------------------
   # Artikel 14 — Subsidiebedragen voor landelijke partijen
@@ -846,12 +869,17 @@ articles:
             description: >-
               Of de opgegeven tenaamstelling overeenkomt met de
               rechtspersoon (IBAN-naam-controle, databron)
-          - name: handelt_als_tekenbevoegd_bestuur
+          # Het feit heet naar wat de bron attesteert (een volledige
+          # eHerkenning-machtiging); de gelijkstelling daarvan met het
+          # tekenbevoegd bestuur uit de wettekst is een aanname van deze
+          # uitvoering en staat hier bewust zichtbaar.
+          - name: eherkenning_volledige_machtiging
             type: boolean
             required: true
             description: >-
-              Of de sessie de rechtspersoon volledig vertegenwoordigt
-              (eHerkenning-machtiging van het tekenbevoegd bestuur)
+              Of de sessie een volledige eHerkenning-machtiging voor de
+              rechtspersoon draagt (gelijkgesteld aan handelen door het
+              tekenbevoegd bestuur)
           - name: rekening_bekend
             type: boolean
             required: true
@@ -872,7 +900,7 @@ articles:
           - output: mag_rekening_wijzigen
             value:
               operation: EQUALS
-              subject: $handelt_als_tekenbevoegd_bestuur
+              subject: $eherkenning_volledige_machtiging
               value: true
           - output: uitbetaling_aangehouden
             value:

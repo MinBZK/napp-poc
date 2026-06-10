@@ -1,17 +1,25 @@
 //! Wrapper around the regelrecht engine.
 //!
-//! De wet rekent per aanspraak (artikel 8 landelijk, artikel 12 decentraal);
+//! De wet rekent per aanspraak (artikel 6/7 recht, artikel 12/14 bedragen);
 //! de orchestratielaag voert de wet per component uit en telt de bedragen
 //! op tot één beschikking. Die som is bewust orchestratie en geen wet: de
 //! engine kent geen aggregatie over collecties (RFC-012).
+//!
+//! Het contract tussen wet en uitvoering is fail-loud: elke output waarnaar
+//! de orchestratie verwijst wordt bij het opstarten tegen de geladen corpus
+//! gecontroleerd (`valideer_contract`), en outputs waarop beslist wordt
+//! worden met `req_*` gelezen — ontbreken of taint is een harde fout, nooit
+//! een stille default.
 
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use regelrecht_engine::{LawExecutionService, Value};
 use serde::Serialize;
+use serde_json::json;
 
-use crate::db::{Component, ComponentUitkomst, LandelijkeDelen};
+use crate::db::{Component, ComponentUitkomst, LandelijkeDelen, OnderdeelFeiten};
 use crate::state::LawCorpus;
 
 pub const WPP_ID: &str = "wet_op_de_politieke_partijen";
@@ -28,6 +36,84 @@ pub const STAGE_BEHANDELING: &str = "BEHANDELING";
 pub const STAGE_BESLUIT: &str = "BESLUIT";
 pub const STAGE_BEKENDMAKING: &str = "BEKENDMAKING";
 pub const STAGE_BEZWAAR: &str = "BEZWAAR";
+
+/// Outputs die de orchestratie opvraagt of (via hooks) uitleest, per wet.
+/// `valideer_contract` controleert bij het opstarten dat ze allemaal in de
+/// geladen corpus bestaan: een hernoemde output in de YAML faalt dan bij de
+/// start in plaats van stil een verkeerd besluit op te leveren.
+const CONTRACT: &[(&str, &[&str])] = &[
+    (
+        WPP_ID,
+        &[
+            "subsidie_toegekend",
+            "subsidiebedrag",
+            "subsidie_partij",
+            "subsidie_wetenschappelijk_instituut",
+            "subsidie_jongerenorganisatie",
+            "subsidie_buitenland",
+            "voldoet_aan_transparantie",
+            "voldoet_verbod_anonieme_giften",
+            "voldoet_verbod_giften_niet_ingezetenen",
+            "voldoet_meldplicht_giften",
+            "voldoet_openbaarmaking_financien",
+            "heeft_recht_landelijk",
+            "voldoet_zeteleis_landelijk",
+            "voldoet_ledeneis",
+            "voldoet_zeteleis_decentraal",
+            "onderdeel_beschikbaar",
+            "aanvraagtermijn_einddatum",
+            "beslistermijn_einddatum",
+            "voorschotpercentage",
+            "rekening_aanvaardbaar",
+            "mag_rekening_wijzigen",
+            "uitbetaling_aangehouden",
+            "betaalopdracht_vereist",
+            "betaalopdracht_bedrag",
+        ],
+    ),
+    (
+        AWB_ID,
+        &[
+            "motivering_vereist",
+            "bezwaartermijn_weken",
+            "bezwaartermijn_startdatum",
+            "bezwaartermijn_einddatum",
+        ],
+    ),
+    (ATW_ID, &["verlengde_einddatum"]),
+    (
+        KIESWET_ID,
+        &[
+            "voldoet_aan_registratie_eisen",
+            "voldoet_eis_inschrijving",
+            "voldoet_eis_rechtsvorm",
+            "voldoet_eis_naam",
+        ],
+    ),
+];
+
+/// Controleer het contract tussen wet en uitvoering tegen de geladen
+/// corpus. Aanroepen bij het opstarten: bestaat een output niet (meer),
+/// dan weigert de applicatie te starten.
+pub fn valideer_contract(corpus: &Arc<LawCorpus>) -> anyhow::Result<()> {
+    with_service(corpus, |service| {
+        for (law_id, outputs) in CONTRACT {
+            for output in *outputs {
+                if service
+                    .resolver()
+                    .get_article_by_output(law_id, output, None)
+                    .is_none()
+                {
+                    anyhow::bail!(
+                        "contractbreuk wet↔uitvoering: output '{output}' bestaat niet (meer) \
+                         in {law_id}"
+                    );
+                }
+            }
+        }
+        Ok(())
+    })
+}
 
 /// De beschikking-procedure zoals de wet die definieert: de geordende
 /// lifecycle-stages. De orchestratie bewaart per aanvraag de huidige stage
@@ -105,6 +191,10 @@ pub struct JaaruitkomstUitkomst {
     pub voldoet_aan_transparantie: bool,
     pub componenten: Vec<ComponentUitkomst>,
     pub motivering: String,
+    /// Het bewijs van dit besluit: peildatum, wetversies en per component
+    /// de parameters en outputs van de evaluatie. Wordt bij het besluit
+    /// gepersisteerd zodat het later herleidbaar is.
+    pub bewijs: serde_json::Value,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -113,7 +203,7 @@ pub struct BezwaartermijnUitkomst {
     pub einddatum: String,
 }
 
-fn service_with_corpus(corpus: &LawCorpus) -> anyhow::Result<LawExecutionService> {
+fn build_service(corpus: &LawCorpus) -> anyhow::Result<LawExecutionService> {
     let mut service = LawExecutionService::new();
     service
         .load_law(&corpus.wpp)
@@ -130,14 +220,73 @@ fn service_with_corpus(corpus: &LawCorpus) -> anyhow::Result<LawExecutionService
     service
         .load_law(&corpus.termijnenwet)
         .map_err(|e| anyhow::anyhow!("laden Algemene termijnenwet mislukt: {e}"))?;
+    service
+        .load_law(&corpus.kieswet)
+        .map_err(|e| anyhow::anyhow!("laden Kieswet mislukt: {e}"))?;
     Ok(service)
 }
 
-fn as_bool(outputs: &BTreeMap<String, Value>, name: &str) -> bool {
+thread_local! {
+    /// Eén geladen service per (blocking-)thread per corpus: de YAML's
+    /// worden niet bij elke evaluatie opnieuw geparsed. De sleutel is het
+    /// Arc-adres van de corpus; een nieuw geladen corpus krijgt een nieuw
+    /// adres en dus een verse service.
+    static SERVICE: RefCell<Option<(usize, LawExecutionService)>> = const { RefCell::new(None) };
+}
+
+fn with_service<R, F>(corpus: &Arc<LawCorpus>, f: F) -> anyhow::Result<R>
+where
+    F: FnOnce(&LawExecutionService) -> anyhow::Result<R>,
+{
+    let key = Arc::as_ptr(corpus) as usize;
+    SERVICE.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        let geldig = matches!(&*slot, Some((k, _)) if *k == key);
+        if !geldig {
+            *slot = Some((key, build_service(corpus)?));
+        }
+        let (_, service) = slot.as_ref().expect("service zojuist gezet");
+        f(service)
+    })
+}
+
+/// Lees een output waarop een besluit wordt gebouwd. Ontbreekt hij of is
+/// hij geen boolean (bijvoorbeeld een Untranslatable-taint), dan is dat een
+/// contractbreuk tussen wet en uitvoering: hard falen, nooit stil een
+/// default kiezen.
+fn req_bool(outputs: &BTreeMap<String, Value>, name: &str) -> anyhow::Result<bool> {
+    match outputs.get(name) {
+        Some(Value::Bool(b)) => Ok(*b),
+        Some(other) => anyhow::bail!("output '{name}' is geen boolean maar {other:?}"),
+        None => anyhow::bail!("output '{name}' ontbreekt in het engine-resultaat"),
+    }
+}
+
+fn req_int(outputs: &BTreeMap<String, Value>, name: &str) -> anyhow::Result<i64> {
+    match outputs.get(name) {
+        Some(Value::Int(n)) => Ok(*n),
+        Some(Value::Float(f)) => Ok(f.round() as i64),
+        Some(other) => anyhow::bail!("output '{name}' is geen getal maar {other:?}"),
+        None => anyhow::bail!("output '{name}' ontbreekt in het engine-resultaat"),
+    }
+}
+
+fn req_date(outputs: &BTreeMap<String, Value>, name: &str) -> anyhow::Result<String> {
+    match outputs.get(name) {
+        Some(Value::String(s)) => Ok(s.clone()),
+        Some(other) => anyhow::bail!("output '{name}' is geen datum maar {other:?}"),
+        None => anyhow::bail!("output '{name}' ontbreekt in het engine-resultaat"),
+    }
+}
+
+/// Lenient lezen, uitsluitend voor hook-outputs die er legitiem niet zijn
+/// (de betaalopdracht-hook van art. 16 vuurt alleen bij toekenning; de
+/// AWB-hooks alleen op hun stage). Voor opgevraagde outputs geldt `req_*`.
+fn hook_bool(outputs: &BTreeMap<String, Value>, name: &str) -> bool {
     matches!(outputs.get(name), Some(Value::Bool(true)))
 }
 
-fn as_int(outputs: &BTreeMap<String, Value>, name: &str) -> i64 {
+fn hook_int(outputs: &BTreeMap<String, Value>, name: &str) -> i64 {
     match outputs.get(name) {
         Some(Value::Int(n)) => *n,
         Some(Value::Float(f)) => f.round() as i64,
@@ -281,59 +430,19 @@ struct TransparantieToets {
     openbaarmaking_financien: bool,
 }
 
-fn transparantie_toets(
-    service: &LawExecutionService,
-    params: BTreeMap<String, Value>,
-    date: &str,
-) -> anyhow::Result<TransparantieToets> {
-    let result = service
-        .evaluate_law(
-            WPP_ID,
-            &[
-                "voldoet_aan_transparantie",
-                "voldoet_verbod_anonieme_giften",
-                "voldoet_verbod_giften_niet_ingezetenen",
-                "voldoet_meldplicht_giften",
-                "voldoet_openbaarmaking_financien",
-            ],
-            params,
-            date,
-        )
-        .map_err(|e| anyhow::anyhow!("toetsing transparantie mislukt: {e}"))?;
-    Ok(TransparantieToets {
-        voldoet: as_bool(&result.outputs, "voldoet_aan_transparantie"),
-        verbod_anonieme_giften: as_bool(&result.outputs, "voldoet_verbod_anonieme_giften"),
-        verbod_giften_niet_ingezetenen: as_bool(
-            &result.outputs,
-            "voldoet_verbod_giften_niet_ingezetenen",
-        ),
-        meldplicht_giften: as_bool(&result.outputs, "voldoet_meldplicht_giften"),
-        openbaarmaking_financien: as_bool(&result.outputs, "voldoet_openbaarmaking_financien"),
-    })
-}
-
-/// De motiveringszin voor een afgewezen onderdeel, op basis van de
-/// per-voorwaarde outputs van art. 6 (landelijk) of art. 7 (decentraal).
+/// De motiveringszin voor een afgewezen onderdeel, uit de per-voorwaarde
+/// outputs van dezelfde evaluatie als het besluit zelf — geen tweede
+/// evaluatie, zodat motivering en bewijs per definitie bij elkaar horen.
 /// De drempels (één zetel, duizend leden) staan alleen in de wet; hier
 /// wordt uitsluitend geformuleerd.
 fn afwijzingsgrond(
-    service: &LawExecutionService,
     component: &Component,
-    params: BTreeMap<String, Value>,
-    date: &str,
+    outputs: &BTreeMap<String, Value>,
 ) -> anyhow::Result<String> {
     if component.soort == "LANDELIJK" {
-        let eisen = service
-            .evaluate_law(
-                WPP_ID,
-                &["voldoet_zeteleis_landelijk", "voldoet_ledeneis"],
-                params,
-                date,
-            )
-            .map_err(|e| anyhow::anyhow!("toetsing artikel 6 mislukt: {e}"))?;
-        let reden = if !as_bool(&eisen.outputs, "voldoet_zeteleis_landelijk") {
+        let reden = if !req_bool(outputs, "voldoet_zeteleis_landelijk")? {
             "de partij geen zetel in de Eerste of Tweede Kamer heeft"
-        } else if !as_bool(&eisen.outputs, "voldoet_ledeneis") {
+        } else if !req_bool(outputs, "voldoet_ledeneis")? {
             "de partij minder dan duizend betalende leden heeft"
         } else {
             "niet aan de voorwaarden van artikel 6 is voldaan"
@@ -342,10 +451,7 @@ fn afwijzingsgrond(
             "Het landelijke onderdeel wordt afgewezen omdat {reden} (artikel 6)."
         ))
     } else {
-        let eisen = service
-            .evaluate_law(WPP_ID, &["voldoet_zeteleis_decentraal"], params, date)
-            .map_err(|e| anyhow::anyhow!("toetsing artikel 7 mislukt: {e}"))?;
-        let reden = if !as_bool(&eisen.outputs, "voldoet_zeteleis_decentraal") {
+        let reden = if !req_bool(outputs, "voldoet_zeteleis_decentraal")? {
             "daar geen zetel is toegewezen"
         } else {
             "niet aan de voorwaarden van artikel 7 is voldaan"
@@ -422,133 +528,202 @@ fn build_motivering(
 }
 
 /// Voer de wet uit voor elke component van een jaaraanvraag en stel het
-/// samengestelde verleningsbesluit op. `totaal_leden` is de noemer van de
-/// ledencomponent (art. 14, onderdeel a): de som van de opgegeven
-/// ledentallen van alle aanvragen voor het subsidiejaar — aggregatie over
-/// aanvragen is bewust orchestratie en geen wet (RFC-012).
+/// samengestelde verleningsbesluit op. De rekendatum is de peildatum van
+/// het subsidiejaar (art. 17: 1 januari); daarmee selecteert de engine ook
+/// de wetversies die voor dat jaar gelden. `totaal_leden` is de noemer van
+/// de ledencomponent (art. 14, onderdeel a) — aggregatie over aanvragen is
+/// bewust orchestratie en geen wet (RFC-012).
 pub async fn evaluate_jaaraanvraag(
     corpus: Arc<LawCorpus>,
     componenten: Vec<Component>,
     eigen: serde_json::Map<String, serde_json::Value>,
-    date: String,
+    peildatum: String,
     subsidiejaar: i64,
     totaal_leden: i64,
 ) -> anyhow::Result<JaaruitkomstUitkomst> {
     tokio::task::spawn_blocking(move || {
-        let service = service_with_corpus(&corpus)?;
+        with_service(&corpus, |service| {
+            let mut uitkomsten: Vec<ComponentUitkomst> = Vec::new();
+            let mut bewijs_componenten: Vec<serde_json::Value> = Vec::new();
+            let mut totaal: i64 = 0;
+            let mut betaal_totaal: i64 = 0;
+            let mut bezwaartermijn_weken = 0;
+            let mut motivering_vereist = false;
 
-        let mut uitkomsten: Vec<ComponentUitkomst> = Vec::new();
-        let mut totaal: i64 = 0;
-        let mut betaal_totaal: i64 = 0;
-        let mut bezwaartermijn_weken = 0;
-        let mut motivering_vereist = false;
-        let mut voldoet_transparantie = true;
+            for component in &componenten {
+                let params = component_params(component, &eigen, totaal_leden);
+                // De eisen-outputs (art. 6/7) worden in dezelfde evaluatie
+                // opgevraagd als het besluit: motivering en bewijs komen zo
+                // per definitie uit dezelfde berekening.
+                let gevraagd: &[&str] = if component.soort == "LANDELIJK" {
+                    &[
+                        "subsidie_toegekend",
+                        "subsidiebedrag",
+                        "voldoet_zeteleis_landelijk",
+                        "voldoet_ledeneis",
+                    ]
+                } else {
+                    &[
+                        "subsidie_toegekend",
+                        "subsidiebedrag",
+                        "voldoet_zeteleis_decentraal",
+                    ]
+                };
+                let result = service
+                    .evaluate_law(WPP_ID, gevraagd, params.clone(), &peildatum)
+                    .map_err(|e| {
+                        anyhow::anyhow!("berekening onderdeel {} mislukt: {e}", component.key)
+                    })?;
 
-        for component in &componenten {
-            let params = component_params(component, &eigen, totaal_leden);
-            let result = service
-                .evaluate_law(
-                    WPP_ID,
-                    &["subsidie_toegekend", "subsidiebedrag"],
-                    params.clone(),
-                    &date,
-                )
-                .map_err(|e| {
-                    anyhow::anyhow!("berekening onderdeel {} mislukt: {e}", component.key)
-                })?;
+                let toegekend = req_bool(&result.outputs, "subsidie_toegekend")?;
+                let bedrag = req_int(&result.outputs, "subsidiebedrag")?;
+                totaal += bedrag;
+                // Hook-outputs: art. 16 vuurt alleen bij toekenning, de
+                // AWB-hooks op hun stage — afwezigheid is hier legitiem.
+                betaal_totaal += hook_int(&result.outputs, "betaalopdracht_bedrag");
+                bezwaartermijn_weken = hook_int(&result.outputs, "bezwaartermijn_weken");
+                motivering_vereist |= hook_bool(&result.outputs, "motivering_vereist");
 
-            let toegekend = as_bool(&result.outputs, "subsidie_toegekend");
-            let bedrag = as_int(&result.outputs, "subsidiebedrag");
-            totaal += bedrag;
-            betaal_totaal += as_int(&result.outputs, "betaalopdracht_bedrag");
-            bezwaartermijn_weken = as_int(&result.outputs, "bezwaartermijn_weken");
-            motivering_vereist |= as_bool(&result.outputs, "motivering_vereist");
-
-            // De specificatie van de landelijke component: de vier delen van
-            // art. 14 (partij + geoormerkte bedragen neveninstellingen).
-            let delen = if component.soort == "LANDELIJK" && toegekend {
-                let delen_result = service
-                    .evaluate_law(
-                        WPP_ID,
-                        &[
-                            "subsidie_partij",
+                // De specificatie van de landelijke component: de vier delen
+                // van art. 14 (partij + geoormerkte bedragen).
+                let mut delen_outputs: Option<serde_json::Value> = None;
+                let delen = if component.soort == "LANDELIJK" && toegekend {
+                    let delen_result = service
+                        .evaluate_law(
+                            WPP_ID,
+                            &[
+                                "subsidie_partij",
+                                "subsidie_wetenschappelijk_instituut",
+                                "subsidie_jongerenorganisatie",
+                                "subsidie_buitenland",
+                            ],
+                            params.clone(),
+                            &peildatum,
+                        )
+                        .map_err(|e| anyhow::anyhow!("specificatie art. 14 mislukt: {e}"))?;
+                    delen_outputs = serde_json::to_value(&delen_result.outputs).ok();
+                    Some(LandelijkeDelen {
+                        partij: req_int(&delen_result.outputs, "subsidie_partij")?,
+                        wetenschappelijk_instituut: req_int(
+                            &delen_result.outputs,
                             "subsidie_wetenschappelijk_instituut",
+                        )?,
+                        jongerenorganisatie: req_int(
+                            &delen_result.outputs,
                             "subsidie_jongerenorganisatie",
-                            "subsidie_buitenland",
-                        ],
-                        params.clone(),
-                        &date,
-                    )
-                    .map_err(|e| anyhow::anyhow!("specificatie art. 14 mislukt: {e}"))?;
-                Some(LandelijkeDelen {
-                    partij: as_int(&delen_result.outputs, "subsidie_partij"),
-                    wetenschappelijk_instituut: as_int(
-                        &delen_result.outputs,
-                        "subsidie_wetenschappelijk_instituut",
-                    ),
-                    jongerenorganisatie: as_int(
-                        &delen_result.outputs,
-                        "subsidie_jongerenorganisatie",
-                    ),
-                    buitenland: as_int(&delen_result.outputs, "subsidie_buitenland"),
-                })
-            } else {
-                None
+                        )?,
+                        buitenland: req_int(&delen_result.outputs, "subsidie_buitenland")?,
+                    })
+                } else {
+                    None
+                };
+
+                // Bij afwijzing levert dezelfde evaluatie de gefaalde
+                // voorwaarde; hier wordt alleen de zin samengesteld.
+                let grond = if toegekend {
+                    None
+                } else {
+                    Some(afwijzingsgrond(component, &result.outputs)?)
+                };
+
+                let mut bewijs_component = json!({
+                    "key": component.key,
+                    "parameters": serde_json::to_value(&params).unwrap_or_default(),
+                    "outputs": serde_json::to_value(&result.outputs).unwrap_or_default(),
+                });
+                if let Some(d) = delen_outputs {
+                    bewijs_component["delen_outputs"] = d;
+                }
+                bewijs_componenten.push(bewijs_component);
+
+                uitkomsten.push(ComponentUitkomst {
+                    component: component.clone(),
+                    toegekend,
+                    bedrag,
+                    delen,
+                    afwijzingsgrond: grond,
+                });
+            }
+
+            // Transparantie geldt op rechtspersoonsniveau; één toets volstaat.
+            let (transparantie, transparantie_outputs) = match componenten.first() {
+                Some(component) => {
+                    let result = service
+                        .evaluate_law(
+                            WPP_ID,
+                            &[
+                                "voldoet_aan_transparantie",
+                                "voldoet_verbod_anonieme_giften",
+                                "voldoet_verbod_giften_niet_ingezetenen",
+                                "voldoet_meldplicht_giften",
+                                "voldoet_openbaarmaking_financien",
+                            ],
+                            component_params(component, &eigen, totaal_leden),
+                            &peildatum,
+                        )
+                        .map_err(|e| anyhow::anyhow!("toetsing transparantie mislukt: {e}"))?;
+                    let toets = TransparantieToets {
+                        voldoet: req_bool(&result.outputs, "voldoet_aan_transparantie")?,
+                        verbod_anonieme_giften: req_bool(
+                            &result.outputs,
+                            "voldoet_verbod_anonieme_giften",
+                        )?,
+                        verbod_giften_niet_ingezetenen: req_bool(
+                            &result.outputs,
+                            "voldoet_verbod_giften_niet_ingezetenen",
+                        )?,
+                        meldplicht_giften: req_bool(&result.outputs, "voldoet_meldplicht_giften")?,
+                        openbaarmaking_financien: req_bool(
+                            &result.outputs,
+                            "voldoet_openbaarmaking_financien",
+                        )?,
+                    };
+                    let outputs = serde_json::to_value(&result.outputs).unwrap_or_default();
+                    (toets, outputs)
+                }
+                None => (
+                    TransparantieToets {
+                        voldoet: true,
+                        verbod_anonieme_giften: true,
+                        verbod_giften_niet_ingezetenen: true,
+                        meldplicht_giften: true,
+                        openbaarmaking_financien: true,
+                    },
+                    serde_json::Value::Null,
+                ),
             };
 
-            // Bij afwijzing levert de wet de gefaalde voorwaarde; hier wordt
-            // alleen de zin samengesteld.
-            let grond = if toegekend {
-                None
-            } else {
-                Some(afwijzingsgrond(&service, component, params, &date)?)
-            };
+            let toegekend = uitkomsten.iter().any(|u| u.toegekend);
+            let motivering = build_motivering(
+                &transparantie,
+                &uitkomsten,
+                totaal,
+                subsidiejaar,
+                betaal_totaal,
+            );
 
-            uitkomsten.push(ComponentUitkomst {
-                component: component.clone(),
-                toegekend,
-                bedrag,
-                delen,
-                afwijzingsgrond: grond,
+            // Het bewijs: waarop dit besluit is gebaseerd, herleidbaar
+            // vastgelegd (peildatum, wetversies, feiten en oordelen).
+            let bewijs = json!({
+                "peildatum": peildatum,
+                "wetten": corpus.versies,
+                "totaal_aantal_betalende_leden": totaal_leden,
+                "componenten": bewijs_componenten,
+                "transparantie_outputs": transparantie_outputs,
             });
-        }
 
-        // Transparantie geldt op rechtspersoonsniveau; één toets volstaat.
-        let transparantie = match componenten.first() {
-            Some(component) => transparantie_toets(
-                &service,
-                component_params(component, &eigen, totaal_leden),
-                &date,
-            )?,
-            None => TransparantieToets {
-                voldoet: true,
-                verbod_anonieme_giften: true,
-                verbod_giften_niet_ingezetenen: true,
-                meldplicht_giften: true,
-                openbaarmaking_financien: true,
-            },
-        };
-        voldoet_transparantie = transparantie.voldoet;
-
-        let toegekend = uitkomsten.iter().any(|u| u.toegekend);
-        let motivering = build_motivering(
-            &transparantie,
-            &uitkomsten,
-            totaal,
-            subsidiejaar,
-            betaal_totaal,
-        );
-
-        Ok(JaaruitkomstUitkomst {
-            subsidie_toegekend: toegekend,
-            subsidiebedrag: totaal,
-            betaalopdracht_vereist: betaal_totaal > 0,
-            betaalopdracht_bedrag: betaal_totaal,
-            bezwaartermijn_weken,
-            motivering_vereist,
-            voldoet_aan_transparantie: voldoet_transparantie,
-            componenten: uitkomsten,
-            motivering,
+            Ok(JaaruitkomstUitkomst {
+                subsidie_toegekend: toegekend,
+                subsidiebedrag: totaal,
+                betaalopdracht_vereist: betaal_totaal > 0,
+                betaalopdracht_bedrag: betaal_totaal,
+                bezwaartermijn_weken,
+                motivering_vereist,
+                voldoet_aan_transparantie: transparantie.voldoet,
+                componenten: uitkomsten,
+                motivering,
+                bewijs,
+            })
         })
     })
     .await?
@@ -562,41 +737,42 @@ pub async fn evaluate_jaaraanvraag(
 pub async fn ledentotaal(
     corpus: Arc<LawCorpus>,
     opgaven: Vec<crate::db::LandelijkeOpgave>,
-    date: String,
+    peildatum: String,
 ) -> anyhow::Result<i64> {
     tokio::task::spawn_blocking(move || {
-        let service = service_with_corpus(&corpus)?;
-        let mut totaal: i64 = 0;
-        for opgave in &opgaven {
-            let leden = opgave
-                .parameters
-                .get("aantal_betalende_leden")
-                .and_then(|v| v.as_i64())
-                .unwrap_or(0);
-            let mut params: BTreeMap<String, Value> = BTreeMap::new();
-            params.insert("aantal_kamerzetels".into(), Value::Int(opgave.zetels));
-            params.insert("aantal_betalende_leden".into(), Value::Int(leden));
-            for key in [
-                "ontvangt_anonieme_giften",
-                "ontvangt_giften_niet_ingezetenen",
-                "voldoet_aan_meldplicht_giften",
-                "financien_openbaar_op_website",
-            ] {
-                let waarde = opgave
+        with_service(&corpus, |service| {
+            let mut totaal: i64 = 0;
+            for opgave in &opgaven {
+                let leden = opgave
                     .parameters
-                    .get(key)
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(false);
-                params.insert(key.to_string(), Value::Bool(waarde));
+                    .get("aantal_betalende_leden")
+                    .and_then(|v| v.as_i64())
+                    .unwrap_or(0);
+                let mut params: BTreeMap<String, Value> = BTreeMap::new();
+                params.insert("aantal_kamerzetels".into(), Value::Int(opgave.zetels));
+                params.insert("aantal_betalende_leden".into(), Value::Int(leden));
+                for key in [
+                    "ontvangt_anonieme_giften",
+                    "ontvangt_giften_niet_ingezetenen",
+                    "voldoet_aan_meldplicht_giften",
+                    "financien_openbaar_op_website",
+                ] {
+                    let waarde = opgave
+                        .parameters
+                        .get(key)
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
+                    params.insert(key.to_string(), Value::Bool(waarde));
+                }
+                let result = service
+                    .evaluate_law(WPP_ID, &["heeft_recht_landelijk"], params, &peildatum)
+                    .map_err(|e| anyhow::anyhow!("toetsing ledenbudget-opgave mislukt: {e}"))?;
+                if req_bool(&result.outputs, "heeft_recht_landelijk")? {
+                    totaal += leden;
+                }
             }
-            let result = service
-                .evaluate_law(WPP_ID, &["heeft_recht_landelijk"], params, &date)
-                .map_err(|e| anyhow::anyhow!("toetsing ledenbudget-opgave mislukt: {e}"))?;
-            if as_bool(&result.outputs, "heeft_recht_landelijk") {
-                totaal += leden;
-            }
-        }
-        Ok(totaal)
+            Ok(totaal)
+        })
     })
     .await?
 }
@@ -621,34 +797,29 @@ pub async fn evaluate_termijnen(
     date: String,
 ) -> anyhow::Result<TermijnenUitkomst> {
     tokio::task::spawn_blocking(move || {
-        let service = service_with_corpus(&corpus)?;
-        let mut params = BTreeMap::new();
-        params.insert(
-            "subsidiejaar_startdatum".to_string(),
-            Value::String(format!("{subsidiejaar}-01-01")),
-        );
-        let result = service
-            .evaluate_law(
-                WPP_ID,
-                &[
-                    "aanvraagtermijn_einddatum",
-                    "beslistermijn_einddatum",
-                    "voorschotpercentage",
-                ],
-                params,
-                &date,
-            )
-            .map_err(|e| anyhow::anyhow!("termijnen art. 17 berekenen mislukt: {e}"))?;
-        let as_date = |name: &str| -> String {
-            match result.outputs.get(name) {
-                Some(Value::String(s)) => s.clone(),
-                other => format!("{other:?}"),
-            }
-        };
-        Ok(TermijnenUitkomst {
-            aanvraagtermijn_einddatum: as_date("aanvraagtermijn_einddatum"),
-            beslistermijn_einddatum: as_date("beslistermijn_einddatum"),
-            voorschotpercentage: as_int(&result.outputs, "voorschotpercentage"),
+        with_service(&corpus, |service| {
+            let mut params = BTreeMap::new();
+            params.insert(
+                "subsidiejaar_startdatum".to_string(),
+                Value::String(format!("{subsidiejaar}-01-01")),
+            );
+            let result = service
+                .evaluate_law(
+                    WPP_ID,
+                    &[
+                        "aanvraagtermijn_einddatum",
+                        "beslistermijn_einddatum",
+                        "voorschotpercentage",
+                    ],
+                    params,
+                    &date,
+                )
+                .map_err(|e| anyhow::anyhow!("termijnen art. 17 berekenen mislukt: {e}"))?;
+            Ok(TermijnenUitkomst {
+                aanvraagtermijn_einddatum: req_date(&result.outputs, "aanvraagtermijn_einddatum")?,
+                beslistermijn_einddatum: req_date(&result.outputs, "beslistermijn_einddatum")?,
+                voorschotpercentage: req_int(&result.outputs, "voorschotpercentage")?,
+            })
         })
     })
     .await?
@@ -667,67 +838,78 @@ pub struct RekeningToets {
 pub async fn evaluate_rekening(
     corpus: Arc<LawCorpus>,
     rekening_op_naam_van_rechtspersoon: bool,
-    handelt_als_tekenbevoegd_bestuur: bool,
+    eherkenning_volledige_machtiging: bool,
     rekening_bekend: bool,
     date: String,
 ) -> anyhow::Result<RekeningToets> {
     tokio::task::spawn_blocking(move || {
-        let service = service_with_corpus(&corpus)?;
-        let mut params: BTreeMap<String, Value> = BTreeMap::new();
-        params.insert(
-            "rekening_op_naam_van_rechtspersoon".into(),
-            Value::Bool(rekening_op_naam_van_rechtspersoon),
-        );
-        params.insert(
-            "handelt_als_tekenbevoegd_bestuur".into(),
-            Value::Bool(handelt_als_tekenbevoegd_bestuur),
-        );
-        params.insert("rekening_bekend".into(), Value::Bool(rekening_bekend));
-        let result = service
-            .evaluate_law(
-                WPP_ID,
-                &[
-                    "rekening_aanvaardbaar",
-                    "mag_rekening_wijzigen",
-                    "uitbetaling_aangehouden",
-                ],
-                params,
-                &date,
-            )
-            .map_err(|e| anyhow::anyhow!("toetsing artikel 27 mislukt: {e}"))?;
-        Ok(RekeningToets {
-            rekening_aanvaardbaar: as_bool(&result.outputs, "rekening_aanvaardbaar"),
-            mag_rekening_wijzigen: as_bool(&result.outputs, "mag_rekening_wijzigen"),
-            uitbetaling_aangehouden: as_bool(&result.outputs, "uitbetaling_aangehouden"),
+        with_service(&corpus, |service| {
+            let mut params: BTreeMap<String, Value> = BTreeMap::new();
+            params.insert(
+                "rekening_op_naam_van_rechtspersoon".into(),
+                Value::Bool(rekening_op_naam_van_rechtspersoon),
+            );
+            params.insert(
+                "eherkenning_volledige_machtiging".into(),
+                Value::Bool(eherkenning_volledige_machtiging),
+            );
+            params.insert("rekening_bekend".into(), Value::Bool(rekening_bekend));
+            let result = service
+                .evaluate_law(
+                    WPP_ID,
+                    &[
+                        "rekening_aanvaardbaar",
+                        "mag_rekening_wijzigen",
+                        "uitbetaling_aangehouden",
+                    ],
+                    params,
+                    &date,
+                )
+                .map_err(|e| anyhow::anyhow!("toetsing artikel 27 mislukt: {e}"))?;
+            Ok(RekeningToets {
+                rekening_aanvaardbaar: req_bool(&result.outputs, "rekening_aanvaardbaar")?,
+                mag_rekening_wijzigen: req_bool(&result.outputs, "mag_rekening_wijzigen")?,
+                uitbetaling_aangehouden: req_bool(&result.outputs, "uitbetaling_aangehouden")?,
+            })
         })
     })
     .await?
 }
 
 /// Het oordeel van art. 13 (eenmalige verstrekking per subsidiejaar) per
-/// onderdeel. De orchestratie levert per onderdeel het feit of er al een
-/// aanvraag loopt of subsidie is toegekend; de wet beslist of het
-/// onderdeel nog beschikbaar is.
+/// onderdeel. De orchestratie levert per onderdeel de rauwe feiten uit de
+/// aanvragentabel (loopt er een aanvraag, is er toegekend, is er
+/// afgewezen); de wet beslist wat blokkeert — en dus ook dat een eerdere
+/// afwijzing níét blokkeert.
 pub async fn beschikbare_onderdelen(
     corpus: Arc<LawCorpus>,
-    al_bezet: Vec<bool>,
+    feiten: Vec<OnderdeelFeiten>,
     date: String,
 ) -> anyhow::Result<Vec<bool>> {
     tokio::task::spawn_blocking(move || {
-        let service = service_with_corpus(&corpus)?;
-        let mut beschikbaar = Vec::with_capacity(al_bezet.len());
-        for bezet in al_bezet {
-            let mut params: BTreeMap<String, Value> = BTreeMap::new();
-            params.insert(
-                "onderdeel_al_aangevraagd_of_toegekend".into(),
-                Value::Bool(bezet),
-            );
-            let result = service
-                .evaluate_law(WPP_ID, &["onderdeel_beschikbaar"], params, &date)
-                .map_err(|e| anyhow::anyhow!("toetsing artikel 13 mislukt: {e}"))?;
-            beschikbaar.push(as_bool(&result.outputs, "onderdeel_beschikbaar"));
-        }
-        Ok(beschikbaar)
+        with_service(&corpus, |service| {
+            let mut beschikbaar = Vec::with_capacity(feiten.len());
+            for feit in &feiten {
+                let mut params: BTreeMap<String, Value> = BTreeMap::new();
+                params.insert(
+                    "onderdeel_in_behandeling".into(),
+                    Value::Bool(feit.in_behandeling),
+                );
+                params.insert(
+                    "onderdeel_eerder_toegekend".into(),
+                    Value::Bool(feit.eerder_toegekend),
+                );
+                params.insert(
+                    "onderdeel_eerder_afgewezen".into(),
+                    Value::Bool(feit.eerder_afgewezen),
+                );
+                let result = service
+                    .evaluate_law(WPP_ID, &["onderdeel_beschikbaar"], params, &date)
+                    .map_err(|e| anyhow::anyhow!("toetsing artikel 13 mislukt: {e}"))?;
+                beschikbaar.push(req_bool(&result.outputs, "onderdeel_beschikbaar")?);
+            }
+            Ok(beschikbaar)
+        })
     })
     .await?
 }
@@ -752,41 +934,39 @@ pub async fn evaluate_registratie_eisen(
     date: String,
 ) -> anyhow::Result<RegistratieToets> {
     tokio::task::spawn_blocking(move || {
-        let mut service = LawExecutionService::new();
-        service
-            .load_law(&corpus.kieswet)
-            .map_err(|e| anyhow::anyhow!("laden Kieswet mislukt: {e}"))?;
-        let mut params: BTreeMap<String, Value> = BTreeMap::new();
-        params.insert(
-            "ingeschreven_in_handelsregister".into(),
-            Value::Bool(toets.gevonden),
-        );
-        params.insert(
-            "rechtsvorm".into(),
-            Value::String(toets.rechtsvorm.clone().unwrap_or_default()),
-        );
-        params.insert("naam_komt_overeen".into(), Value::Bool(toets.naam_match));
-        let result = service
-            .evaluate_law(
-                KIESWET_ID,
-                &[
+        with_service(&corpus, |service| {
+            let mut params: BTreeMap<String, Value> = BTreeMap::new();
+            params.insert(
+                "ingeschreven_in_handelsregister".into(),
+                Value::Bool(toets.gevonden),
+            );
+            params.insert(
+                "rechtsvorm".into(),
+                Value::String(toets.rechtsvorm.clone().unwrap_or_default()),
+            );
+            params.insert("naam_komt_overeen".into(), Value::Bool(toets.naam_match));
+            let result = service
+                .evaluate_law(
+                    KIESWET_ID,
+                    &[
+                        "voldoet_aan_registratie_eisen",
+                        "voldoet_eis_inschrijving",
+                        "voldoet_eis_rechtsvorm",
+                        "voldoet_eis_naam",
+                    ],
+                    params,
+                    &date,
+                )
+                .map_err(|e| anyhow::anyhow!("toetsing Kieswet G 1 mislukt: {e}"))?;
+            Ok(RegistratieToets {
+                voldoet_aan_registratie_eisen: req_bool(
+                    &result.outputs,
                     "voldoet_aan_registratie_eisen",
-                    "voldoet_eis_inschrijving",
-                    "voldoet_eis_rechtsvorm",
-                    "voldoet_eis_naam",
-                ],
-                params,
-                &date,
-            )
-            .map_err(|e| anyhow::anyhow!("toetsing Kieswet G 1 mislukt: {e}"))?;
-        Ok(RegistratieToets {
-            voldoet_aan_registratie_eisen: as_bool(
-                &result.outputs,
-                "voldoet_aan_registratie_eisen",
-            ),
-            voldoet_eis_inschrijving: as_bool(&result.outputs, "voldoet_eis_inschrijving"),
-            voldoet_eis_rechtsvorm: as_bool(&result.outputs, "voldoet_eis_rechtsvorm"),
-            voldoet_eis_naam: as_bool(&result.outputs, "voldoet_eis_naam"),
+                )?,
+                voldoet_eis_inschrijving: req_bool(&result.outputs, "voldoet_eis_inschrijving")?,
+                voldoet_eis_rechtsvorm: req_bool(&result.outputs, "voldoet_eis_rechtsvorm")?,
+                voldoet_eis_naam: req_bool(&result.outputs, "voldoet_eis_naam")?,
+            })
         })
     })
     .await?
@@ -799,42 +979,37 @@ pub async fn evaluate_bezwaartermijn(
     bekendmaking_datum: String,
 ) -> anyhow::Result<BezwaartermijnUitkomst> {
     tokio::task::spawn_blocking(move || {
-        let service = service_with_corpus(&corpus)?;
-        let mut params = BTreeMap::new();
-        params.insert(
-            "bekendmaking_datum".to_string(),
-            Value::String(bekendmaking_datum.clone()),
-        );
-        let result = service
-            .evaluate_law(
-                AWB_ID,
-                &["bezwaartermijn_startdatum", "bezwaartermijn_einddatum"],
-                params,
-                &bekendmaking_datum,
-            )
-            .map_err(|e| anyhow::anyhow!("bezwaartermijn berekenen mislukt: {e}"))?;
-        let as_date = |outputs: &BTreeMap<String, Value>, name: &str| -> String {
-            match outputs.get(name) {
-                Some(Value::String(s)) => s.clone(),
-                other => format!("{other:?}"),
-            }
-        };
-        let einddatum = as_date(&result.outputs, "bezwaartermijn_einddatum");
+        with_service(&corpus, |service| {
+            let mut params = BTreeMap::new();
+            params.insert(
+                "bekendmaking_datum".to_string(),
+                Value::String(bekendmaking_datum.clone()),
+            );
+            let result = service
+                .evaluate_law(
+                    AWB_ID,
+                    &["bezwaartermijn_startdatum", "bezwaartermijn_einddatum"],
+                    params,
+                    &bekendmaking_datum,
+                )
+                .map_err(|e| anyhow::anyhow!("bezwaartermijn berekenen mislukt: {e}"))?;
+            let einddatum = req_date(&result.outputs, "bezwaartermijn_einddatum")?;
 
-        let mut atw_params = BTreeMap::new();
-        atw_params.insert("einddatum".to_string(), Value::String(einddatum.clone()));
-        let verlengd = service
-            .evaluate_law(
-                ATW_ID,
-                &["verlengde_einddatum"],
-                atw_params,
-                &bekendmaking_datum,
-            )
-            .map_err(|e| anyhow::anyhow!("termijnverlenging berekenen mislukt: {e}"))?;
+            let mut atw_params = BTreeMap::new();
+            atw_params.insert("einddatum".to_string(), Value::String(einddatum.clone()));
+            let verlengd = service
+                .evaluate_law(
+                    ATW_ID,
+                    &["verlengde_einddatum"],
+                    atw_params,
+                    &bekendmaking_datum,
+                )
+                .map_err(|e| anyhow::anyhow!("termijnverlenging berekenen mislukt: {e}"))?;
 
-        Ok(BezwaartermijnUitkomst {
-            startdatum: as_date(&result.outputs, "bezwaartermijn_startdatum"),
-            einddatum: as_date(&verlengd.outputs, "verlengde_einddatum"),
+            Ok(BezwaartermijnUitkomst {
+                startdatum: req_date(&result.outputs, "bezwaartermijn_startdatum")?,
+                einddatum: req_date(&verlengd.outputs, "verlengde_einddatum")?,
+            })
         })
     })
     .await?
@@ -872,5 +1047,33 @@ mod tests {
         assert!(p.transitie(STAGE_BESLUIT, STAGE_BESLUIT).is_err());
         assert!(p.transitie(STAGE_BEZWAAR, STAGE_BESLUIT).is_err());
         assert!(p.transitie("ONBEKEND", STAGE_BESLUIT).is_err());
+    }
+
+    /// Elke output waarnaar de orchestratie verwijst bestaat in de echte
+    /// wetteksten. Hernoemt iemand een output in de YAML zonder de
+    /// uitvoering mee te nemen, dan faalt deze test (en de startup).
+    #[test]
+    fn contract_houdt_tegen_de_echte_wetteksten() {
+        let corpus = Arc::new(LawCorpus::embedded());
+        valideer_contract(&corpus).expect("contract wet↔uitvoering");
+    }
+
+    /// Een verwijzing naar een niet-bestaande output wordt gemeld met de
+    /// naam van de output en de wet.
+    #[test]
+    fn contractbreuk_wordt_luid_gemeld() {
+        let corpus = Arc::new(LawCorpus::embedded());
+        let fout = with_service(&corpus, |service| {
+            if service
+                .resolver()
+                .get_article_by_output(WPP_ID, "bestaat_niet", None)
+                .is_none()
+            {
+                anyhow::bail!("contractbreuk wet↔uitvoering: output 'bestaat_niet'");
+            }
+            Ok(())
+        })
+        .expect_err("onbekende output hoort te falen");
+        assert!(fout.to_string().contains("bestaat_niet"));
     }
 }

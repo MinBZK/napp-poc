@@ -37,7 +37,10 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let corpus = Arc::new(LawCorpus::load()?);
-    tracing::info!("wetscorpus geladen (Wpp, regeling, AWB)");
+    // Fail-loud contract: elke output waarnaar de orchestratie verwijst
+    // moet in de geladen corpus bestaan, anders start de applicatie niet.
+    engine::valideer_contract(&corpus)?;
+    tracing::info!("wetscorpus geladen en contract wet↔uitvoering gevalideerd");
 
     let database_url =
         std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite:napp.db?mode=rwc".to_string());

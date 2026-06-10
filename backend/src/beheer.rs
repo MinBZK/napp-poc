@@ -222,14 +222,7 @@ mod tests {
             .expect("afdeling fixture");
         AppState {
             pool,
-            corpus: Arc::new(LawCorpus {
-                wpp: String::new(),
-                regeling: String::new(),
-                besluit_decentraal: String::new(),
-                awb: String::new(),
-                termijnenwet: String::new(),
-                kieswet: String::new(),
-            }),
+            corpus: Arc::new(LawCorpus::embedded()),
             procedure: Arc::new(
                 crate::engine::beschikking_procedure(include_str!(
                     "../../law/wet_op_de_politieke_partijen/2026-01-01.yaml"

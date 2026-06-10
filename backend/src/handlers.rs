@@ -179,7 +179,7 @@ pub async fn mijn_registratie(
         .await
         .map_err(internal_error)?
         .filter(|p| !p.is_ongekoppeld());
-    let bezet = db::bezette_componenten(&state.pool, &kvk, jaar)
+    let feiten = db::onderdeel_feiten(&state.pool, &kvk, jaar)
         .await
         .map_err(internal_error)?;
     let termijnen = engine::evaluate_termijnen(state.corpus.clone(), jaar, vandaag)
@@ -196,10 +196,16 @@ pub async fn mijn_registratie(
     let aanspraken: Vec<serde_json::Value> = componenten
         .iter()
         .map(|c| {
-            let status = bezet
-                .get(&c.key)
-                .cloned()
-                .unwrap_or_else(|| "BESCHIKBAAR".to_string());
+            // Weergavelabel uit de rauwe feiten; wat een nieuwe aanvraag
+            // blokkeert beslist art. 13 bij het indienen.
+            let feit = feiten.get(&c.key).copied().unwrap_or_default();
+            let status = if feit.in_behandeling {
+                "IN_BEHANDELING"
+            } else if feit.eerder_toegekend {
+                "TOEGEKEND"
+            } else {
+                "BESCHIKBAAR"
+            };
             let mut v = serde_json::to_value(c).unwrap_or_default();
             v["status"] = json!(status);
             v
@@ -322,6 +328,7 @@ async fn ledentotaal_voor(
     state: &AppState,
     jaar: i64,
     eigen: Option<db::LandelijkeOpgave>,
+    peildatum: &str,
 ) -> Result<i64, ApiError> {
     let mut opgaven = db::landelijke_opgaven(&state.pool, jaar)
         .await
@@ -329,10 +336,16 @@ async fn ledentotaal_voor(
     if let Some(opgave) = eigen {
         opgaven.push(opgave);
     }
-    let vandaag = Utc::now().format("%Y-%m-%d").to_string();
-    engine::ledentotaal(state.corpus.clone(), opgaven, vandaag)
+    engine::ledentotaal(state.corpus.clone(), opgaven, peildatum.to_string())
         .await
         .map_err(internal_error)
+}
+
+/// De peildatum voor de gegevens en de berekening van een subsidiejaar:
+/// 1 januari van dat jaar (Wpp art. 17). Hiermee selecteert de engine ook
+/// de wetversies die voor het subsidiejaar gelden.
+fn peildatum_voor(subsidiejaar: i64) -> String {
+    format!("{subsidiejaar}-01-01")
 }
 
 /// Demo-voorbeelden voor de gemockte eHerkenning-login (alleen metadata).
@@ -487,17 +500,18 @@ pub async fn create_aanvraag(
         componenten.push(c.clone());
     }
 
-    // Eenmalige verstrekking per subsidiejaar (art. 13): de feiten komen
-    // uit de aanvragentabel, het oordeel per onderdeel komt uit de wet.
-    let bezet = db::bezette_componenten(&state.pool, &kvk, jaar)
+    // Eenmalige verstrekking per subsidiejaar (art. 13): de rauwe feiten
+    // komen uit de aanvragentabel, het oordeel per onderdeel komt uit de
+    // wet — inclusief de regel dat een eerdere afwijzing niet blokkeert.
+    let feiten = db::onderdeel_feiten(&state.pool, &kvk, jaar)
         .await
         .map_err(internal_error)?;
-    let al_bezet: Vec<bool> = componenten
+    let per_onderdeel: Vec<db::OnderdeelFeiten> = componenten
         .iter()
-        .map(|c| bezet.contains_key(&c.key))
+        .map(|c| feiten.get(&c.key).copied().unwrap_or_default())
         .collect();
     let beschikbaar =
-        engine::beschikbare_onderdelen(state.corpus.clone(), al_bezet, vandaag.clone())
+        engine::beschikbare_onderdelen(state.corpus.clone(), per_onderdeel, vandaag.clone())
             .await
             .map_err(internal_error)?;
     if let Some(c) = componenten
@@ -615,12 +629,13 @@ pub async fn proef_aanspraken(
             zetels: c.zetels,
             parameters: eigen.clone(),
         });
-    let totaal_leden = ledentotaal_voor(&state, jaar, eigen_opgave).await?;
+    let peildatum = peildatum_voor(jaar);
+    let totaal_leden = ledentotaal_voor(&state, jaar, eigen_opgave, &peildatum).await?;
     let uitkomst = engine::evaluate_jaaraanvraag(
         state.corpus.clone(),
         componenten,
         eigen,
-        vandaag,
+        peildatum,
         jaar,
         totaal_leden,
     )
@@ -805,6 +820,7 @@ pub async fn stel_besluit_vast(
         &uitkomst.motivering,
         &vandaag,
         &beoordelaar,
+        &serde_json::to_string(&uitkomst.bewijs).map_err(internal_error)?,
     )
     .await
     .map_err(internal_error)?;
@@ -819,14 +835,23 @@ pub async fn stel_besluit_vast(
     // levert alleen het feit dat er (g)een rekening bekend is.
     let mut betaalopdracht_status: Option<&str> = None;
     if uitkomst.betaalopdracht_vereist {
-        let rekening = crate::register::partij_by_kvk(&state.pool, &aanvraag.kvk_nummer)
+        let partij = crate::register::partij_by_kvk(&state.pool, &aanvraag.kvk_nummer)
             .await
-            .map_err(internal_error)?
-            .and_then(|p| p.iban.zip(p.iban_tenaamstelling));
+            .map_err(internal_error)?;
+        let rekening = partij
+            .as_ref()
+            .and_then(|p| p.iban.clone().zip(p.iban_tenaamstelling.clone()));
+        // Het naam-feit wordt hier opnieuw vastgesteld tegen de huidige
+        // registratie, niet afgeleid uit "er is een rekening opgeslagen".
+        let op_naam = match (&partij, &rekening) {
+            (Some(p), Some((_, tenaamstelling))) => {
+                crate::rekening::naam_komt_overeen(tenaamstelling, Some(&p.naam))
+            }
+            _ => false,
+        };
         let toets = engine::evaluate_rekening(
             state.corpus.clone(),
-            // De opgeslagen rekening is bij opgave al op naam getoetst.
-            rekening.is_some(),
+            op_naam,
             false,
             rekening.is_some(),
             vandaag.clone(),
@@ -876,15 +901,15 @@ async fn run_engine(
     let serde_json::Value::Object(eigen) = aanvraag.parameters.clone() else {
         return Err(internal_error("aanvraagparameters zijn geen object"));
     };
-    let vandaag = Utc::now().format("%Y-%m-%d").to_string();
+    let peildatum = peildatum_voor(aanvraag.subsidiejaar);
     // De eigen aanvraag staat al in de aanvragentabel en telt dus al mee in
     // het ledentotaal van het subsidiejaar.
-    let totaal_leden = ledentotaal_voor(state, aanvraag.subsidiejaar, None).await?;
+    let totaal_leden = ledentotaal_voor(state, aanvraag.subsidiejaar, None, &peildatum).await?;
     engine::evaluate_jaaraanvraag(
         state.corpus.clone(),
         aanvraag.componenten.clone(),
         eigen,
-        vandaag,
+        peildatum,
         aanvraag.subsidiejaar,
         totaal_leden,
     )

@@ -37,6 +37,9 @@ pub async fn init(pool: &SqlitePool) -> anyhow::Result<()> {
             bezwaartermijn_startdatum TEXT,
             bezwaartermijn_einddatum TEXT,
             beoordelaar TEXT NOT NULL,
+            -- Het bewijs van het besluit: peildatum, wetversies en per
+            -- component de parameters en outputs van de evaluatie (JSON).
+            bewijs TEXT,
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
         -- Status: AANGEMAAKT (klaar voor het betaalsysteem, met rekening)
@@ -110,6 +113,11 @@ pub async fn init(pool: &SqlitePool) -> anyhow::Result<()> {
     )
     .execute(pool)
     .await?;
+    // Migratie voor bestaande databases van vóór de bewijs-kolom; faalt
+    // (genegeerd) wanneer de kolom al bestaat.
+    let _ = sqlx::query("ALTER TABLE besluiten ADD COLUMN bewijs TEXT")
+        .execute(pool)
+        .await;
     Ok(())
 }
 
@@ -187,6 +195,9 @@ pub struct Besluit {
     pub bezwaartermijn_startdatum: Option<String>,
     pub bezwaartermijn_einddatum: Option<String>,
     pub beoordelaar: String,
+    /// Het bewijs van het besluit (peildatum, wetversies, parameters en
+    /// outputs per component); None voor besluiten van vóór deze kolom.
+    pub bewijs: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Serialize)]
@@ -234,6 +245,9 @@ fn row_to_besluit(row: &sqlx::sqlite::SqliteRow) -> Besluit {
         bezwaartermijn_startdatum: row.get("bezwaartermijn_startdatum"),
         bezwaartermijn_einddatum: row.get("bezwaartermijn_einddatum"),
         beoordelaar: row.get("beoordelaar"),
+        bewijs: row
+            .get::<Option<String>, _>("bewijs")
+            .and_then(|s| serde_json::from_str(&s).ok()),
     }
 }
 
@@ -308,11 +322,24 @@ pub async fn set_aanvraag_status(pool: &SqlitePool, id: &str, status: &str) -> a
 /// Componentsleutels van deze partij die in het subsidiejaar al bezet zijn:
 /// in behandeling, of besloten met toekenning. Een afgewezen component mag
 /// opnieuw worden aangevraagd.
-pub async fn bezette_componenten(
+/// Rauwe feiten per onderdeel uit de aanvragentabel en het
+/// besluitenregister. Wat hiervan een nieuwe aanvraag blokkeert beslist de
+/// wet (art. 13) — deze laag stelt alleen vast wat er gebeurd is.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct OnderdeelFeiten {
+    /// Er is voor dit onderdeel een aanvraag die nog op een besluit wacht.
+    pub in_behandeling: bool,
+    /// Er is voor dit onderdeel in het subsidiejaar subsidie toegekend.
+    pub eerder_toegekend: bool,
+    /// Er is voor dit onderdeel in het subsidiejaar eerder afgewezen.
+    pub eerder_afgewezen: bool,
+}
+
+pub async fn onderdeel_feiten(
     pool: &SqlitePool,
     kvk: &str,
     subsidiejaar: i64,
-) -> anyhow::Result<std::collections::HashMap<String, String>> {
+) -> anyhow::Result<std::collections::HashMap<String, OnderdeelFeiten>> {
     let rows = sqlx::query(
         "SELECT a.id, a.componenten, a.status, b.componenten AS besluit_componenten
          FROM aanvragen a LEFT JOIN besluiten b ON b.aanvraag_id = a.id
@@ -323,7 +350,8 @@ pub async fn bezette_componenten(
     .fetch_all(pool)
     .await?;
 
-    let mut bezet = std::collections::HashMap::new();
+    let mut feiten: std::collections::HashMap<String, OnderdeelFeiten> =
+        std::collections::HashMap::new();
     for row in rows {
         let status: String = row.get("status");
         if status == crate::engine::STAGE_BEHANDELING {
@@ -331,7 +359,7 @@ pub async fn bezette_componenten(
                 serde_json::from_str(row.get::<String, _>("componenten").as_str())
                     .unwrap_or_default();
             for c in componenten {
-                bezet.insert(c.key, "IN_BEHANDELING".to_string());
+                feiten.entry(c.key).or_default().in_behandeling = true;
             }
         } else if let Ok(uitkomsten) = serde_json::from_str::<Vec<ComponentUitkomst>>(
             row.get::<Option<String>, _>("besluit_componenten")
@@ -339,13 +367,16 @@ pub async fn bezette_componenten(
                 .as_str(),
         ) {
             for u in uitkomsten {
+                let feit = feiten.entry(u.component.key).or_default();
                 if u.toegekend {
-                    bezet.insert(u.component.key, "TOEGEKEND".to_string());
+                    feit.eerder_toegekend = true;
+                } else {
+                    feit.eerder_afgewezen = true;
                 }
             }
         }
     }
-    Ok(bezet)
+    Ok(feiten)
 }
 
 /// Som van de opgegeven ledentallen van alle aanvragen met een landelijke
@@ -400,10 +431,11 @@ pub async fn insert_besluit(
     motivering: &str,
     besluit_datum: &str,
     beoordelaar: &str,
+    bewijs_json: &str,
 ) -> anyhow::Result<()> {
     sqlx::query(
-        "INSERT INTO besluiten (id, aanvraag_id, subsidie_toegekend, subsidiebedrag, componenten, motivering, besluit_datum, beoordelaar)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO besluiten (id, aanvraag_id, subsidie_toegekend, subsidiebedrag, componenten, motivering, besluit_datum, beoordelaar, bewijs)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(id)
     .bind(aanvraag_id)
@@ -413,6 +445,7 @@ pub async fn insert_besluit(
     .bind(motivering)
     .bind(besluit_datum)
     .bind(beoordelaar)
+    .bind(bewijs_json)
     .execute(pool)
     .await?;
     Ok(())
