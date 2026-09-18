@@ -1,117 +1,35 @@
-# Napp — Nederlandse autoriteit politieke partijen
+# Napp — verhuisd naar de monorepo
 
-> **Proof of concept.** Deze repository is een demonstratie met fictieve
-> gegevens; de Napp bestaat niet en de Wet op de politieke partijen is nog
-> een wetsvoorstel. Aan deze omgeving kunnen geen rechten worden ontleend.
+> **Deze repository is gearchiveerd.** De Napp-poc leeft verder in
+> [MinBZK/regelrecht](https://github.com/MinBZK/regelrecht) en is te bereiken
+> via [poc.regelrecht.rijks.app/napp](https://poc.regelrecht.rijks.app/napp/)
+> (achter een wachtwoord).
 
-End-to-end demonstratie van wetsuitvoering als code: het subsidieproces van de
-Nederlandse autoriteit politieke partijen (Napp) uit het wetsvoorstel
-[Wet op de politieke partijen](https://www.tweedekamer.nl/kamerstukken/wetsvoorstellen/detail?qry=wetsvoorstel%3A36742)
-(kamerstuk 36742), uitgevoerd door de
-[regelrecht](https://github.com/MinBZK/regelrecht)-engine.
+Wat hier nog staat is één ding: een permanente verwijzing (301) van
+`napp-poc.rijks.app` naar de poc op zijn nieuwe plek, zodat rondgestuurde
+links blijven werken. De code daarvan staat in `redirect/`.
 
-De wet is een uitvoerbare reconstructie (werkversie); zodra de definitieve
-tekst er is, wordt het YAML-bestand vervangen zonder dat de rest verandert.
+Het oude adres serveerde de casus aan iedereen die de link had, terwijl het
+portaal er een wachtwoord voor zet. Dat is de reden dat het niet gewoon is
+blijven draaien.
 
-## Wat zit erin
+## Waar het nu staat
 
-| Onderdeel | Beschrijving |
+| Was | Is |
 |---|---|
-| `law/` | Machine-leesbare wetten: Wpp (twee subsidietracks + betaalopdracht-hook), regeling met bedragen (IoC), AWB-subset (procedure + hooks 3:46/6:7/6:8), Algemene termijnenwet (weekend-verlenging) |
-| `scenarios/` | 21 Gherkin-scenario's die vastleggen hoe de wet hoort te werken |
-| `backend/` | Axum-orchestratielaag: aanvragen, besluiten (RFC-008 besluit-state), betaalopdrachten, openbaar register; SQLite; SSO Rijk via regelrecht-auth (OIDC) met demo-fallback |
-| `backend/data/` | Partijregister-snapshot uit open data: TK2025- en GR2026-uitslagen (Kiesraad, data.overheid.nl) en inwoneraantallen (CBS StatLine). Regenereren: `uv run scripts/bouw_register.py` |
-| `frontend/` | Drie gescheiden ingangen (Vue 3 + NLDD design system): publiek (landing + register), subsidieportaal voor partijen (mock-eHerkenning), beoordelingsomgeving voor de Napp (incl. in-browser scenario-runner op de WASM-engine) |
+| `backend/` | `packages/poc-napp/` |
+| `frontend/` | `frontend-poc-napp/` |
+| `law/` | `corpus-poc/napp/law/` |
+| `scenarios/` | `corpus-poc/napp/scenarios/` |
+| `scripts/` | `packages/poc-napp/scripts/` |
 
-## Draaien
+De uitleg die in deze README stond (de twee organisatiemodellen uit de MvT bij
+art. 27, de besluitstate, de datumketen AWB 6:8 naar de Algemene termijnenwet)
+staat nu in `packages/poc-napp/README.md` in de monorepo.
 
-Vereist: Rust (incl. `wasm32-unknown-unknown` target + `wasm-bindgen`),
-Node.js, [just](https://github.com/casey/just), en een checkout van
-[regelrecht](https://github.com/MinBZK/regelrecht) naast deze repo
-(of zet `REGELRECHT_DIR`).
+## De geschiedenis
 
-```bash
-just law-validate   # wetten valideren tegen het regelrecht-schema
-just bdd            # 21 scenario's op de Rust-engine
-just wasm           # engine naar WASM bouwen (voor de scenario-runner)
-cd frontend && npm install
-just dev            # backend (:8400) + frontend (:5400)
-```
-
-Ingangen:
-
-- http://localhost:5400/ — publieke site + openbaar register
-- http://localhost:5400/aanvrager/ — subsidieportaal (eHerkenning gemockt)
-- http://localhost:5400/beoordelaar/ — beoordelingsomgeving (SSO Rijk, of
-  demo-login zonder OIDC-configuratie)
-
-SSO Rijk wordt actief zodra de `OIDC_*`-omgevingsvariabelen zijn gezet
-(zelfde configuratie als regelrecht's editor-api).
-
-## Deployen
-
-Eén container met alles erin (backend serveert de gebouwde frontend zelf):
-
-```bash
-just docker-build   # backend + frontend + WASM-engine in één image
-just docker-run     # draait op :8400, database in named volume napp-data
-```
-
-De build clonet [regelrecht](https://github.com/MinBZK/regelrecht) (main) als
-path-dependency; pin een ref met `--build-arg REGELRECHT_REF=<tag-of-sha>`.
-
-`.github/workflows/deploy.yml` bouwt en pusht het image naar
-`ghcr.io/minbzk/napp-poc` bij elke push naar main, en deployt naar ZAD zodra
-de repository variable `ZAD_PROJECT_ID` en het secret `RIG_API_KEY` gezet
-zijn (component `napp`, deployment `productie`).
-
-Omgevingsvariabelen (defaults in het image):
-
-| Variabele | Default | Betekenis |
-|---|---|---|
-| `NAPP_PORT` | `8400` | luisterpoort |
-| `DATABASE_URL` | `sqlite:/data/napp.db?mode=rwc` | SQLite op het persistente volume |
-| `NAPP_LAW_DIR` | `/app/law` | wetscorpus |
-| `NAPP_STATIC_DIR` | `/app/frontend/dist` | frontend-assets |
-| `OIDC_*` | (leeg) | SSO Rijk; zonder configuratie is de demo-login actief |
-
-## Hoe het werkt
-
-1. Een partij dient een aanvraag in; de backend persisteert de besluit-state
-   (stage `BEHANDELING`, conform RFC-008: de engine is stateless, de
-   orchestratielaag bewaart de toestand).
-2. De beoordelaar ziet de uitkomst die de wet berekent (recht, bedrag,
-   motivering met artikelverwijzingen) en stelt het besluit vast. Bij
-   toekenning vuurt artikel 16 (post_actions-hook) en ontstaat een
-   betaalopdracht naar het (gemockte) betaalsysteem.
-3. Bij bekendmaking berekent AWB 6:8 de bezwaartermijn; de Algemene
-   termijnenwet verlengt een einddatum die in het weekend valt naar de
-   eerstvolgende werkdag (feestdagen zijn als untranslatable gemarkeerd,
-   RFC-012).
-4. Het bekendgemaakte besluit verschijnt in het openbare register met
-   statistieken.
-
-Zetelaantallen komen uit de echte verkiezingsuitslagen (Kiesraad: TK2025
-en GR2026 als CSV, PS2023 en AB2023 uit de officiele Resultaat-EML's) en
-inwoneraantallen van het CBS; aanvragers declareren die niet zelf. De
-KvK-koppeling is synthetisch: die koppeling (rechtspersoon naar
-geregistreerde aanduiding) is precies wat de Napp bij registratie vastlegt
-en is geen open data.
-
-De aanvraag volgt de rechtspersoon, conform de twee organisatiemodellen
-uit de Wpp (MvT bij art. 27). Een centraal georganiseerde partij (een
-vereniging, een KvK) dient een samengestelde jaaraanvraag in met al haar
-aanspraken als onderdelen: landelijk plus elk decentraal orgaan/gebied
-(gemeenteraad, provinciale staten, waterschap) waar de Kiesraad haar
-zetels toewees. Een decentraal georganiseerde partij heeft afdelingen met
-eigen rechtspersoonlijkheid; elke afdeling logt zelf in en vraagt alleen
-haar eigen gebied aan. De wet rekent per onderdeel; de som, de
-specificatie en de ene betaalopdracht aan de rechtspersoon zijn
-orchestratie. Onderdelen die al lopen of zijn toegekend voor het
-subsidiejaar zijn geblokkeerd voor herhaalaanvraag; na een afwijzing kan
-het opnieuw. Tijdens het invullen toont het formulier een indicatieve
-uitkomst, live berekend door dezelfde wet-engine.
-
-De scenario-runner in de beoordelingsomgeving draait dezelfde 21 scenario's
-live in de browser op de naar WASM gecompileerde engine: het bewijs dat de
-wet doet wat hij moet doen, naast elke beoordeling.
+De commits tot en met juni 2026 zijn het werk aan de losse PoC. Die historie
+is hier bewaard; de monorepo begint bij de migratie. Eén lokale branch met een
+uitwerking van de aanvraagvereisten is bewust niet meegegaan: die voerde een
+artikelnummer op dat het wetsvoorstel niet kent.

@@ -1,74 +1,19 @@
-# NAPP — Nederlandse autoriteit politieke partijen (demo)
-
-# Path to the regelrecht checkout (engine, validate binary, schema)
-regelrecht := env_var_or_default("REGELRECHT_DIR", "../regelrecht")
+# Deze repository is gearchiveerd; wat er nog draait is de 301 naar de poc op
+# zijn nieuwe plek. De recepten voor de applicatie (wetten valideren, BDD,
+# WASM, dev-server, docker) staan in de monorepo, MinBZK/regelrecht.
 
 # List available commands
 default:
     @just --list
 
-# Validate all law YAML files against the regelrecht schema
-law-validate:
-    cargo run --manifest-path {{regelrecht}}/packages/engine/Cargo.toml \
-        --features validate --bin validate --release -- \
-        law/wet_op_de_politieke_partijen/2026-01-01.yaml \
-        law/regeling_subsidiebedragen/2026-01-01.yaml \
-        law/besluit_subsidiering_decentrale_politieke_partijen/2026-01-01.yaml \
-        law/algemene_wet_bestuursrecht/1994-01-01.yaml \
-        law/algemene_termijnenwet/1964-04-01.yaml \
-        law/kieswet/1989-09-28.yaml
-
-# Run the BDD scenario suite against the engine
-bdd *ARGS:
-    cargo test --test bdd -- {{ARGS}}
-
-# Run Rust unit tests
+# Run the redirect's tests
 test:
-    cargo test --workspace --exclude-test bdd 2>/dev/null || cargo test --lib --bins
+    cargo test -p napp-redirect
 
-# Check formatting
-format:
-    cargo fmt --all -- --check
+# Run the redirect locally (PORT overrides the 8400 default)
+run:
+    cargo run -p napp-redirect
 
-# Run clippy
-lint:
-    cargo clippy --workspace --all-targets
-
-# Build the engine to WASM for the in-browser scenario runner
-wasm:
-    cargo build --manifest-path {{regelrecht}}/packages/engine/Cargo.toml \
-        --features wasm --target wasm32-unknown-unknown --release
-    wasm-bindgen --target web --out-dir frontend/public/wasm/pkg \
-        {{regelrecht}}/packages/target/wasm32-unknown-unknown/release/regelrecht_engine.wasm
-
-# Run the backend API server
-backend:
-    cargo run --bin napp-backend
-
-# Run the frontend dev server
-frontend:
-    cd frontend && npm run dev
-
-# Run backend + frontend together (dev)
-dev:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    just backend &
-    BACKEND_PID=$!
-    trap "kill $BACKEND_PID 2>/dev/null" EXIT
-    just frontend
-
-# All quality checks
-check: format lint law-validate bdd
-
-# Vul een draaiende backend met demo-dossiers
-seed:
-    ./scripts/seed_demo.sh
-
-# Build het productie-image (backend + frontend + WASM in één)
-docker-build tag="napp-poc:local":
-    docker build -t {{tag}} .
-
-# Draai het productie-image lokaal op :8400, met named volume voor de database
-docker-run tag="napp-poc:local":
-    docker run --rm -p 8400:8400 -v napp-data:/data {{tag}}
+# Build the image that the deploy publishes
+docker-build:
+    docker build -t napp-redirect .

@@ -1,0 +1,17 @@
+[package]
+name = "napp-redirect"
+version = "0.1.0"
+edition = "2021"
+description = "Permanente verwijzing van het oude napp-adres naar de poc achter het portaal"
+
+[[bin]]
+name = "napp-redirect"
+path = "src/main.rs"
+
+[dependencies]
+axum = "0.8"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"
